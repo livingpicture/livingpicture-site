@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Failed | Living Picture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background-color: #f9f7f3;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .error-container {
+            max-width: 600px;
+            margin: auto;
+            padding: 2rem;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .error-icon {
+            font-size: 5rem;
+            color: #e74c3c;
+            margin-bottom: 1.5rem;
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        
+        .error-message h1 {
+            font-family: 'Cormorant Garamond', serif;
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .error-details {
+            background: #fdf0ee;
+            border-left: 4px solid #e74c3c;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: left;
+        }
+
+        .error-details h3 {
+            font-family: 'Cormorant Garamond', serif;
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+
+        .btn-retry {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #8b7355;
+            color: white;
+            padding: 0.9rem 2.5rem;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1.05rem;
+            transition: all 0.3s ease;
+            border: 2px solid #8b7355;
+            cursor: pointer;
+            margin: 1rem 0.5rem;
+        }
+
+        .btn-retry:hover {
+            background: transparent;
+            color: #8b7355;
+        }
+
+        .btn-retry i {
+            margin-right: 0.5rem;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #8b7355;
+            border: 2px solid #8b7355;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f1ea;
+        }
+
+        .error-suggestions {
+            margin: 2rem 0;
+            text-align: left;
+        }
+
+        .error-suggestions h3 {
+            font-family: 'Cormorant Garamond', serif;
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .suggestions-list {
+            padding-left: 1.5rem;
+        }
+
+        .suggestions-list li {
+            margin-bottom: 0.75rem;
+            color: #555;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .suggestions-list li:before {
+            content: '•';
+            color: #e74c3c;
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .error-container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .error-message h1 {
+                font-size: 2rem;
+            }
+            
+            .btn-container {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .btn-retry, .btn-secondary {
+                width: 100%;
+                margin: 0.25rem 0;
+            }
+        }
+    </style>
+</head>
+<body class="store-page">
+    <div class="error-container">
+        <div class="error-icon">
+            <i class="fas fa-exclamation-circle"></i>
+        </div>
+        
+        <div class="error-message">
+            <h1>Payment Not Processed</h1>
+            <p>We're sorry, but we couldn't process your payment. Please try again or use a different payment method.</p>
+        </div>
+        
+        <div class="error-details">
+            <h3>What happened?</h3>
+            <p>Your payment was declined or an error occurred during processing. This could be due to insufficient funds, incorrect card details, or a temporary issue with your payment method.</p>
+        </div>
+        
+        <div class="error-suggestions">
+            <h3>What can you do?</h3>
+            <ul class="suggestions-list">
+                <li>Check your card details and try again</li>
+                <li>Ensure you have sufficient funds in your account</li>
+                <li>Try a different payment method</li>
+                <li>Contact your bank if the issue persists</li>
+            </ul>
+        </div>
+        
+        <div class="btn-container">
+            <a href="store.html#checkout" class="btn-retry">
+                <i class="fas fa-redo"></i> Try Again
+            </a>
+            <a href="index.html" class="btn-retry btn-secondary">
+                <i class="fas fa-home"></i> Return Home
+            </a>
+        </div>
+        
+        <p style="margin-top: 2rem; color: #777; font-size: 0.9rem;">
+            Need help? Contact our support team at 
+            <a href="mailto:admin@livingpicture.net" style="color: #8b7355; text-decoration: none; font-weight: 500;">
+                admin@livingpicture.net
+            </a>
+        </p>
+    </div>
+    
+    <script>
+        // Add a small delay before showing the content to prevent flash of unstyled content
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.style.opacity = '0';
+            setTimeout(function() {
+                document.body.style.transition = 'opacity 0.5s ease';
+                document.body.style.opacity = '1';
+            }, 100);
+            
+            // You can add any additional JavaScript here if needed
+        });
+    </script>
+</body>
+</html>

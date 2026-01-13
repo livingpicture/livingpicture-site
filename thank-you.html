@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You - Living Picture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .thank-you-container {
+            max-width: 600px;
+            margin: 4rem auto 2rem;
+            padding: 2rem;
+            text-align: center;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .thank-you-icon {
+            font-size: 4rem;
+            color: #8B7355;
+            margin-bottom: 1.5rem;
+            animation: bounce 1s ease infinite alternate;
+        }
+
+        .thank-you-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .thank-you-message {
+            font-size: 1.1rem;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+            max-width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn-return {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #8B7355;
+            color: white;
+            padding: 0.8rem 2rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            gap: 0.5rem;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-return:hover {
+            background: #75604a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-8px); }
+        }
+
+        @media (max-width: 768px) {
+            .thank-you-container {
+                margin: 2rem 1rem;
+                padding: 1.5rem;
+            }
+            
+            .thank-you-title {
+                font-size: 2rem;
+            }
+            
+            .thank-you-message {
+                font-size: 1rem;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="store-page">
+    <a href="index.html" class="back-button" aria-label="Back to home">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    
+    <div class="thank-you-container">
+        <div class="thank-you-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        
+        <h1 class="thank-you-title">Message Sent Successfully!</h1>
+        <p class="thank-you-message">
+            Thank you for reaching out to us. We've received your message and will get back to you within 24 hours.
+        </p>
+        
+        <a href="index.html" class="btn-return">
+            <i class="fas fa-home"></i> Back to Home
+        </a>
+    </div>
+</body>
+</html>
