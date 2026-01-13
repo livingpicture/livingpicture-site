@@ -1,3 +1,5 @@
+const fetch = require('node-fetch');
+
 exports.handler = async (event, context) => {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
@@ -11,25 +13,49 @@ exports.handler = async (event, context) => {
         const orderData = JSON.parse(event.body);
         
         // Validate required fields
-        if (!orderData.email || !orderData.photoCount === undefined || !orderData.currency || !orderData.total) {
+        if (!orderData.customerEmail && !orderData.email) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ ok: false, error: 'Missing required fields' })
+                body: JSON.stringify({ ok: false, error: 'Missing required field: customerEmail' })
+            };
+        }
+        
+        if (orderData.photoCount === undefined) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ ok: false, error: 'Missing required field: photoCount' })
+            };
+        }
+        
+        if (orderData.priceUSD === undefined) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ ok: false, error: 'Missing required field: priceUSD' })
             };
         }
 
-        // Prepare Airtable record
+        // Prepare Airtable record with exact field names
         const recordData = {
             fields: {
-                'Email': orderData.email,
-                'Photo Count': orderData.photoCount,
-                'Currency': orderData.currency,
-                'Total': orderData.total,
-                'Status': 'New',
-                'Created At': orderData.createdAt || new Date().toISOString(),
-                'Customer Name': orderData.customerName || '',
-                'Memory Name': orderData.memoryName || '',
-                'Notes': orderData.notes || ''
+                orderId: orderData.orderId || `ORD-${Date.now()}`,
+                createdAt: orderData.createdAt || new Date().toISOString(),
+                status: orderData.status || 'DRAFT',
+                customerEmail: orderData.customerEmail || orderData.email || '',
+                customerName: orderData.customerName || '',
+                country: orderData.country || '',
+                memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
+                songChoice: orderData.songChoice || '',
+                photoCount: typeof orderData.photoCount === 'number' ? orderData.photoCount : 0,
+                packageKey: orderData.packageKey || '',
+                priceUSD: typeof orderData.priceUSD === 'number' ? orderData.priceUSD : 0,
+                imageUrls: Array.isArray(orderData.imageUrls) ? JSON.stringify(orderData.imageUrls) : (orderData.imageUrls || ''),
+                transactionId: orderData.transactionId || '',
+                paymentProvider: orderData.paymentProvider || '',
+                paymentStatusRaw: orderData.paymentStatusRaw 
+                    ? (typeof orderData.paymentStatusRaw === 'object' 
+                        ? JSON.stringify(orderData.paymentStatusRaw) 
+                        : String(orderData.paymentStatusRaw))
+                    : ''
             }
         };
 
@@ -95,4 +121,3 @@ exports.handler = async (event, context) => {
         };
     }
 };
-
