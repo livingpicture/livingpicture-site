@@ -37,7 +37,7 @@ exports.handler = async (event, context) => {
             fields: {
                 orderId: orderData.orderId || `ORD-${Date.now()}`,
                 createdAt: orderData.createdAt || new Date().toISOString(),
-                status: orderData.paymentstatus || 'DRAFT',
+                paymentstatus: orderData.paymentstatus || 'DRAFT',
                 customerEmail: orderData.customerEmail || orderData.email || '',
                 customerName: orderData.customerName || '',
                 country: orderData.country || '',
