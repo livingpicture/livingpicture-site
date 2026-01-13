@@ -1458,7 +1458,7 @@ function updateOrderSummary() {
 }
 
 // Complete purchase
-async function completePurchase() {
+function completePurchase() {
     // Show loading state
     const completeBtn = document.getElementById('complete-purchase');
     const originalBtnText = completeBtn ? completeBtn.innerHTML : '';
@@ -1472,69 +1472,52 @@ async function completePurchase() {
         completeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     }
 
-    // Prepare order data
+    // In a real app, this would process the payment
+    // For demonstration, we'll simulate a payment process with a 90% success rate
+    const isPaymentSuccessful = Math.random() < 0.9; // 90% success rate for demo
+
+    // Generate a random order ID
+    const orderId = 'LP-' + Math.floor(100000 + Math.random() * 900000);
+
+    // Save order data to localStorage for the thank you page
     const orderData = {
+        orderId: orderId,
+        date: new Date().toISOString(),
         email: formData.customer?.email || '',
-        customerName: formData.customer?.name || '',
         memoryName: formData.memoryName || 'My Memory',
         photoCount: formData.photos?.length || 0,
-        currency: currency,
+        items: formData.photos || [],
         total: formData.pricing?.totalPrice || 0,
-        createdAt: new Date().toISOString(),
-        notes: `Memory: ${formData.memoryName || 'N/A'}, Photos: ${formData.photos?.length || 0}`,
-        pricingTier: formData.pricing?.currentTier || '1-5',
-        pricePerPhoto: formData.pricing?.pricePerPhoto || 0
+        currency: currency,
+        currencySymbol: currencySymbol,
+        pricing: {
+            tier: formData.pricing?.currentTier || '1-5',
+            pricePerPhoto: formData.pricing?.pricePerPhoto || 0,
+            totalPrice: formData.pricing?.totalPrice || 0
+        },
+        customer: formData.customer || {}
     };
 
-    try {
-        // Call Netlify Function to create order
-        const response = await fetch('/.netlify/functions/create-order', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(orderData)
-        });
+    localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
 
-        const result = await response.json();
+    // Simulate API call delay (1-2 seconds)
+    setTimeout(() => {
+        if (isPaymentSuccessful) {
+            // Payment successful - redirect to thanks.html
+            window.location.href = 'thanks.html?order=' + orderId;
+            // Clear the form data after successful purchase
+            clearFormData();
+        } else {
+            // Payment failed - redirect to payment-failed.html
+            window.location.href = 'payment-failed.html';
 
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to process order');
+            // Restore button state if still on the same page
+            if (completeBtn) {
+                completeBtn.disabled = false;
+                completeBtn.innerHTML = originalBtnText;
+            }
         }
-
-        if (!result.ok) {
-            throw new Error(result.error || 'Order processing failed');
-        }
-
-        // Save order data to localStorage for the thank you page
-        const orderDisplayData = {
-            orderId: result.orderId,
-            date: orderData.createdAt,
-            email: orderData.email,
-            memoryName: orderData.memoryName,
-            photoCount: orderData.photoCount,
-            total: orderData.total,
-            currency: orderData.currency,
-            currencySymbol: currencySymbol
-        };
-
-        localStorage.setItem('livingPictureOrder', JSON.stringify(orderDisplayData));
-
-        // Redirect to thank you page
-        window.location.href = `thanks.html?order=${result.orderId}`;
-
-    } catch (error) {
-        console.error('Order processing error:', error);
-        
-        // Show error message
-        showError(error.message || 'Failed to process your order. Please try again.');
-        
-        // Re-enable the complete button
-        if (completeBtn) {
-            completeBtn.disabled = false;
-            completeBtn.innerHTML = originalBtnText;
-        }
-    }
+    }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
 }
 
 // Handle payment retry from payment-failed.html
