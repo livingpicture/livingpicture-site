@@ -45,7 +45,7 @@ exports.handler = async (event, context) => {
                 songChoice: orderData.songChoice || '',
                 photoCount: typeof orderData.photoCount === 'number' ? orderData.photoCount : 0,
                 packageKey: orderData.packageKey || '',
-                priceUSD: typeof orderData.priceUSD === 'number' ? orderData.priceUSD : 0,
+                totalAmount: typeof orderData.totalAmount === 'number' ? orderData.totalAmount : 0,
                 imageUrls: Array.isArray(orderData.imageUrls) ? JSON.stringify(orderData.imageUrls) : (orderData.imageUrls || ''),
                 transactionId: orderData.transactionId || '',
                 paymentProvider: orderData.paymentProvider || '',
