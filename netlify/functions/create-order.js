@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
             };
         }
         
-        if (orderData.priceUSD === undefined) {
+        if (orderData.totalAmount === undefined) {
             return {
                 statusCode: 400,
                 body: JSON.stringify({ ok: false, error: 'Missing required field: priceUSD' })
