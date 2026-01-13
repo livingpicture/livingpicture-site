@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Contact Us - Living Picture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Contact page specific styles */
+        .contact-page {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .contact-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .contact-header h1 {
+            color: var(--charcoal);
+            font-family: var(--font-serif);
+            margin-bottom: 1rem;
+        }
+
+        .contact-intro {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+            color: #444;
+            font-size: 1.1rem;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 2.5rem 0;
+            color: #ddd;
+            font-size: 1.5rem;
+            letter-spacing: 5px;
+        }
+
+        .contact-info {
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .business-name {
+            font-family: var(--font-serif);
+            color: var(--charcoal);
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .business-tagline {
+            color: var(--walnut);
+            margin-bottom: 2rem;
+            font-style: italic;
+        }
+
+        .contact-details {
+            font-size: 1.1rem;
+            line-height: 2;
+        }
+
+        .contact-details a {
+            color: var(--walnut);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .contact-details a:hover {
+            color: var(--charcoal);
+            text-decoration: underline;
+        }
+
+        .back-to-home {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--walnut);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .back-to-home:hover {
+            color: var(--charcoal);
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .contact-page {
+                margin: 0;
+                padding: 1.5rem;
+                border-radius: 0;
+                box-shadow: none;
+            }
+
+            .contact-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .contact-intro {
+                font-size: 1rem;
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <button class="menu-toggle" aria-label="Open menu">
+                <span class="menu-icon">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <h1 class="site-logo">Living Picture</h1>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation Menu -->
+    <nav class="mobile-nav" id="mobileNav">
+        <div class="nav-container">
+            <ul>
+                <li><a href="index.html#how-it-works">How It Works</a></li>
+                <li><a href="index.html#pricing">Pricing</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-content">
+
+        <!-- Main Content -->
+        <main>
+            <div class="contact-page">
+                <div class="contact-header">
+                    <h1>Contact</h1>
+                </div>
+
+                <div class="contact-intro">
+                    <p>If you have any questions regarding your order or our services, please feel free to contact us.</p>
+                    <p>We aim to respond to all inquiries within 24 hours.</p>
+                </div>
+
+                <div class="divider">⸻</div>
+
+                <div class="contact-info">
+                    <div class="business-name">Living Picture</div>
+                    <div class="business-tagline">Digital Memory Services</div>
+                    
+                    <div class="contact-details">
+                        <div><strong>Email:</strong> <a href="mailto:support@livingpicture.net">support@livingpicture.net</a></div>
+                        <div><strong>Phone:</strong> +972-XX-XXXXXXX</div>
+                        <div><strong>Business Address:</strong> Israel</div>
+                    </div>
+                </div>
+
+                <div style="text-align: center;">
+                    <a href="index.html" class="back-to-home">← Back to Home</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>© 2025 Living Picture. Preserving your precious moments.</p>
+                    <div class="footer-links">
+                        <a href="terms-of-service.html" class="footer-link">Terms of Service</a>
+                        <span class="footer-separator">·</span>
+                        <a href="privacy-policy.html" class="footer-link">Privacy Policy</a>
+                        <span class="footer-separator">·</span>
+                        <a href="contact.html" class="footer-link">Contact</a>
+                    </div>
+                </div>
+                <div class="social-links">
+                    <a href="https://www.instagram.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="https://www.facebook.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="https://www.pinterest.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Pinterest">
+                        <i class="fab fa-pinterest-p"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

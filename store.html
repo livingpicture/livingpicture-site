@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Create Your Memory - Living Picture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="store.css">
+</head>
+<body class="store-page">
+    <!-- Back Button -->
+    <a href="index.html" class="back-button">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+
+    <!-- Progress Indicator -->
+    <div class="progress-container">
+        <div class="progress-steps">
+            <div class="step" data-step="1">
+                <span class="step-number">1</span>
+                <span class="step-name">Name</span>
+            </div>
+            <div class="step" data-step="2">
+                <span class="step-number">2</span>
+                <span class="step-name">Photos</span>
+            </div>
+            <div class="step" data-step="3">
+                <span class="step-number">3</span>
+                <span class="step-name">Music</span>
+            </div>
+            <div class="step" data-step="4">
+                <span class="step-number">4</span>
+                <span class="step-name">Checkout</span>
+            </div>
+        </div>
+        <div class="progress-bar">
+            <div class="progress" style="width: 25%;"></div>
+        </div>
+    </div>
+    
+    <!-- Mobile Step Indicator -->
+    <div class="mobile-step-indicator">
+        <div class="mobile-progress-container">
+            <div class="mobile-progress-bar" id="mobile-progress-bar"></div>
+        </div>
+        <span class="step-text">Step <span id="current-step">1</span> of 4</span>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="store-container">
+        <!-- Step 1: Name the Memory -->
+        <section class="store-step active" id="step-1">
+            <h1>Name Your Memory</h1>
+            <p class="step-description">Give your memory a special name that speaks to you.</p>
+            
+            <div class="form-group">
+                <input type="text" id="memory-name" name="memory-name" placeholder="e.g., 'Our Story', 'Galina's Gift Book'" autocomplete="off">
+                <div class="input-underline"></div>
+            </div>
+            
+            <div class="step-actions">
+                <button class="btn btn-primary" id="next-to-photos">Continue</button>
+            </div>
+        </section>
+
+        <!-- Step 2: Upload Photos -->
+        <section class="store-step" id="step-2">
+            <h1>Add Your Photos</h1>
+            <p class="step-description">Select the photos that tell your story (5-20 photos recommended).</p>
+            
+            <!-- Currency Selector -->
+            <div class="form-group currency-selection">
+                <label for="currency-selector">Select Currency</label>
+                <div id="currency-selector-container">
+                    <!-- Currency dropdown will be inserted here by currency.js -->
+                </div>
+                <p class="currency-note">You'll be charged in the selected currency</p>
+            </div>
+            
+            <div class="photo-upload-container">
+                <input type="file" id="photo-upload" name="photo-upload" multiple accept="image/*" style="display: none;">
+                <button class="btn btn-primary" id="browse-files">
+                    <i class="fas fa-plus"></i> Add Photos
+                </button>
+                <div id="upload-progress" class="upload-progress">
+                    <div class="progress-container">
+                        <div id="upload-progress-bar" class="progress-bar"></div>
+                    </div>
+                    <div id="upload-progress-text" class="progress-text">Processing photos...</div>
+                </div>
+                <div id="photo-upload-error" class="photo-upload-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Please upload at least one photo to continue</span>
+                </div>
+            </div>
+            
+            <div class="photo-grid-container">
+                <div class="photo-grid" id="photo-grid">
+                    <!-- Photos will be added here dynamically -->
+                </div>
+                <button id="show-more-btn" class="show-more-btn" style="display: none;">
+                    Show More Photos
+                </button>
+            </div>
+            <div class="photo-counter" id="photo-counter">
+                <!-- Counter will be updated dynamically -->
+            </div>
+            
+            <div class="pricing-summary">
+                <div class="pricing-total">
+                    <div class="total-amount" id="total-price">$0.00</div>
+                    <div class="total-label">Total for <span id="photo-count-text">0 photos</span></div>
+                </div>
+                <div class="pricing-details">
+                    <span id="price-details">Add photos to see your price per photo</span>
+                </div>
+                <div class="pricing-note">
+                    <i class="fas fa-tag"></i>
+                    <span>Save more when you add more photos</span>
+                </div>
+                <div class="pricing-incentive" id="pricing-incentive">
+                    <!-- Dynamic incentive message will appear here -->
+                </div>
+            </div>
+            
+            <div class="step-actions">
+                <button class="btn btn-text" id="back-to-name">Back</button>
+                <button class="btn btn-primary" id="next-to-music" disabled>Continue</button>
+            </div>
+        </section>
+
+        <!-- Step 3: Choose Music -->
+        <section class="store-step" id="step-3">
+            <h1>Music Selection</h1>
+            <p class="step-description">Choose how you'd like to select music for your memory.</p>
+            
+            <div class="music-selection-options">
+                <div class="selection-option" id="choose-song-option">
+                    <div class="option-content">
+                        <div class="option-icon">
+                            <i class="fas fa-music"></i>
+                        </div>
+                        <div class="option-details">
+                            <h3>Choose a Song</h3>
+                            <p>Enter your preferred song and artist</p>
+                        </div>
+                    </div>
+                    <div class="option-radio">
+                        <input type="radio" name="music-option" id="select-song" value="choose-song" checked>
+                        <span class="radio-custom"></span>
+                    </div>
+                </div>
+                
+                <div class="selection-option" id="team-choose-option">
+                    <div class="option-content">
+                        <div class="option-icon">
+                            <i class="fas fa-random"></i>
+                        </div>
+                        <div class="option-details">
+                            <h3>Let Us Choose</h3>
+                            <p>Our team will select the perfect song for your memory</p>
+                        </div>
+                    </div>
+                    <div class="option-radio">
+                        <input type="radio" name="music-option" id="team-choose" value="team-choose">
+                        <span class="radio-custom"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="music-form" id="song-selection-form">
+                <div class="form-group">
+                    <label for="song-name">Song Title</label>
+                    <input type="text" id="song-name" name="song-name" placeholder="e.g., Yesterday" class="form-input">
+                    <div class="input-underline"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="artist-name">Artist Name</label>
+                    <input type="text" id="artist-name" name="artist-name" placeholder="e.g., The Beatles" class="form-input">
+                    <div class="input-underline"></div>
+                </div>
+                
+                <div class="preview-note">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Please ensure you have the rights to use this music or use royalty-free music.</span>
+                </div>
+            </div>
+            
+            <div class="team-choose-note" id="team-choose-note" style="display: none;">
+                <div class="note-content">
+                    <i class="fas fa-check-circle"></i>
+                    <p>Great choice! Our team will carefully select music that matches the mood and style of your memory. We'll ensure it's royalty-free and perfectly complements your photos.</p>
+                </div>
+            </div>
+            
+            <div class="step-actions">
+                <button class="btn btn-text" id="back-to-photos">Back</button>
+                <button class="btn btn-primary" id="next-to-checkout" disabled>Continue</button>
+            </div>
+        </section>
+
+        <!-- Step 4: Checkout -->
+        <section class="store-step" id="step-4">
+            <h1>Complete Your Memory</h1>
+            <p class="step-description">Review your memory book before we bring it to life.</p>
+            
+            <div class="order-summary">
+                <div class="summary-item summary-currency">
+                    <span class="summary-label">Currency:</span>
+                    <span class="summary-value" id="summary-currency">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Memory Name:</span>
+                    <span class="summary-value" id="summary-name">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Photos:</span>
+                    <span class="summary-value" id="summary-photo-count">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Music:</span>
+                    <span class="summary-value" id="summary-music">-</span>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="summary-total">
+                    <span>Total:</span>
+                    <span class="price" id="order-total-price">$0.00</span>
+                </div>
+            </div>
+            
+            <!-- Customer Details Form -->
+            <div class="customer-details-form">
+                <h3>Customer Details</h3>
+                <p class="form-note">We'll use this information to deliver your video and receipt.</p>
+                
+                <div class="form-group">
+                    <label for="customer-name">Full Name <span class="required">*</span></label>
+                    <input type="text" id="customer-name" name="customerName" required>
+                    <div class="error-message" id="name-error"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer-email">Email Address <span class="required">*</span></label>
+                    <input type="email" id="customer-email" name="customerEmail" required>
+                    <div class="error-message" id="email-error"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer-country">Country <span class="required">*</span></label>
+                    <select id="customer-country" name="customerCountry" required>
+                        <option value="">Select a country</option>
+                        <option value="Afghanistan">Afghanistan</option>
+                        <option value="Albania">Albania</option>
+                        <option value="Algeria">Algeria</option>
+                        <option value="Andorra">Andorra</option>
+                        <option value="Angola">Angola</option>
+                        <option value="Antigua and Barbuda">Antigua and Barbuda</option>
+                        <option value="Argentina">Argentina</option>
+                        <option value="Armenia">Armenia</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Austria">Austria</option>
+                        <option value="Azerbaijan">Azerbaijan</option>
+                        <option value="Bahamas">Bahamas</option>
+                        <option value="Bahrain">Bahrain</option>
+                        <option value="Bangladesh">Bangladesh</option>
+                        <option value="Barbados">Barbados</option>
+                        <option value="Belarus">Belarus</option>
+                        <option value="Belgium">Belgium</option>
+                        <option value="Belize">Belize</option>
+                        <option value="Benin">Benin</option>
+                        <option value="Bhutan">Bhutan</option>
+                        <option value="Bolivia">Bolivia</option>
+                        <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+                        <option value="Botswana">Botswana</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Brunei">Brunei</option>
+                        <option value="Bulgaria">Bulgaria</option>
+                        <option value="Burkina Faso">Burkina Faso</option>
+                        <option value="Burundi">Burundi</option>
+                        <option value="Cabo Verde">Cabo Verde</option>
+                        <option value="Cambodia">Cambodia</option>
+                        <option value="Cameroon">Cameroon</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Central African Republic">Central African Republic</option>
+                        <option value="Chad">Chad</option>
+                        <option value="Chile">Chile</option>
+                        <option value="China">China</option>
+                        <option value="Colombia">Colombia</option>
+                        <option value="Comoros">Comoros</option>
+                        <option value="Congo">Congo</option>
+                        <option value="Costa Rica">Costa Rica</option>
+                        <option value="Croatia">Croatia</option>
+                        <option value="Cuba">Cuba</option>
+                        <option value="Cyprus">Cyprus</option>
+                        <option value="Czech Republic">Czech Republic</option>
+                        <option value="Denmark">Denmark</option>
+                        <option value="Djibouti">Djibouti</option>
+                        <option value="Dominica">Dominica</option>
+                        <option value="Dominican Republic">Dominican Republic</option>
+                        <option value="Ecuador">Ecuador</option>
+                        <option value="Egypt">Egypt</option>
+                        <option value="El Salvador">El Salvador</option>
+                        <option value="Equatorial Guinea">Equatorial Guinea</option>
+                        <option value="Eritrea">Eritrea</option>
+                        <option value="Estonia">Estonia</option>
+                        <option value="Eswatini">Eswatini</option>
+                        <option value="Ethiopia">Ethiopia</option>
+                        <option value="Fiji">Fiji</option>
+                        <option value="Finland">Finland</option>
+                        <option value="France">France</option>
+                        <option value="Gabon">Gabon</option>
+                        <option value="Gambia">Gambia</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Germany">Germany</option>
+                        <option value="Ghana">Ghana</option>
+                        <option value="Greece">Greece</option>
+                        <option value="Grenada">Grenada</option>
+                        <option value="Guatemala">Guatemala</option>
+                        <option value="Guinea">Guinea</option>
+                        <option value="Guinea-Bissau">Guinea-Bissau</option>
+                        <option value="Guyana">Guyana</option>
+                        <option value="Haiti">Haiti</option>
+                        <option value="Honduras">Honduras</option>
+                        <option value="Hungary">Hungary</option>
+                        <option value="Iceland">Iceland</option>
+                        <option value="India">India</option>
+                        <option value="Indonesia">Indonesia</option>
+                        <option value="Iran">Iran</option>
+                        <option value="Iraq">Iraq</option>
+                        <option value="Ireland">Ireland</option>
+                        <option value="Israel">Israel</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Jamaica">Jamaica</option>
+                        <option value="Japan">Japan</option>
+                        <option value="Jordan">Jordan</option>
+                        <option value="Kazakhstan">Kazakhstan</option>
+                        <option value="Kenya">Kenya</option>
+                        <option value="Kiribati">Kiribati</option>
+                        <option value="Korea, North">Korea, North</option>
+                        <option value="Korea, South">Korea, South</option>
+                        <option value="Kosovo">Kosovo</option>
+                        <option value="Kuwait">Kuwait</option>
+                        <option value="Kyrgyzstan">Kyrgyzstan</option>
+                        <option value="Laos">Laos</option>
+                        <option value="Latvia">Latvia</option>
+                        <option value="Lebanon">Lebanon</option>
+                        <option value="Lesotho">Lesotho</option>
+                        <option value="Liberia">Liberia</option>
+                        <option value="Libya">Libya</option>
+                        <option value="Liechtenstein">Liechtenstein</option>
+                        <option value="Lithuania">Lithuania</option>
+                        <option value="Luxembourg">Luxembourg</option>
+                        <option value="Madagascar">Madagascar</option>
+                        <option value="Malawi">Malawi</option>
+                        <option value="Malaysia">Malaysia</option>
+                        <option value="Maldives">Maldives</option>
+                        <option value="Mali">Mali</option>
+                        <option value="Malta">Malta</option>
+                        <option value="Marshall Islands">Marshall Islands</option>
+                        <option value="Mauritania">Mauritania</option>
+                        <option value="Mauritius">Mauritius</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="Micronesia">Micronesia</option>
+                        <option value="Moldova">Moldova</option>
+                        <option value="Monaco">Monaco</option>
+                        <option value="Mongolia">Mongolia</option>
+                        <option value="Montenegro">Montenegro</option>
+                        <option value="Morocco">Morocco</option>
+                        <option value="Mozambique">Mozambique</option>
+                        <option value="Myanmar">Myanmar</option>
+                        <option value="Namibia">Namibia</option>
+                        <option value="Nauru">Nauru</option>
+                        <option value="Nepal">Nepal</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="New Zealand">New Zealand</option>
+                        <option value="Nicaragua">Nicaragua</option>
+                        <option value="Niger">Niger</option>
+                        <option value="Nigeria">Nigeria</option>
+                        <option value="North Macedonia">North Macedonia</option>
+                        <option value="Norway">Norway</option>
+                        <option value="Oman">Oman</option>
+                        <option value="Pakistan">Pakistan</option>
+                        <option value="Palau">Palau</option>
+                        <option value="Panama">Panama</option>
+                        <option value="Papua New Guinea">Papua New Guinea</option>
+                        <option value="Paraguay">Paraguay</option>
+                        <option value="Peru">Peru</option>
+                        <option value="Philippines">Philippines</option>
+                        <option value="Poland">Poland</option>
+                        <option value="Portugal">Portugal</option>
+                        <option value="Qatar">Qatar</option>
+                        <option value="Romania">Romania</option>
+                        <option value="Russia">Russia</option>
+                        <option value="Rwanda">Rwanda</option>
+                        <option value="Saint Kitts and Nevis">Saint Kitts and Nevis</option>
+                        <option value="Saint Lucia">Saint Lucia</option>
+                        <option value="Saint Vincent and the Grenadines">Saint Vincent and the Grenadines</option>
+                        <option value="Samoa">Samoa</option>
+                        <option value="San Marino">San Marino</option>
+                        <option value="Sao Tome and Principe">Sao Tome and Principe</option>
+                        <option value="Saudi Arabia">Saudi Arabia</option>
+                        <option value="Senegal">Senegal</option>
+                        <option value="Serbia">Serbia</option>
+                        <option value="Seychelles">Seychelles</option>
+                        <option value="Sierra Leone">Sierra Leone</option>
+                        <option value="Singapore">Singapore</option>
+                        <option value="Slovakia">Slovakia</option>
+                        <option value="Slovenia">Slovenia</option>
+                        <option value="Solomon Islands">Solomon Islands</option>
+                        <option value="Somalia">Somalia</option>
+                        <option value="South Africa">South Africa</option>
+                        <option value="South Sudan">South Sudan</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Sri Lanka">Sri Lanka</option>
+                        <option value="Sudan">Sudan</option>
+                        <option value="Suriname">Suriname</option>
+                        <option value="Sweden">Sweden</option>
+                        <option value="Switzerland">Switzerland</option>
+                        <option value="Syria">Syria</option>
+                        <option value="Taiwan">Taiwan</option>
+                        <option value="Tajikistan">Tajikistan</option>
+                        <option value="Tanzania">Tanzania</option>
+                        <option value="Thailand">Thailand</option>
+                        <option value="Timor-Leste">Timor-Leste</option>
+                        <option value="Togo">Togo</option>
+                        <option value="Tonga">Tonga</option>
+                        <option value="Trinidad and Tobago">Trinidad and Tobago</option>
+                        <option value="Tunisia">Tunisia</option>
+                        <option value="Turkey">Turkey</option>
+                        <option value="Turkmenistan">Turkmenistan</option>
+                        <option value="Tuvalu">Tuvalu</option>
+                        <option value="Uganda">Uganda</option>
+                        <option value="Ukraine">Ukraine</option>
+                        <option value="United Arab Emirates">United Arab Emirates</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="United States">United States</option>
+                        <option value="Uruguay">Uruguay</option>
+                        <option value="Uzbekistan">Uzbekistan</option>
+                        <option value="Vanuatu">Vanuatu</option>
+                        <option value="Vatican City">Vatican City</option>
+                        <option value="Venezuela">Venezuela</option>
+                        <option value="Vietnam">Vietnam</option>
+                        <option value="Yemen">Yemen</option>
+                        <option value="Zambia">Zambia</option>
+                        <option value="Zimbabwe">Zimbabwe</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <div class="error-message" id="country-error"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer-phone">Phone Number (Optional)</label>
+                    <input type="tel" id="customer-phone" name="customerPhone">
+                    <div class="error-message" id="phone-error"></div>
+                </div>
+                
+                <p class="privacy-note">Your details are used only to deliver your video and receipt.</p>
+            </div>
+            </div>
+            
+            <div class="step-actions">
+                <button class="btn btn-text" id="back-to-music">Back</button>
+                <button class="btn btn-primary" id="complete-purchase">Complete Purchase</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Success Modal -->
+    <div class="modal" id="success-modal">
+        <div class="modal-content">
+            <div class="modal-icon success">
+                <i class="fas fa-check"></i>
+            </div>
+            <h2>Memory Saved</h2>
+            <p>Your memory has been saved. You can continue working on it anytime.</p>
+            <button class="btn btn-primary" id="close-modal">Continue Browsing</button>
+        </div>
+    </div>
+
+    <script src="store.js"></script>
+</body>
+</html>

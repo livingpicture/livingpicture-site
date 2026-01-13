@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Living Picture | Breathe Life Into Your Memories</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Mobile Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <button class="menu-toggle" aria-label="Open menu">
+                <span class="menu-icon">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <h1 class="site-logo">Living Picture</h1>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation Menu -->
+    <nav class="mobile-nav" id="mobileNav">
+        <div class="nav-container">
+            <div class="nav-header">
+                <span class="nav-close">
+                    <span></span>
+                    <span></span>
+                </span>
+            </div>
+            <div class="nav-actions">
+                <a href="store.html" class="cta-button nav-cta">Create My Living Picture</a>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+                <li><a href="#pricing" class="nav-link">Pricing</a></li>
+                <li><a href="#contact" class="nav-link">Contact Us</a></li>
+            </ul>
+            <div class="nav-footer">
+                <p>Preserving your precious moments</p>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <div class="page-content">
+    <section class="hero">
+        <div class="hero-video-container">
+            <video class="hero-video" autoplay muted loop playsinline>
+                <source src="videos/hero vid.mov" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-overlay"></div>
+        </div>
+    </section>
+
+    <section class="emotional-cta">
+        <div class="container">
+            <p class="emotional-text">Breathe life into your cherished memories, one frame at a time.</p>
+            <a href="store.html" class="cta-button">Begin Your Memory's Journey</a>
+        </div>
+    </section>
+
+    <section class="showcase">
+        <div class="container">
+            <div class="before-after">
+                <div class="comparison-container">
+                    <div class="before">
+                        <h3>Before</h3>
+                        <img src="images/beforepic.jpg" alt="Before - Original Photo" class="comparison-media">
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="after">
+                        <h3>After</h3>
+                        <video autoplay loop muted playsinline class="comparison-media">
+                            <source src="videos/LP after video.mp4" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="what-you-get">
+        <div class="container">
+            <h2>What You Get</h2>
+            <p class="section-subtitle">Each photo you upload is animated individually. All animated clips are combined into one emotional video with music in the background.</p>
+            
+            <!-- Example Video -->
+            <div class="video-container">
+                <video autoplay loop muted playsinline class="example-video">
+                    <source src="videos/LP after video.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <p class="video-caption">Example of a final video made from multiple animated photos.</p>
+            </div>
+    </section>
+
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <h2>How It Works</h2>
+            <div class="step">
+                <span class="step-number">1</span>
+                <p>Upload your photo</p>
+            </div>
+            <div class="step">
+                <span class="step-number">2</span>
+                <p>Our AI creates the magic</p>
+            </div>
+            <div class="step">
+                <span class="step-number">3</span>
+                <p>Receive your video memory</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="pricing">
+        <div class="container">
+            <h2>Simple, Transparent Pricing</h2>
+            
+            <!-- Currency Selector -->
+            <div class="currency-selector-container">
+                <label for="pricing-currency">Select Currency:</label>
+                <div id="pricing-currency-selector">
+                    <!-- Currency dropdown will be inserted here by currency.js -->
+                </div>
+            </div>
+            
+            <div class="price-ladder">
+                <div class="price-tier best-value" data-tier="1-5">
+                    <div class="tier-range">1-5 photos</div>
+                    <div class="tier-price">
+                        <span class="amount" data-currency="ILS">₪20</span>
+                        <span class="per-photo">per photo</span>
+                    </div>
+                </div>
+                
+                <div class="price-tier" data-tier="6-15">
+                    <div class="tier-range">6-15 photos</div>
+                    <div class="tier-price">
+                        <span class="amount" data-currency="ILS">₪18</span>
+                        <span class="per-photo">per photo</span>
+                        <span class="save-badge">Save 10%</span>
+                    </div>
+                </div>
+                
+                <div class="price-tier" data-tier="16-25">
+                    <div class="tier-range">16-25 photos</div>
+                    <div class="tier-price">
+                        <span class="amount" data-currency="ILS">₪16</span>
+                        <span class="per-photo">per photo</span>
+                        <span class="save-badge">Save 20%</span>
+                    </div>
+                </div>
+                
+                <div class="price-tier" data-tier="26+">
+                    <div class="tier-range">26+ photos</div>
+                    <div class="tier-price">
+                        <span class="amount" data-currency="ILS">₪14</span>
+                        <span class="per-photo">per photo</span>
+                        <span class="save-badge">Save 30%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pricing-cta">
+                <a href="store.html" class="cta-button primary">Create Your Living Picture</a>
+                <p class="trust-line">No subscription. Pay only per photo.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p class="contact-subtitle">Have questions? We're here to help</p>
+            
+            <div class="contact-content">
+                <div class="contact-info">
+                    <div class="contact-method">
+                        <div class="contact-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h3>Email Us</h3>
+                            <p class="contact-email"><a href="mailto:admin@livingpicture.net">admin@livingpicture.net</a></p>
+                            <p class="response-time">We typically respond within 24 hours</p>
+                        </div>
+                    </div>
+                </div>
+                <form class="contact-form" id="contactForm" name="contact" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" action="/thank-you.html">
+                    <input type="hidden" name="form-name" value="contact">
+                    <input type="hidden" name="_subject" value="New contact form submission from Living Picture">
+                    <p style="display: none;">
+                        <label>Don't fill this out if you're human: <input name="bot-field"></label>
+                    </p>
+                    <!-- Honeypot field to catch spam bots -->
+                    <div class="form-group">
+                        <label for="name" class="form-label">Your Name</label>
+                        <input type="text" id="name" name="name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email" class="form-label">Your Email</label>
+                        <input type="email" id="email" name="email" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject" class="form-label">Subject</label>
+                        <input type="text" id="subject" name="subject" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="message" class="form-label">Your Message</label>
+                        <textarea id="message" name="message" class="form-textarea" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="cta-button form-submit">Send Message</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    </div> <!-- End of page-content -->
+    
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>© 2025 Living Picture. Preserving your precious moments.</p>
+                    <div class="footer-links">
+                        <a href="terms-of-service.html" class="footer-link">Terms of Service</a>
+                        <span class="footer-separator">·</span>
+                        <a href="privacy-policy.html" class="footer-link">Privacy Policy</a>
+                        <span class="footer-separator">·</span>
+                        <a href="contact.html" class="footer-link">Contact</a>
+                    </div>
+                </div>
+                <div class="social-links">
+                    <a href="https://www.instagram.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="https://www.facebook.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="https://www.pinterest.com/livingpicture" target="_blank" rel="noopener noreferrer" aria-label="Pinterest">
+                        <i class="fab fa-pinterest-p"></i>
+                    </a>
+                    <a href="https://www.tiktok.com/@livingpicture" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+                        <i class="fab fa-tiktok"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
