@@ -73,27 +73,24 @@ exports.handler = async (event, context) => {
             });
         }
 
-        // Read and trim environment variables
-        const apiKey = String(process.env.PAYPLUS_API_KEY || '').trim();
-        const secretKey = String(process.env.PAYPLUS_SECRET_KEY || '').trim();
-        const baseUrl = String(process.env.PAYPLUS_BASE_URL || '').trim() || 'https://restapi.payplus.co.il/api/v1.0';
-        const siteUrl = String(process.env.SITE_URL || '').trim();
-        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || '').trim();
-        const paymentPageUid = String(process.env.PAYPLUS_PAYMENT_PAGE_UID || '').trim();
+        // Read and validate required environment variables
+        const requiredVars = {
+            PAYPLUS_API_KEY: process.env.PAYPLUS_API_KEY,
+            PAYPLUS_SECRET_KEY: process.env.PAYPLUS_SECRET_KEY,
+            PAYPLUS_PAYMENT_PAGE_UID: process.env.PAYPLUS_PAYMENT_PAGE_UID,
+            PAYPLUS_BASE_URL: process.env.PAYPLUS_BASE_URL,
+            SITE_URL: process.env.SITE_URL
+        };
 
-        // Safety check for required variables
-        if (!apiKey) {
-            return createResponse(500, {
-                ok: false,
-                error: 'Missing PAYPLUS_API_KEY environment variable'
-            });
-        }
-
-        // Validate other required variables
+        // Trim all values and check for missing required variables
+        const config = {};
         const missingVars = [];
-        if (!paymentPageUid) missingVars.push('PAYPLUS_PAYMENT_PAGE_UID');
-        if (!secretKey) missingVars.push('PAYPLUS_SECRET_KEY');
-        if (!siteUrl) missingVars.push('SITE_URL');
+        
+        for (const [key, value] of Object.entries(requiredVars)) {
+            const trimmed = String(value || '').trim();
+            if (!trimmed) missingVars.push(key);
+            config[key] = trimmed;
+        }
 
         if (missingVars.length > 0) {
             return createResponse(500, {
@@ -101,6 +98,19 @@ exports.handler = async (event, context) => {
                 error: `Missing required environment variables: ${missingVars.join(', ')}`
             });
         }
+
+        const { 
+            PAYPLUS_API_KEY: apiKey, 
+            PAYPLUS_SECRET_KEY: secretKey, 
+            PAYPLUS_PAYMENT_PAGE_UID: paymentPageUid, 
+            PAYPLUS_BASE_URL: baseUrl, 
+            SITE_URL: siteUrl 
+        } = config;
+        
+        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || '').trim() || `${siteUrl}/thank-you.html`;
+
+        // Log the start of the payment process (without sensitive data)
+        console.log('Starting payment process with PayPlus');
 
         // Prepare PayPlus request payload
         const paymentData = {
@@ -132,14 +142,12 @@ exports.handler = async (event, context) => {
         });
 
         const responseData = await response.json();
-        console.log('PayPlus response keys:', responseData ? Object.keys(responseData) : 'No response data');
+        // Log response status without sensitive data
+        console.log('Received response from PayPlus API');
 
         if (!response.ok) {
-            console.error('PayPlus API error:', {
-                status: response.status,
-                statusText: response.statusText,
-                data: responseData
-            });
+            // Log error without exposing sensitive data
+            console.error('PayPlus API error - Status:', response.status);
 
             return createResponse(500, {
                 ok: false,
@@ -154,7 +162,7 @@ exports.handler = async (event, context) => {
         const transactionId = responseData?.results?.transaction_uid;
 
         if (!paymentUrl || !transactionId) {
-            console.error('Invalid PayPlus response:', responseData);
+            console.error('Received invalid response from PayPlus');
             throw new Error('Invalid response from payment provider');
         }
 
