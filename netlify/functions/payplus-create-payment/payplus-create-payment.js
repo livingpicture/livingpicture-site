@@ -181,12 +181,12 @@ exports.handler = async (event, context) => {
             });
         }
 
-        // Check for payment page link in the response
-        if (result.data && result.data.payment_page_link) {
+        // Check for successful response and payment page link
+        if (result.results && result.results.status === 'success' && result.data && result.data.payment_page_link) {
             return createResponse(200, {
                 ok: true,
                 paymentUrl: result.data.payment_page_link,
-                transactionId: result.data.uid || `tx_${Date.now()}`,
+                transactionId: result.data.uid || result.results.transaction_uid || `tx_${Date.now()}`,
                 debug: {
                     leadId: leadId,
                     orderId: orderId
