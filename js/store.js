@@ -1958,44 +1958,43 @@ function showFieldError(fieldId, message) {
     }
 }
 
-// Complete purchase
-function completePurchase() {
-    // Set validation attempted flag to true
-    validationAttempted = true;
-    
-    // First validate customer details
-    if (!validateCustomerDetails()) {
-        // Scroll to the first error
-        const firstError = document.querySelector('.form-group.error');
-        if (firstError) {
-            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        return;
-    }
-
-    // In a real implementation, this would integrate with a payment processor
-    console.log('Completing purchase with data:', formData);
-
-    // For demo purposes, just show success
-    saveToLocalStorage();
-    showSuccessModal();
-
-    // Clear form data after successful purchase
-    setTimeout(() => {
-        clearFormData();
-        // Redirect to home page or confirmation page
-        window.location.href = 'index.html?purchase=success';
-    }, 3000);
-}
+// Complete purchase is implemented above with PayPlus integration
 
 // Initialize the store when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Make sure all required elements exist
     const fileInput = document.getElementById('photo-upload');
     const browseBtn = document.getElementById('browse-files');
+    const completePurchaseBtn = document.getElementById('complete-purchase');
     
     // Initialize the store
     initStore();
+    
+    // Add direct event listener for Complete Purchase button
+    if (completePurchaseBtn) {
+        completePurchaseBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            // Set validation attempted flag to true
+            validationAttempted = true;
+            
+            // First validate customer details
+            if (!validateCustomerDetails()) {
+                // Scroll to the first error
+                const firstError = document.querySelector('.form-group.error');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return;
+            }
+            
+            // Save current step data
+            saveCurrentStep();
+            
+            // Proceed with payment
+            await completePurchase();
+        });
+    }
     
     // Add event listeners for Continue Later buttons
     const saveLaterBtns = [

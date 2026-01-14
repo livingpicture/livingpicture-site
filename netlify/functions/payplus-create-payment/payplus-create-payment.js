@@ -1,8 +1,8 @@
 // Netlify function to create a PayPlus payment
 // Environment variables required:
 // - PAYPLUS_API_KEY: Your PayPlus API key
-// - PAYPLUS_TERMINAL_UID: Your PayPlus terminal UID
-// - PAYPLUS_TERMINAL_SECRET: Your PayPlus terminal secret
+// - PAYPLUS_PAYMENT_PAGE_UID: Your PayPlus payment page UID
+// - PAYPLUS_SECRET_KEY: Your PayPlus secret key
 
 // Function version for tracking
 const FUNC_VERSION = "payplus-create-payment@2026-01-14-1";
@@ -76,16 +76,16 @@ exports.handler = async (event, context) => {
         // Get PayPlus configuration from environment variables
         const {
             PAYPLUS_API_KEY,
-            PAYPLUS_TERMINAL_UID,
-            PAYPLUS_TERMINAL_SECRET,
+            PAYPLUS_PAYMENT_PAGE_UID,
+            PAYPLUS_SECRET_KEY,
             PAYPLUS_BASE_URL = 'https://restapidev.payplus.co.il/api/v1.0'
         } = process.env;
 
         // Validate required environment variables
         const missingVars = [];
         if (!PAYPLUS_API_KEY) missingVars.push('PAYPLUS_API_KEY');
-        if (!PAYPLUS_TERMINAL_UID) missingVars.push('PAYPLUS_TERMINAL_UID');
-        if (!PAYPLUS_TERMINAL_SECRET) missingVars.push('PAYPLUS_TERMINAL_SECRET');
+        if (!PAYPLUS_PAYMENT_PAGE_UID) missingVars.push('PAYPLUS_PAYMENT_PAGE_UID');
+        if (!PAYPLUS_SECRET_KEY) missingVars.push('PAYPLUS_SECRET_KEY');
 
         if (missingVars.length > 0) {
             throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
@@ -93,7 +93,7 @@ exports.handler = async (event, context) => {
 
         // Prepare PayPlus request payload
         const paymentData = {
-            payment_page_uid: PAYPLUS_TERMINAL_UID,
+            payment_page_uid: PAYPLUS_PAYMENT_PAGE_UID,
             amount: amount * 100, // Convert to agorot/cent
             currency_code: currency,
             item_name: 'Memory Book Order',
@@ -110,12 +110,12 @@ exports.handler = async (event, context) => {
         };
 
         // Make request to PayPlus API
+        const authString = Buffer.from(`${NETLIFY_PAYPLUS_API_KEY}:${NETLIFY_PAYPLUS_SECRET_KEY}`).toString('base64');
         const response = await fetch(`${PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': PAYPLUS_API_KEY,
-                'X-API-KEY': PAYPLUS_API_KEY
+                'Authorization': `Basic ${authString}`
             },
             body: JSON.stringify(paymentData)
         });
