@@ -73,41 +73,35 @@ exports.handler = async (event, context) => {
             });
         }
 
-        // Read and validate required environment variables
-        const requiredVars = {
-            PAYPLUS_API_KEY: process.env.PAYPLUS_API_KEY,
-            PAYPLUS_SECRET_KEY: process.env.PAYPLUS_SECRET_KEY,
-            PAYPLUS_PAYMENT_PAGE_UID: process.env.PAYPLUS_PAYMENT_PAGE_UID,
-            PAYPLUS_BASE_URL: process.env.PAYPLUS_BASE_URL,
-            SITE_URL: process.env.SITE_URL
-        };
-
-        // Trim all values and check for missing required variables
-        const config = {};
-        const missingVars = [];
-        
-        for (const [key, value] of Object.entries(requiredVars)) {
-            const trimmed = String(value || '').trim();
-            if (!trimmed) missingVars.push(key);
-            config[key] = trimmed;
-        }
-
-        if (missingVars.length > 0) {
-            return createResponse(500, {
-                ok: false,
-                error: `Missing required environment variables: ${missingVars.join(', ')}`
+        // Build clean API key from environment
+        const rawApiKey = String(process.env.PAYPLUS_API_KEY || "");
+        const apiKey = rawApiKey.replace(/^Bearer\s+/i, "").trim();
+        if (!apiKey) {
+            return createResponse(500, { 
+                ok: false, 
+                error: "Missing PAYPLUS_API_KEY" 
             });
         }
 
-        const { 
-            PAYPLUS_API_KEY: apiKey, 
-            PAYPLUS_SECRET_KEY: secretKey, 
-            PAYPLUS_PAYMENT_PAGE_UID: paymentPageUid, 
-            PAYPLUS_BASE_URL: baseUrl, 
-            SITE_URL: siteUrl 
-        } = config;
+        // Get base URL with fallback to production
+        const baseUrl = String(process.env.PAYPLUS_BASE_URL || "").trim() || "https://restapi.payplus.co.il/api/v1.0";
         
-        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || '').trim() || `${siteUrl}/thank-you.html`;
+        // Get required configuration from environment
+        const paymentPageUid = String(process.env.PAYPLUS_PAYMENT_PAGE_UID || "").trim();
+        const siteUrl = String(process.env.SITE_URL || "").trim();
+        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || "").trim() || `${siteUrl}/thank-you.html`;
+
+        // Validate required configuration
+        if (!paymentPageUid || !siteUrl) {
+            const missing = [];
+            if (!paymentPageUid) missing.push('PAYPLUS_PAYMENT_PAGE_UID');
+            if (!siteUrl) missing.push('SITE_URL');
+            
+            return createResponse(500, {
+                ok: false,
+                error: `Missing required configuration: ${missing.join(', ')}`
+            });
+        }
 
         // Log the start of the payment process (without sensitive data)
         console.log('Starting payment process with PayPlus');
@@ -135,25 +129,38 @@ exports.handler = async (event, context) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'secret-key': secretKey
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify(paymentData)
         });
 
-        const responseData = await response.json();
-        // Log response status without sensitive data
-        console.log('Received response from PayPlus API');
+        // Get response as text first to properly log errors
+        const responseText = await response.text();
+        let responseData;
+        
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Failed to parse PayPlus response:', responseText);
+            return createResponse(500, {
+                ok: false,
+                error: 'Invalid response from payment provider',
+                details: 'Could not parse response as JSON'
+            });
+        }
 
         if (!response.ok) {
-            // Log error without exposing sensitive data
-            console.error('PayPlus API error - Status:', response.status);
+            console.error('PayPlus API error:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: responseText
+            });
 
             return createResponse(500, {
                 ok: false,
                 error: 'Payment processing failed',
-                details: responseData?.error_description || 'Unknown error from payment provider',
-                raw: responseData
+                details: responseData?.error_description || response.statusText,
+                code: response.status
             });
         }
 
