@@ -30,52 +30,52 @@ async function moveLeadToOrders(leadId, paymentData) {
 
     const lead = leads[0];
     const leadData = lead.fields;
+    
+    // Get the order ID from PayPlus metadata or use leadId as fallback
+    const orderId = paymentData.metadata?.orderId || leadId;
+    const now = new Date().toISOString();
 
-    // 2. Create order data with required fields
+    // 2. Create order data matching the 20-field Orders table schema
     const orderData = {
-      // Primary field
-      'orderId': leadId,
+      // Primary field - first column in Airtable is the record name
+      'orderId': orderId,
       
-      // Customer information
-      'customerEmail': leadData['customerEmail'] || leadData['Email'] || '',
-      'customerName': leadData['Name'] || leadData['customerName'] || '',
-      'customerPhone': leadData['Phone'] || leadData['customerPhone'] || '',
-      'country': leadData['Country'] || leadData['country'] || '',
+      // Customer information (fields 1-5)
+      'customerEmail': leadData['customerEmail'] || '',
+      'customerName': leadData['customerName'] || leadData['Name'] || '',
+      'customerPhone': leadData['customerPhone'] || leadData['Phone'] || '',
+      'country': leadData['country'] || leadData['Country'] || 'Israel',
       
-      // Order details
+      // Order details (fields 6-13)
       'memoryTitle': leadData['memoryTitle'] || leadData['Memory Name'] || '',
-      'photoCount': Number(leadData['Photo Count'] || leadData['photoCount'] || 0),
-      'totalAmount': Number(leadData['Total Amount'] || leadData['totalAmount'] || 0),
-      'currency': (leadData['Currency'] || leadData['currency'] || 'ILS').toUpperCase(),
+      'photoCount': Number(leadData['photoCount'] || leadData['Photo Count'] || 0),
+      'packageKey': leadData['packageKey'] || 'basic',
+      'totalAmount': Number(leadData['totalAmount'] || leadData['Total Amount'] || 0),
+      'currency': (leadData['currency'] || leadData['Currency'] || 'ILS').toUpperCase(),
+      'imageUrls': Array.isArray(leadData['imageUrls']) 
+        ? leadData['imageUrls'].join(',') 
+        : (leadData['imageUrls'] || leadData['Image URLs'] || ''),
+      'source': leadData['source'] || 'website',
+      'notes': leadData['notes'] || leadData['Notes'] || '',
       
-      // Payment information
-      'paymentstatus': 'PAID', // all lowercase as per schema
-      'transactionId': paymentData.transaction_uid || '',
-      'paymentMethod': paymentData.payment_method || 'credit_card',
+      // Payment information (fields 14-17)
+      'paymentstatus': 'paid', // all lowercase as per schema
+      'transactionId': paymentData.transaction_uid || paymentData.id || '',
+      'paymentProvider': 'payplus',
       'paymentStatusRaw': JSON.stringify(paymentData) || '{}',
       
-      // Order status
+      // Order status (fields 18-20)
       'fulfillmentStatus': 'NEW',
-      'source': leadData['source'] || 'website',
-      
-      // Image URLs - ensure we have an array
-      'imageUrls': Array.isArray(leadData['Image URLs']) 
-        ? leadData['Image URLs'].join(',') 
-        : (leadData['Image URLs'] || leadData['imageUrls'] || ''),
-      
-      // Timestamps
-      'createdAt': new Date().toISOString(),
-      'updatedAt': new Date().toISOString(),
-      'paidAt': new Date().toISOString(),
-      
-      // Additional metadata
-      'leadId': leadId,
-      'notes': ''
+      'createdAt': leadData['createdAt'] || now,
+      'updatedAt': now
     };
+    
+    console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
 
-    // 3. Create record in Orders table
+    // 3. Create record in Orders table with typecasting enabled
     const orderRecord = await base('Orders').create([{
-      fields: orderData
+      fields: orderData,
+      typecast: true
     }]);
 
     // 4. Update lead status to indicate it's now an order
@@ -83,11 +83,15 @@ async function moveLeadToOrders(leadId, paymentData) {
       id: lead.id,
       fields: {
         'Status': 'CONVERTED_TO_ORDER',
-        'Converted At': new Date().toISOString(),
-        'Order ID': orderRecord[0].id
-      }
+        'Converted At': now,
+        'Order ID': orderRecord[0].id,
+        'paymentstatus': 'paid', // Update payment status in leads as well
+        'updatedAt': now
+      },
+      typecast: true
     }]);
-
+    
+    console.log(`Successfully created order ${orderRecord[0].id} for lead ${leadId}`);
     return orderRecord[0];
   } catch (error) {
     console.error('Error moving lead to orders:', error);

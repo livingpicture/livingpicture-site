@@ -518,13 +518,11 @@ input[type="text"]:focus + .input-underline {
 }
 
 .pricing-incentive .progress-bar {
-    height: 100%;
+    height: 8px;
     background-color: var(--walnut) !important;
     border-radius: 4px;
     transition: width 0.4s ease-out;
     min-width: 5px; /* So it's visible even at low percentages */
-    transition: width 0.4s ease-out;
-    width: 0%; /* Start with 0 width, will be updated by JS */
 }
 
 .pricing-incentive:hover {

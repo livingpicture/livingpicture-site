@@ -1,4 +1,24 @@
 exports.handler = async (event, context) => {
+    // Log the raw request body for debugging
+    console.log('Function triggered with body:', event.body);
+    
+    // Parse and log the parsed data
+    let data = {};
+    try {
+        data = event.body ? JSON.parse(event.body) : {};
+        console.log('Parsed request data:', JSON.stringify(data, null, 2));
+    } catch (parseError) {
+        console.error('Failed to parse request body:', parseError);
+        return {
+            statusCode: 400,
+            body: JSON.stringify({
+                ok: false,
+                error: 'Invalid JSON in request body',
+                message: parseError.message
+            })
+        };
+    }
+    
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
@@ -35,6 +55,19 @@ exports.handler = async (event, context) => {
         const requestBody = JSON.parse(event.body || '{}');
         const { leadId, step, ...otherFields } = requestBody;
 
+        // Map incoming fields to Airtable schema
+        const mappedFields = {};
+        if (otherFields.memoryTitle) mappedFields.memoryTitle = otherFields.memoryTitle;
+        if (otherFields.customerEmail) mappedFields.customerEmail = otherFields.customerEmail;
+        if (otherFields.step) mappedFields.step = otherFields.step;
+        
+        // Handle imageUrls - convert to string if it's an array
+        if (otherFields.imageUrls) {
+            mappedFields.imageUrls = Array.isArray(otherFields.imageUrls) 
+                ? otherFields.imageUrls.join(',') 
+                : otherFields.imageUrls;
+        }
+
         // Validate required fields
         if (!leadId) {
             return {
@@ -58,21 +91,34 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Prepare the record data
+        // Prepare the record data with proper field mapping
         const now = new Date().toISOString();
         const recordData = {
             fields: {
+                // Required fields
                 leadId,
                 step,
                 updatedAt: now,
-                ...otherFields
+                
+                // Map other fields with proper naming
+                ...(otherFields.customerEmail && { customerEmail: otherFields.customerEmail }),
+                ...(otherFields.memoryTitle && { memoryTitle: otherFields.memoryTitle }),
+                ...(otherFields.imageUrls && { 
+                    // Ensure imageUrls is stored as a string (Long Text)
+                    imageUrls: Array.isArray(otherFields.imageUrls) 
+                        ? otherFields.imageUrls.join(',') 
+                        : otherFields.imageUrls 
+                }),
+                
+                // Include all other fields that don't need special handling
+                ...Object.fromEntries(
+                    Object.entries(otherFields)
+                        .filter(([key]) => !['customerEmail', 'memoryTitle', 'imageUrls'].includes(key))
+                )
             }
         };
-
-        // Handle imageUrls - convert to JSON string if it's an array
-        if (recordData.fields.imageUrls && Array.isArray(recordData.fields.imageUrls)) {
-            recordData.fields.imageUrls = JSON.stringify(recordData.fields.imageUrls);
-        }
+        
+        console.log('Prepared record data for Airtable:', JSON.stringify(recordData, null, 2));
 
         // First, try to find an existing record with this leadId
         const findResponse = await fetch(
@@ -162,13 +208,24 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('Error processing lead:', error);
+        console.error('Error processing lead:', {
+            message: error.message,
+            stack: error.stack,
+            leadId: leadId || 'unknown',
+            step: step || 'unknown'
+        });
+        
+        // Return detailed error information
         return {
-            statusCode: 500,
+            statusCode: error.statusCode || 500,
             body: JSON.stringify({ 
                 ok: false, 
                 error: 'Internal server error',
-                message: error.message
+                message: error.message,
+                details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+                leadId: leadId || 'unknown',
+                step: step || 'unknown',
+                timestamp: new Date().toISOString()
             })
         };
     }

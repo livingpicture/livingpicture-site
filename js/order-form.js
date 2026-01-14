@@ -238,15 +238,26 @@ function setupEventListeners() {
             button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 
-                // For photo upload step, only check if we have at least one photo
+                // If we're on the photo upload step
                 if (currentStep === 2) {
-                    if (formData.photos.length === 0) {
+                    // Only validate if no photos are selected at all
+                    if (!formData.photos || formData.photos.length === 0) {
                         validatePhotoUpload();
                         return; // Don't proceed if no photos at all
                     }
-                    // If we have photos, continue to the next step
+                    
+                    // If we have photos, proceed even if files are still processing
                     saveCurrentStep();
-                    showStep(nextButtons[buttonId]);
+                    try {
+                        console.log('Syncing lead data before step transition...');
+                        await syncLeadToAirtable();
+                        console.log('Lead data synced successfully, proceeding to next step');
+                        showStep(nextButtons[buttonId]);
+                    } catch (error) {
+                        console.error('Error syncing lead data:', error);
+                        // Still proceed to next step even if sync fails
+                        showStep(nextButtons[buttonId]);
+                    }
                     return;
                 }
                 
@@ -281,10 +292,21 @@ function setupEventListeners() {
                     saveCurrentStep();
                 }
                 
+                // Sync lead data before proceeding to next step
+                try {
+                    console.log('Syncing lead data before step transition...');
+                    await syncLeadToAirtable();
+                    console.log('Lead data synced successfully, proceeding to next step');
+                } catch (error) {
+                    console.error('Error syncing lead data:', error);
+                    // Still proceed to next step even if sync fails
+                }
+                
                 if (nextStep === 'complete') {
                     completePurchase();
                 } else {
-                    showStep(nextStep);
+                    // Make sure to await the showStep call since it's now async
+                    await showStep(nextStep);
                 }
             });
         }
@@ -454,7 +476,8 @@ async function syncLeadToAirtable() {
     try {
         // Only sync if we have at least some data
         if (!formData) {
-            return;
+            console.log('No form data available for sync');
+            return null;
         }
 
         // Map step number to Single Select values
@@ -468,190 +491,186 @@ async function syncLeadToAirtable() {
         // Get current step in the correct format
         const currentStepValue = stepMapping[currentStep] || 'STEP_1';
         
-        // Prepare lead data according to Airtable Leads schema
+        // Get all image URLs, ensuring they're valid Cloudinary URLs
+        const imageUrls = (formData.photos || [])
+            .map(photo => photo.permanentUrl || '')
+            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'));
+
+        // Prepare lead data according to Airtable Leads schema (16 fields)
         const leadData = {
-            // Customer information
-            customerEmail: formData.customer?.email || '',
-            Name: formData.customer?.name || '',
-            Phone: formData.customer?.phone || '',
-            Country: formData.customer?.country || '',
+            // Customer information (fields 1-5)
+            customerEmail: (formData.customer?.email || '').trim(),
+            customerName: (formData.customer?.name || '').trim(),
+            customerPhone: (formData.customer?.phone || '').trim(),
+            country: (formData.customer?.country || 'Israel').trim(),
             
-            // Memory information
-            memoryTitle: formData.memoryName || '',
-            'Photo Count': formData.photos?.length || 0,
+            // Memory information (fields 6-10)
+            memoryTitle: (formData.memoryName || '').trim(),
+            photoCount: formData.photos?.length || 0,
+            packageKey: formData.pricing?.currentTier || '1-5',
+            imageUrls: imageUrls.join(','), // Convert array to comma-separated string
             
-            // Step and status
-            'Step': currentStepValue,
-            'Status': currentStep === 4 ? 'PENDING_PAYMENT' : 'IN_PROGRESS',
+            // Step and status (fields 11-13)
+            step: currentStepValue,
+            status: currentStep === 4 ? 'PENDING_PAYMENT' : 'IN_PROGRESS',
             
-            // Image URLs - ensure we only include valid Cloudinary permanent URLs
-            'Image URLs': formData.photos
-                ?.map(photo => photo.permanentUrl)
-                .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com')),
-                
-            // Ensure we always have an array, even if empty
-            'imageUrls': formData.photos
-                ?.map(photo => photo.permanentUrl)
-                .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com')) || [],
+            // Financial information (fields 14-15)
+            totalAmount: formData.pricing?.totalPrice || 0,
+            currency: (formData.pricing?.currency || 'ILS').toUpperCase(),
             
-            // Financial information
-            'Total Amount': formData.pricing?.totalPrice || 0,
-            'Currency': formData.pricing?.currency || 'ILS',
-            
-            // Music selection
-            'Song Choice': formData.music?.songName 
+            // Music selection (field 16)
+            songChoice: formData.music?.songName 
                 ? `${formData.music.songName} by ${formData.music.artistName || 'Unknown Artist'}` 
-                : ''
+                : '',
+                
+            // System fields
+            updatedAt: new Date().toISOString(),
+            createdAt: formData.createdAt || new Date().toISOString()
         };
         
-        // Add lead ID if available
+        // Add lead ID if available, or generate a new one
         if (window.leadTracker?.leadId) {
-            leadData['Lead ID'] = window.leadTracker.leadId;
+            leadData.leadId = window.leadTracker.leadId;
+        } else {
+            const newLeadId = 'lead_' + Math.random().toString(36).substr(2, 9);
+            leadData.leadId = newLeadId;
+            if (window.leadTracker) {
+                window.leadTracker.leadId = newLeadId;
+            }
         }
 
-        // Log the payload before making the fetch call
-        console.log('Attempting to sync lead...', {
-            url: '/.netlify/functions/lead-upsert',
-            method: 'POST',
-            payload: leadData
+        console.log('Syncing lead to Airtable:', {
+            leadId: leadData.leadId,
+            step: leadData.step,
+            hasImages: imageUrls.length > 0
         });
 
         try {
-            // Call the Netlify function
+            // Call the Netlify function with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             const response = await fetch('/.netlify/functions/lead-upsert', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(leadData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(leadData),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Failed to sync lead to Airtable:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    error: errorText
-                });
-            } else {
-                const responseData = await response.json().catch(() => ({}));
-                console.log('Lead synced to Airtable successfully', responseData);
+                const error = new Error(`HTTP error! status: ${response.status}`);
+                error.response = { status: response.status, statusText: response.statusText, data: errorText };
+                throw error;
             }
+
+            const responseData = await response.json();
+            console.log('Lead synced successfully:', { leadId: leadData.leadId, step: leadData.step });
+            return responseData;
+            
         } catch (error) {
-            console.error('Network error when syncing lead to Airtable:', {
+            console.error('Error in sync request:', {
                 error: error.message,
-                stack: error.stack
+                name: error.name,
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                leadId: leadData.leadId,
+                step: leadData.step
             });
+            throw error;
         }
     } catch (error) {
-        console.error('Error syncing lead to Airtable:', error);
+        console.error('Error in syncLeadToAirtable:', error);
         // Don't show error to user as this is a background sync
+        return null;
     }
 }
 
 // Show a specific step
 async function showStep(stepNumber) {
+    // 1. First, sync with Airtable at the beginning of step transition
+    try {
+        console.log(`Syncing lead data before step transition from ${currentStep} to ${stepNumber}...`);
+        await syncLeadToAirtable();
+        console.log('Lead data synced successfully before step change');
+    } catch (error) {
+        console.error('Error syncing lead data before step change:', error);
+        // Continue with step change even if sync fails
+    }
+    
+    // 2. Validate current step before proceeding
     let canProceed = true;
     
-    // If trying to move to step 2, validate step 1 first
+    // Validate step 1 when moving to step 2
     if (stepNumber === 2 && currentStep === 1) {
         if (!saveCurrentStep()) {
-            // If validation fails, don't proceed to next step
-            canProceed = false;
+            console.log('Step 1 validation failed');
+            return false;
         }
     }
     
-    // If trying to move to step 3, validate step 2 (photo upload)
+    // Validate photo upload when moving to step 3
     if (stepNumber === 3 && currentStep === 2) {
         if (!validatePhotoUpload()) {
-            // If validation fails, don't proceed to next step
-            canProceed = false;
+            console.log('Photo upload validation failed');
+            return false;
         }
     }
     
     // Only proceed with step change if validation passed
     if (canProceed) {
-        // Sync lead data to Airtable in the background
-        syncLeadToAirtable().catch(error => {
-            console.error('Background sync to Airtable failed:', error);
-        });
-        
-        // Hide all steps
-        document.querySelectorAll('.store-step').forEach(step => {
-            step.classList.remove('active');
-        });
-        
-        // Show the selected step
-        const stepElement = document.getElementById(`step-${stepNumber}`);
-        if (stepElement) {
-            stepElement.classList.add('active');
+        // 3. Update UI to show loading state
+        const nextButton = document.querySelector(`[data-next-to="${stepNumber}"]`);
+        if (nextButton) {
+            nextButton.classList.add('loading');
+            nextButton.disabled = true;
         }
         
-        // Update active state in progress steps
-        document.querySelectorAll('.step').forEach(step => {
-            if (parseInt(step.getAttribute('data-step')) === stepNumber) {
-                step.classList.add('active');
-            } else {
+        try {
+            // 4. Hide all steps
+            document.querySelectorAll('.store-step').forEach(step => {
                 step.classList.remove('active');
-            }
-        });
-        
-        // Update progress bars
-        const progress = (stepNumber / 4) * 100;
-        
-        // Update desktop progress bar
-        const desktopProgress = document.querySelector('.progress');
-        if (desktopProgress) {
-            desktopProgress.style.width = `${progress}%`;
-        }
-        
-        // Update mobile progress bar
-        const mobileProgressBar = document.getElementById('mobile-progress-bar');
-        if (mobileProgressBar) {
-            mobileProgressBar.style.width = `${progress}%`;
-        }
-        
-        // Update mobile step indicator
-        const currentStepElement = document.getElementById('current-step');
-        if (currentStepElement) {
-            currentStepElement.textContent = stepNumber;
-        }
-        
-        // Scroll to top of the step
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-        
-        // Validate the current step
-        validateCurrentStep(stepNumber);
-        
-        // Update current step
-        currentStep = stepNumber;
-        
-        // Update UI based on the current step
-        updateUIForStep(stepNumber);
-        
-        // Track the lead with current step and form data
-        if (window.leadTracker) {
-            const stepNames = {
-                1: 'NAME',
-                2: 'PHOTOS',
-                3: 'MUSIC',
-                4: 'CHECKOUT'
-            };
-            
-            window.leadTracker.trackStep(stepNames[stepNumber] || `STEP_${stepNumber}`, {
-                memoryName: formData.memoryName || '',
-                customerEmail: formData.customer?.email || '',
-                currency: formData.currency || 'ILS',
-                // Include any additional data you want to track
-                photoCount: formData.photos?.length || 0,
-                musicSelected: formData.music?.songName ? true : false
             });
+            
+            // 5. Show the selected step
+            const stepElement = document.getElementById(`step-${stepNumber}`);
+            if (stepElement) {
+                stepElement.classList.add('active');
+            }
+            
+            // 6. Update progress indicators
+            updateProgressIndicators(stepNumber);
+            
+            // 7. Update current step
+            const previousStep = currentStep;
+            currentStep = stepNumber;
+            
+            // 8. Save the current step data
+            saveCurrentStep();
+            
+            // 9. Validate the new step
+            validateCurrentStep(stepNumber);
+            
+            // 10. Update UI for the new step
+            updateUIForStep(stepNumber);
+            
+            // 11. Track the step change
+            trackStepChange(stepNumber, previousStep);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Error during step transition:', error);
+            return false;
+        } finally {
+            // 12. Remove loading state
+            if (nextButton) {
+                nextButton.classList.remove('loading');
+                nextButton.disabled = false;
+            }
         }
-        
-        return true;
     }
     
     return false;

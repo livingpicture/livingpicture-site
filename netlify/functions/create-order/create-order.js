@@ -77,16 +77,32 @@ async function airtableRequest(config) {
 }
 
 exports.handler = async (event, context) => {
+    // Log the raw request body for debugging
+    console.log('Function triggered with body:', event.body);
+    
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return createResponse(405, { 
             ok: false, 
-            error: 'Method Not Allowed' 
+            error: 'Method Not Allowed',
+            message: 'Only POST requests are accepted'
         }, { 'Allow': 'POST' });
     }
 
     try {
-        const orderData = JSON.parse(event.body);
+        // Parse and log the parsed data
+        let orderData;
+        try {
+            orderData = JSON.parse(event.body);
+            console.log('Parsed order data:', JSON.stringify(orderData, null, 2));
+        } catch (parseError) {
+            console.error('Failed to parse request body:', parseError);
+            return createResponse(400, {
+                ok: false,
+                error: 'Invalid JSON in request body',
+                message: parseError.message
+            });
+        }
         const { 
             AIRTABLE_API_KEY, 
             AIRTABLE_BASE_ID, 
@@ -179,67 +195,97 @@ exports.handler = async (event, context) => {
                 }
             };
 
-            // Whitelisted fields for order creation
+            // Whitelisted fields for order creation with standardized field names
+            const now = new Date().toISOString();
             const orderFields = {
                 // Primary field
                 orderId: orderData.orderId || `ORD-${Date.now()}`,
                 
-                // Customer Information
-                customerEmail: orderData.customerEmail || '',
-                customerName: orderData.customerName || '',
-                customerPhone: orderData.customerPhone || '',
-                country: orderData.country || '',
+                // Customer Information (fields 1-5)
+                customerEmail: orderData.customerEmail?.toString().trim() || '',
+                customerName: orderData.customerName?.toString().trim() || '',
+                customerPhone: orderData.customerPhone?.toString().trim() || '',
+                country: (orderData.country?.toString().trim() || 'Israel').toUpperCase(),
                 
-                // Order Details
-                memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
-                songChoice: orderData.songChoice || '',
-                photoCount: Number(orderData.photoCount) || 0,
-                packageKey: orderData.packageKey || (() => {
+                // Order Details (fields 6-13)
+                memoryTitle: (orderData.memoryTitle || orderData.memoryName || '').toString().trim(),
+                photoCount: Math.max(0, parseInt(orderData.photoCount, 10) || 0),
+                packageKey: (() => {
+                    if (orderData.packageKey) return orderData.packageKey.toString();
                     // Auto-determine package key based on photo count if not provided
-                    const count = Number(orderData.photoCount) || 0;
+                    const count = Math.max(0, parseInt(orderData.photoCount, 10) || 0);
                     if (count <= 5) return '1-5';
                     if (count <= 15) return '6-15';
                     if (count <= 30) return '16-30';
                     return '30+';
                 })(),
-                imageUrls: Array.isArray(orderData.imageUrls) 
-                    ? orderData.imageUrls.join(',') 
-                    : (orderData.imageUrls || ''),
-                totalAmount: Number(orderData.totalAmount) || 0,
-                currency: orderData.currency || 'ILS',
+                imageUrls: (() => {
+                    if (!orderData.imageUrls) return '';
+                    if (Array.isArray(orderData.imageUrls)) {
+                        return orderData.imageUrls
+                            .map(url => url?.toString().trim())
+                            .filter(url => url && url.startsWith('http'))
+                            .join(',');
+                    }
+                    return orderData.imageUrls.toString().trim();
+                })(),
+                totalAmount: Math.max(0, parseFloat(orderData.totalAmount) || 0),
+                currency: (orderData.currency || 'ILS').toUpperCase(),
+                songChoice: orderData.songChoice?.toString().trim() || '',
                 
-                // Payment Information
-                paymentstatus: 'PAID', // all lowercase as per schema
-                transactionId: orderData.transactionId || '',
-                paymentProvider: orderData.paymentProvider || 'payplus',
-                paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
-                    ? JSON.stringify(orderData.paymentStatusRaw) 
-                    : (orderData.paymentStatusRaw || '{}'),
-                payplusPaymentLink: orderData.payplusPaymentLink || '',
+                // Payment Information (fields 14-17)
+                paymentstatus: 'paid', // all lowercase as per schema
+                transactionId: orderData.transactionId?.toString().trim() || '',
+                paymentProvider: (orderData.paymentProvider || 'payplus').toLowerCase(),
+                paymentStatusRaw: (() => {
+                    if (!orderData.paymentStatusRaw) return '{}';
+                    try {
+                        return typeof orderData.paymentStatusRaw === 'string' 
+                            ? orderData.paymentStatusRaw 
+                            : JSON.stringify(orderData.paymentStatusRaw);
+                    } catch {
+                        return '{}';
+                    }
+                })(),
                 
-                // Order Management
+                // Order Management (fields 18-20)
                 fulfillmentStatus: 'NEW',
-                source: orderData.source || 'website',
-                notes: orderData.notes || '',
+                source: (orderData.source || 'website').toLowerCase(),
+                notes: orderData.notes?.toString().trim() || '',
                 
                 // Timestamps
-                createdAt: orderData.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                paidAt: orderData.paidAt || new Date().toISOString(),
+                createdAt: orderData.createdAt || now,
+                updatedAt: now,
+                paidAt: orderData.paidAt || now,
                 
                 // Additional metadata
-                leadId: orderData.leadId || ''
+                leadId: orderData.leadId?.toString().trim() || '',
+                payplusPaymentLink: orderData.payplusPaymentLink?.toString().trim() || ''
             };
+            
+            console.log('Prepared order data for Airtable:', JSON.stringify(orderFields, null, 2));
 
             // Create order record with whitelisted fields
             const orderRecord = { fields: orderFields };
 
-            // Log field keys before making API calls
-            const leadFieldKeys = Object.keys(leadUpdate.fields || {});
-            const orderFieldKeys = Object.keys(orderRecord.fields || {});
+            // Log field keys and sample values before making API calls
+            const logSafeLeadFields = {};
+            const logSafeOrderFields = {};
             
-            console.log('Sending to Airtable - Lead fields:', leadFieldKeys);
-            console.log('Sending to Airtable - Order fields:', orderFieldKeys);
+            Object.entries(leadUpdate.fields || {}).forEach(([key, value]) => {
+                logSafeLeadFields[key] = typeof value === 'string' && value.length > 50 
+                    ? `${value.substring(0, 50)}...` 
+                    : value;
+            });
+            
+            Object.entries(orderRecord.fields || {}).forEach(([key, value]) => {
+                logSafeOrderFields[key] = typeof value === 'string' && value.length > 50 
+                    ? `${value.substring(0, 50)}...` 
+                    : value;
+            });
+            
+            console.log('Sending to Airtable - Lead fields:', JSON.stringify(logSafeLeadFields, null, 2));
+            console.log('Sending to Airtable - Order fields:', JSON.stringify(logSafeOrderFields, null, 2));
 
             // Execute both operations in parallel
             try {
@@ -263,8 +309,8 @@ exports.handler = async (event, context) => {
                     order: orderResult,
                     action: 'order_created',
                     debug: {
-                        sentLeadFields: leadFieldKeys,
-                        sentOrderFields: orderFieldKeys,
+                        sentLeadFields: logSafeLeadFields,
+                        sentOrderFields: logSafeOrderFields,
                         receivedKeys: Object.keys(orderData || {})
                     }
                 });
@@ -274,8 +320,8 @@ exports.handler = async (event, context) => {
                     ...error,
                     debug: {
                         ...(error.debug || {}),
-                        sentLeadFields: leadFieldKeys,
-                        sentOrderFields: orderFieldKeys,
+                        sentLeadFields: logSafeLeadFields,
+                        sentOrderFields: logSafeOrderFields,
                         receivedKeys: Object.keys(orderData || {})
                     }
                 };
@@ -334,7 +380,7 @@ exports.handler = async (event, context) => {
                 lead: leadResult,
                 action: 'lead_updated_failed',
                 debug: {
-                    sentLeadFields: leadFieldKeys,
+                    sentLeadFields: logSafeLeadFields,
                     receivedKeys: Object.keys(orderData || {})
                 }
             });
@@ -425,7 +471,7 @@ exports.handler = async (event, context) => {
                 lead: leadResult,
                 action: 'lead_updated',
                 debug: {
-                    sentLeadFields: leadFieldKeys,
+                    sentLeadFields: logSafeLeadFields,
                     receivedKeys: Object.keys(orderData || {})
                 }
             });
@@ -434,69 +480,30 @@ exports.handler = async (event, context) => {
         // This block intentionally left blank - redundant code removed
 
     } catch (error) {
-        console.error('Error processing order:', {
-            message: error.message,
-            type: error.type,
-            status: error.status,
-            details: error.details ? 'Details available in response' : undefined
-        });
+        // Enhanced error logging
+        const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const errorDetails = {
+            errorId,
+            timestamp: new Date().toISOString(),
+            message: error.message || 'Unknown error',
+            name: error.name || 'Error',
+            status: error.status || 500,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            details: error.details || {}
+        };
         
-        // Handle Airtable API errors
-        if (error.type === 'AirtableError') {
-            const statusCode = error.statusCode || 500;
-            const errorMessage = error.message || 'Airtable API error';
-            
-            return createResponse(
-                error.statusCode || 500,
-                {
-                    ok: false,
-                    error: errorMessage,
-                    details: {
-                        message: error.details?.message || errorMessage,
-                        type: error.type,
-                        status: statusCode,
-                        code: error.details?.code,
-                        raw: process.env.NODE_ENV === 'development' ? error.details : undefined
-                    },
-                    debug: {
-                        ...(error.debug || {}),
-                        errorType: 'AirtableError',
-                        statusCode: error.statusCode || 500
-                    }
-                }
-            );
+        console.error('Error in create-order:', JSON.stringify(errorDetails, null, 2));
+        
+        // Return error response with appropriate status code
+        return createResponse(error.status || 500, {
+            ok: false,
+            error: error.message || 'Internal Server Error',
+            errorId,
+            timestamp: errorDetails.timestamp,
+            details: process.env.NODE_ENV === 'development' 
+                ? error.details || {}
+                : undefined
         }
-        
-        // Handle our custom error format
-        if (error.status) {
-            return createResponse(
-                error.status || 500,
-                {
-                    ok: false,
-                    error: error.message || 'Error processing request',
-                    details: error.details || {},
-                    type: error.type || 'RequestError',
-                    debug: {
-                        ...(error.debug || {}),
-                        errorType: error.type || 'RequestError'
-                    }
-                }
-            );
-        }
-        
-        // Handle standard errors
-        return createResponse(500, {
-            ok: false, 
-            error: 'Internal server error',
-            details: {
-                message: error.message || 'An unknown error occurred',
-                type: 'ServerError'
-            },
-            debug: {
-                errorType: 'ServerError',
-                errorMessage: error.message || 'No error message',
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-            }
-        });
+    });
     }
 };
