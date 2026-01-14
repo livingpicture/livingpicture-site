@@ -238,8 +238,8 @@ function setupEventListeners() {
             button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 
-                // If we're on the photo upload step
-                if (currentStep === 2) {
+                // If we're on the photo upload step (step 2) and moving to music step (step 3)
+                if (currentStep === 2 && nextButtons[buttonId] === 3) {
                     // Only validate if no photos are selected at all
                     if (!formData.photos || formData.photos.length === 0) {
                         validatePhotoUpload();
@@ -249,14 +249,14 @@ function setupEventListeners() {
                     // If we have photos, proceed even if files are still processing
                     saveCurrentStep();
                     try {
-                        console.log('Syncing lead data before step transition...');
+                        console.log('Syncing lead data before moving to music step...');
                         await syncLeadToAirtable();
-                        console.log('Lead data synced successfully, proceeding to next step');
-                        showStep(nextButtons[buttonId]);
+                        console.log('Lead data synced successfully, proceeding to music step');
+                        await showStep(3);
                     } catch (error) {
                         console.error('Error syncing lead data:', error);
                         // Still proceed to next step even if sync fails
-                        showStep(nextButtons[buttonId]);
+                        await showStep(3);
                     }
                     return;
                 }
