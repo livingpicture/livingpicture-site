@@ -114,12 +114,12 @@ exports.handler = async (event, context) => {
         };
 
         // Make request to PayPlus API
+        const apiKey = String(PAYPLUS_API_KEY || '').trim();
         const response = await fetch(`${PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'api-key': PAYPLUS_API_KEY,
-                'secret-key': PAYPLUS_SECRET_KEY
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify(paymentData)
         });
