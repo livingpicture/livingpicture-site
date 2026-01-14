@@ -187,34 +187,48 @@ exports.handler = async (event, context) => {
                 // Customer Information
                 customerEmail: orderData.customerEmail || '',
                 customerName: orderData.customerName || '',
+                customerPhone: orderData.customerPhone || '',
                 country: orderData.country || '',
                 
                 // Order Details
                 memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
                 songChoice: orderData.songChoice || '',
                 photoCount: Number(orderData.photoCount) || 0,
-                packageKey: orderData.packageKey || '',
+                packageKey: orderData.packageKey || (() => {
+                    // Auto-determine package key based on photo count if not provided
+                    const count = Number(orderData.photoCount) || 0;
+                    if (count <= 5) return '1-5';
+                    if (count <= 15) return '6-15';
+                    if (count <= 30) return '16-30';
+                    return '30+';
+                })(),
                 imageUrls: Array.isArray(orderData.imageUrls) 
-                    ? JSON.stringify(orderData.imageUrls) 
+                    ? orderData.imageUrls.join(',') 
                     : (orderData.imageUrls || ''),
                 totalAmount: Number(orderData.totalAmount) || 0,
-                currency: orderData.currency || 'USD',
+                currency: orderData.currency || 'ILS',
                 
                 // Payment Information
-                paymentstatus: 'PAID', // Note: all lowercase as per schema
+                paymentstatus: 'PAID', // all lowercase as per schema
                 transactionId: orderData.transactionId || '',
                 paymentProvider: orderData.paymentProvider || 'payplus',
                 paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                     ? JSON.stringify(orderData.paymentStatusRaw) 
-                    : String(orderData.paymentStatusRaw || ''),
+                    : (orderData.paymentStatusRaw || '{}'),
                 payplusPaymentLink: orderData.payplusPaymentLink || '',
                 
                 // Order Management
                 fulfillmentStatus: 'NEW',
+                source: orderData.source || 'website',
+                notes: orderData.notes || '',
                 
                 // Timestamps
                 createdAt: orderData.createdAt || new Date().toISOString(),
-                paidAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                paidAt: orderData.paidAt || new Date().toISOString(),
+                
+                // Additional metadata
+                leadId: orderData.leadId || ''
             };
 
             // Create order record with whitelisted fields

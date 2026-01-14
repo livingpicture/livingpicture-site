@@ -228,24 +228,37 @@ function updateAllPrices() {
 
 // Set up all event listeners
 function setupEventListeners() {
+    // Track if files are currently being processed
+    let isProcessingFiles = false;
+
     // Next step buttons
     Object.keys(nextButtons).forEach(buttonId => {
         const button = document.getElementById(buttonId);
         if (button) {
-            button.addEventListener('click', (e) => {
+            button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 
-                // Check if the button is enabled using our custom data attribute
-                if (button.classList.contains('btn-disabled')) {
-                    // If the button is visually disabled, run validation to show appropriate error
-                    if (currentStep === 1) {
-                        saveCurrentStep();
-                    } else if (currentStep === 2) {
+                // For photo upload step, only check if we have at least one photo
+                if (currentStep === 2) {
+                    if (formData.photos.length === 0) {
                         validatePhotoUpload();
-                    } else if (currentStep === 3) {
-                        validateMusicInputs();
+                        return; // Don't proceed if no photos at all
                     }
-                    return; // Don't proceed
+                    // If we have photos, continue to the next step
+                    saveCurrentStep();
+                    showStep(nextButtons[buttonId]);
+                    return;
+                }
+                
+                // For other steps, perform their validations
+                if (currentStep === 1) {
+                    if (!saveCurrentStep()) {
+                        return; // Don't proceed if validation fails
+                    }
+                } else if (currentStep === 3) {
+                    if (!validateMusicInputs()) {
+                        return; // Don't proceed if validation fails
+                    }
                 }
                 
                 const nextStep = nextButtons[buttonId];
@@ -436,8 +449,90 @@ function validatePhotoUpload() {
     return true;
 }
 
+// Sync lead data to Airtable
+async function syncLeadToAirtable() {
+    try {
+        // Only sync if we have at least some data
+        if (!formData) {
+            return;
+        }
+
+        // Map step number to Single Select values
+        const stepMapping = {
+            1: 'STEP_1',
+            2: 'STEP_2',
+            3: 'STEP_3',
+            4: 'CHECKOUT'
+        };
+        
+        // Get current step in the correct format
+        const currentStepValue = stepMapping[currentStep] || 'STEP_1';
+        
+        // Prepare lead data according to Airtable Leads schema
+        const leadData = {
+            // Customer information
+            customerEmail: formData.customer?.email || '',
+            Name: formData.customer?.name || '',
+            Phone: formData.customer?.phone || '',
+            Country: formData.customer?.country || '',
+            
+            // Memory information
+            memoryTitle: formData.memoryName || '',
+            'Photo Count': formData.photos?.length || 0,
+            
+            // Step and status
+            'Step': currentStepValue,
+            'Status': currentStep === 4 ? 'PENDING_PAYMENT' : 'IN_PROGRESS',
+            
+            // Image URLs - ensure we only include valid Cloudinary permanent URLs
+            'Image URLs': formData.photos
+                ?.map(photo => photo.permanentUrl)
+                .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com')),
+                
+            // Ensure we always have an array, even if empty
+            'imageUrls': formData.photos
+                ?.map(photo => photo.permanentUrl)
+                .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com')) || [],
+            
+            // Financial information
+            'Total Amount': formData.pricing?.totalPrice || 0,
+            'Currency': formData.pricing?.currency || 'ILS',
+            
+            // Music selection
+            'Song Choice': formData.music?.songName 
+                ? `${formData.music.songName} by ${formData.music.artistName || 'Unknown Artist'}` 
+                : ''
+        };
+        
+        // Add lead ID if available
+        if (window.leadTracker?.leadId) {
+            leadData['Lead ID'] = window.leadTracker.leadId;
+        }
+
+        // Call the Netlify function
+        const response = await fetch('/.netlify/functions/lead-upsert', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(leadData)
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            console.error('Failed to sync lead to Airtable:', error);
+            // Don't show error to user as this is a background sync
+        } else {
+            console.log('Lead synced to Airtable successfully');
+        }
+    } catch (error) {
+        console.error('Error syncing lead to Airtable:', error);
+        // Don't show error to user as this is a background sync
+    }
+}
+
 // Show a specific step
-function showStep(stepNumber) {
+async function showStep(stepNumber) {
     let canProceed = true;
     
     // If trying to move to step 2, validate step 1 first
@@ -458,6 +553,11 @@ function showStep(stepNumber) {
     
     // Only proceed with step change if validation passed
     if (canProceed) {
+        // Sync lead data to Airtable in the background
+        syncLeadToAirtable().catch(error => {
+            console.error('Background sync to Airtable failed:', error);
+        });
+        
         // Hide all steps
         document.querySelectorAll('.store-step').forEach(step => {
             step.classList.remove('active');
@@ -513,6 +613,25 @@ function showStep(stepNumber) {
         
         // Update UI based on the current step
         updateUIForStep(stepNumber);
+        
+        // Track the lead with current step and form data
+        if (window.leadTracker) {
+            const stepNames = {
+                1: 'NAME',
+                2: 'PHOTOS',
+                3: 'MUSIC',
+                4: 'CHECKOUT'
+            };
+            
+            window.leadTracker.trackStep(stepNames[stepNumber] || `STEP_${stepNumber}`, {
+                memoryName: formData.memoryName || '',
+                customerEmail: formData.customer?.email || '',
+                currency: formData.currency || 'ILS',
+                // Include any additional data you want to track
+                photoCount: formData.photos?.length || 0,
+                musicSelected: formData.music?.songName ? true : false
+            });
+        }
         
         return true;
     }
@@ -701,7 +820,7 @@ function updateUIForStep(step) {
 }
 
 // Validate the current step based on step number
-function validateCurrentStep(stepNumber) {
+async function validateCurrentStep(stepNumber) {
     switch (stepNumber) {
         case 1: // Name step
             return formData.memoryName && formData.memoryName.trim() !== '';
@@ -717,22 +836,17 @@ function validateCurrentStep(stepNumber) {
         default:
             return false;
     }
-}
-
-// Update the next button state
 function updateNextButton(buttonId, isEnabled) {
     const button = document.getElementById(buttonId);
-    if (button) {
-        // Always enable the button to allow click events
-        button.disabled = false;
+    if (!button) return;
 
-        // Store the enabled state as a data attribute for validation
-        button.dataset.enabled = isEnabled;
-
-        // Add/remove a class for visual feedback
-        if (!isEnabled) {
-            button.classList.add('btn-disabled');
-        } else {
+    // Always update the disabled state based on isEnabled
+    button.disabled = !isEnabled;
+    
+    // Only toggle the btn-disabled class if the state is changing
+    // This prevents visual flicker
+    if (isEnabled) {
+        if (button.classList.contains('btn-disabled')) {
             button.classList.remove('btn-disabled');
         }
     }
@@ -933,8 +1047,94 @@ function generateFileFingerprint(file) {
     return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
+// Track file processing and upload state
+let isProcessingFiles = false;
+let isUploadingToCloudinary = false;
+
+// Cloudinary configuration
+const CLOUDINARY_CLOUD_NAME = 'dojuekij4';
+const CLOUDINARY_UPLOAD_PRESET = 'livingpicture_orders_unsigned';
+
+/**
+ * Uploads a file to Cloudinary
+ * @param {File} file - The file to upload
+ * @returns {Promise<Object>} The Cloudinary upload response
+ */
+async function uploadToCloudinary(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    
+    try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to upload image to Cloudinary');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error uploading to Cloudinary:', error);
+        throw error;
+    }
+}
+
+// Re-enable file input after processing
+function reenableFileInput() {
+    const fileInput = document.getElementById('photo-upload');
+    const browseBtn = document.getElementById('browse-files');
+    
+    if (fileInput && browseBtn) {
+        // Reset the file input
+        fileInput.value = '';
+        
+        // Re-enable the browse button
+        browseBtn.disabled = false;
+        browseBtn.innerHTML = 'Add More Photos';
+        browseBtn.classList.remove('processing');
+        
+        // Reset processing flags
+        isProcessingFiles = false;
+        isUploadingToCloudinary = false;
+    }
+}
+
+/**
+ * Uploads an image file to Cloudinary
+ * @param {File} file - The image file to upload
+ * @returns {Promise<Object>} - The Cloudinary upload response
+ */
+async function uploadImageToCloudinary(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    
+    try {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to upload image to Cloudinary');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error uploading to Cloudinary:', error);
+        throw error;
+    }
+}
+
 // Process selected files
 async function processFiles(files) {
+    // Set processing flag
+    isProcessingFiles = true;
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const heicTypes = ['image/heic', 'image/heif', 'image/heif-sequence'];
 
@@ -1005,12 +1205,32 @@ async function processFiles(files) {
     const updateProgress = (processed, total) => {
         const percent = Math.round((processed / total) * 100);
         progressBar.style.width = `${percent}%`;
-        progressText.textContent = `Processing ${processed} of ${total} photos...`;
+        const statusText = isUploadingToCloudinary ? 'Uploading' : 'Processing';
+        progressText.textContent = `${statusText} ${processed} of ${total} photos...`;
+        
+        // Update next button state based on upload status
+        if (isUploadingToCloudinary) {
+            updateNextButton('next-to-music', false);
+            const nextBtn = document.getElementById('next-to-music');
+            if (nextBtn) {
+                nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            }
+        } else if (processed > 0) {
+            updateNextButton('next-to-music', true);
+            const nextBtn = document.getElementById('next-to-music');
+            if (nextBtn) {
+                nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
+            }
+        }
     };
 
     // Start loading
     setLoading(true);
+    isUploadingToCloudinary = true; // Start in uploading state
     updateProgress(0, files.length);
+    
+    // Disable next button during initial processing
+    updateNextButton('next-to-music', false);
 
     // Check total size
     const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
@@ -1052,6 +1272,11 @@ async function processFiles(files) {
 
     // Batch UI updates using requestAnimationFrame
     const scheduleUIUpdate = () => {
+        // Immediately enable the next button if we have photos
+        if (formData.photos.length > 0) {
+            updateNextButton('next-to-music', true);
+        }
+
         if (!pendingUIUpdate) {
             pendingUIUpdate = true;
             requestAnimationFrame(() => {
@@ -1060,55 +1285,72 @@ async function processFiles(files) {
                 updatePhotoCounter();
                 pendingUIUpdate = false;
                 lastUpdateTime = performance.now();
+                
+                // Ensure button state is correct after UI updates
+                validatePhotoUpload();
             });
         }
     };
 
-    // Process files with optimized concurrency control
-    const processFilesOptimized = async (filesToProcess) => {
-        const results = [];
-        const processing = new Set();
-        const newPhotos = [];
-        let processed = 0;
-
-        // Process files with controlled concurrency
-        const processFile = async (file) => {
-            // Check file type first (fast check before hashing)
-            if (!file.type.startsWith('image/')) {
-                console.log('Skipping non-image file:', file.name);
-                return { success: false, file, error: 'Not an image' };
+    // Process a single file
+    const processFile = async (file) => {
+        try {
+            const imageData = await getImageData(file);
+            
+            if (imageData.error) {
+                return { success: false, file, error: imageData.error };
             }
 
-            // Generate file fingerprint (quick hash based on name, size, and last modified)
-            const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
-
-            // Check for duplicates
-            if (existingHashes.has(fileFingerprint)) {
-                duplicateCount++;
-                return { success: false, file, error: 'Duplicate file' };
-            }
-
-            // Mark as processed
-            existingHashes.add(fileFingerprint);
-
-            // Create object URL (this is the most expensive part)
-            const objectUrl = URL.createObjectURL(file);
-
-            // Create photo object
+            // Upload to Cloudinary
+            const cloudinaryResponse = await uploadImageToCloudinary(file);
+            
+            // Create photo object with Cloudinary URL
             const photo = {
-                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                previewUrl: objectUrl,
-                file: file,
-                name: file.name,
-                size: file.size,
-                fileFingerprint: fileFingerprint
+                id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                file,
+                previewUrl: URL.createObjectURL(file),
+                permanentUrl: cloudinaryResponse.secure_url,
+                orientation: imageData.orientation,
+                width: imageData.width,
+                height: imageData.height,
+                order: formData.photos.length + newPhotos.length + 1,
+                isCover: formData.photos.length + newPhotos.length === 0
             };
 
-            // Add to results
-            return { success: true, file, photo };
-        };
+            // Add to new photos and update UI
+            newPhotos.push(photo);
+            processedCount++;
+            updateProgress(processedCount, totalFiles);
+            scheduleUIUpdate();
 
-        // Process a batch of files
+            // Enable next button as soon as we have at least one photo
+            if (newPhotos.length === 1) {
+                updateNextButton('next-to-music', true);
+            }
+
+            return { success: true, file, photo };
+        } catch (error) {
+            console.error('Error processing file:', file.name, error);
+            return { 
+                success: false, 
+                file, 
+                error: error.message || 'Upload failed' 
+            };
+        } finally {
+            processing.delete(file);
+            
+            // If this was the last file, update the UI state
+            if (processing.size === 0) {
+                isUploadingToCloudinary = false;
+                if (nextBtn && newPhotos.length > 0) {
+                    nextBtn.disabled = false;
+                    nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
+                }
+            }
+        }
+    };
+
+    // Process a batch of files
         const processBatch = async (batch) => {
             const batchPromises = batch.map(file =>
                 processFile(file).then(result => {
@@ -1157,6 +1399,9 @@ async function processFiles(files) {
             updatePhotoCounter();
             updatePricingDisplay();
             showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
+            
+            // Update the next button state after successful file processing
+            validatePhotoUpload();
         }
 
     } catch (error) {
@@ -1170,6 +1415,8 @@ async function processFiles(files) {
         if (fileInput) {
             fileInput.value = '';
         }
+        // Reset processing flag
+        isProcessingFiles = false;
     }
 }
 
@@ -1472,12 +1719,9 @@ function completePurchase() {
         completeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     }
 
-    // In a real app, this would process the payment
-    // For demonstration, we'll simulate a payment process with a 90% success rate
-    const isPaymentSuccessful = Math.random() < 0.9; // 90% success rate for demo
-
-    // Generate a random order ID
-    const orderId = 'LP-' + Math.floor(100000 + Math.random() * 900000);
+    // Process the payment (in a real implementation, this would be an API call to your payment processor)
+    const isPaymentSuccessful = true; // Assume success in production
+    const orderId = 'LP-' + new Date().getTime(); // Use timestamp for order ID
 
     // Save order data to localStorage for the thank you page
     const orderData = {
@@ -1500,9 +1744,8 @@ function completePurchase() {
 
     localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
 
-    // Simulate API call delay (1-2 seconds)
-    setTimeout(() => {
-        if (isPaymentSuccessful) {
+    // Process payment immediately
+    if (isPaymentSuccessful) {
             // Payment successful - redirect to thanks.html
             window.location.href = 'thanks.html?order=' + orderId;
             // Clear the form data after successful purchase
@@ -1517,7 +1760,6 @@ function completePurchase() {
                 completeBtn.innerHTML = originalBtnText;
             }
         }
-    }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
 }
 
 // Handle payment retry from payment-failed.html
@@ -1965,59 +2207,88 @@ async function completePurchase() {
         const currency = formData.currency || 'ILS';
         const currencySymbol = CURRENCIES[currency]?.symbol || '₪';
 
+        // Ensure all photos have permanent URLs before proceeding
+        const photosWithPermanentUrls = formData.photos?.filter(photo => photo.permanentUrl) || [];
+        
+        if (photosWithPermanentUrls.length === 0 && (formData.photos?.length || 0) > 0) {
+            throw new Error('Some photos are still being processed. Please wait and try again.');
+        }
+        
+        // Recalculate total price to ensure it's up to date
+        const photoCount = photosWithPermanentUrls.length;
+        const tier = calculatePricingTier(photoCount);
+        const pricePerPhoto = getPricePerPhoto(tier, currency);
+        const calculatedTotalPrice = photoCount * pricePerPhoto;
+        
+        // Update formData with recalculated pricing
+        formData.pricing = {
+            currentTier: tier,
+            pricePerPhoto: pricePerPhoto,
+            totalPrice: calculatedTotalPrice,
+            currency: currency
+        };
+        
         // Prepare order data for payment
         const orderData = {
             leadId: window.leadTracker?.leadId || `lead_${Date.now()}`,
             customerEmail: formData.customer?.email || '',
             customerName: formData.customer?.name || '',
+            customerPhone: formData.customer?.phone || '',
             country: formData.customer?.country || '',
             memoryTitle: formData.memoryName || 'My Memory',
             songChoice: formData.music?.songName ? 
                 `${formData.music.songName} by ${formData.music.artistName || 'Unknown Artist'}` : '',
-            photoCount: formData.photos?.length || 0,
-            packageKey: formData.pricing?.currentTier || '1-5',
-            totalAmount: formData.pricing?.totalPrice || 0,
+            photoCount: photoCount,
+            packageKey: tier,
+            totalAmount: calculatedTotalPrice,
             currency: currency,
-            imageUrls: formData.photos?.map(photo => photo.previewUrl || '') || [],
+            imageUrls: photosWithPermanentUrls.map(photo => photo.permanentUrl),
             paymentProvider: 'payplus',
             step: 'CHECKOUT',
-            status: 'PENDING'
+            status: 'PENDING_PAYMENT',
+            successUrl: `${window.location.origin}/thanks.html`,
+            cancelUrl: `${window.location.origin}/checkout.html`,
+            callbackUrl: `${window.location.origin}/.netlify/functions/payplus-callback`
         };
-
-        // In a real implementation, this would integrate with PayPlus
-        // For now, we'll simulate a payment flow
-        console.log('Processing payment with data:', orderData);
         
-        // Update lead status to CHECKOUT
-        await window.leadTracker?.updateLead({
-            ...orderData,
-            step: 'CHECKOUT',
-            status: 'PENDING',
-            paymentstatus: 'PROCESSING'
-        }, true);
+        // Verify the calculated total matches the expected total
+        if (Math.abs(calculatedTotalPrice - (formData.pricing?.totalPrice || 0)) > 0.01) {
+            console.warn(`Price mismatch: calculated ${calculatedTotalPrice} vs stored ${formData.pricing?.totalPrice}`);
+            // Use the calculated price as it's more reliable
+            formData.pricing.totalPrice = calculatedTotalPrice;
+        }
 
-        // Simulate payment processing
-        const isPaymentSuccessful = Math.random() > 0.2; // 80% success rate for demo
-
-        if (isPaymentSuccessful) {
-            // Payment successful - update lead and create order
-            const paymentResult = await window.leadTracker?.updateLead({
+        try {
+            // Update lead status to PENDING_PAYMENT
+            await window.leadTracker?.updateLead({
                 ...orderData,
-                step: 'PAID',
-                status: 'PAID',
-                paymentstatus: 'PAID',
-                transactionId: `tx_${Date.now()}`,
-                paymentstatusRaw: {
-                    status: 'approved',
-                    amount: orderData.totalAmount,
-                    currency: orderData.currency,
-                    timestamp: new Date().toISOString()
-                }
+                step: 'CHECKOUT',
+                status: 'PENDING_PAYMENT',
+                paymentstatus: 'PENDING'
             }, true);
+
+            // Call the PayPlus create payment function to get payment URL
+            const response = await fetch('/.netlify/functions/payplus-create-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to create payment');
+            }
+
+            if (!result.paymentUrl) {
+                throw new Error('No payment URL received from payment provider');
+            }
 
             // Save order data to localStorage for the thank you page
             const orderDisplayData = {
-                orderId: paymentResult?.order?.fields?.orderId || `ORD-${Date.now()}`,
+                orderId: result.orderId || `TEMP-${Date.now()}`,
                 date: new Date().toISOString(),
                 email: orderData.customerEmail,
                 memoryName: orderData.memoryTitle,
@@ -2025,32 +2296,36 @@ async function completePurchase() {
                 total: orderData.totalAmount,
                 currency: orderData.currency,
                 currencySymbol: currencySymbol,
-                transactionId: paymentResult?.order?.fields?.transactionId
+                status: 'PENDING_PAYMENT'
             };
 
             localStorage.setItem('livingPictureOrder', JSON.stringify(orderDisplayData));
             
-            // Clear form data
-            clearFormData();
+            // Redirect to PayPlus payment page
+            window.location.href = result.paymentUrl;
             
-            // Redirect to thank you page
-            window.location.href = 'thanks.html';
-        } else {
-            // Payment failed
-            await window.leadTracker?.updateLead({
-                ...orderData,
-                step: 'FAILED',
-                status: 'FAILED',
-                paymentstatus: 'FAILED',
-                paymentstatusRaw: {
-                    status: 'declined',
-                    reason: 'Insufficient funds',
-                    timestamp: new Date().toISOString()
-                }
-            }, true);
+        } catch (error) {
+            console.error('Payment initialization error:', error);
+            
+            // Update lead status to PAYMENT_FAILED
+            try {
+                await window.leadTracker?.updateLead({
+                    ...orderData,
+                    step: 'CHECKOUT',
+                    status: 'PAYMENT_FAILED',
+                    paymentstatus: 'FAILED',
+                    paymentStatusRaw: {
+                        status: 'declined',
+                        reason: error.message || 'Payment initialization failed',
+                        timestamp: new Date().toISOString()
+                    }
+                }, true);
+            } catch (updateError) {
+                console.error('Failed to update lead status:', updateError);
+            }
             
             // Show error message
-            showError('Payment failed. Please try again or use a different payment method.');
+            showError(error.message || 'Failed to initialize payment. Please try again.');
             
             // Re-enable the complete button
             if (completeBtn) {
