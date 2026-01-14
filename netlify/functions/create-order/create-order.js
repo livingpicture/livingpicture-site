@@ -138,7 +138,7 @@ exports.handler = async (event, context) => {
             const leadUpdate = {
                 fields: {
                     step: 'PAID',
-                    status: 'PAID',
+                    paymentStatus: 'PAID',
                     transactionId: orderData.transactionId,
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
@@ -152,7 +152,7 @@ exports.handler = async (event, context) => {
             const orderFields = {
                 leadId: orderData.leadId,
                 orderId: orderData.orderId || `ORD-${Date.now()}`,
-                status: 'PAID',
+                paymentStatus: 'PAID',
                 customerEmail: orderData.customerEmail || '',
                 customerName: orderData.customerName || '',
                 country: orderData.country || '',
@@ -234,7 +234,7 @@ exports.handler = async (event, context) => {
             const leadUpdate = {
                 fields: {
                     step: 'FAILED',
-                    status: 'FAILED',
+                    paymentStatus: 'FAILED',
                     transactionId: orderData.transactionId || '',
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
@@ -289,18 +289,18 @@ exports.handler = async (event, context) => {
 
             // Whitelist of allowed lead fields (only fields that exist in Airtable)
             const allowedLeadFields = [
-                'step', 'status', 'customerEmail', 'customerName', 'country',
+                'step', 'paymentStatus', 'customerEmail', 'customerName', 'country',
                 'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
-                'photoCount', 'packageKey', 'totalAmount', 'currency', 'paymentStatus',
+                'photoCount', 'packageKey', 'totalAmount', 'currency',
                 'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes'
             ];
             
             // Only include fields that exist in the Airtable schema
             const existingLeadFields = new Set([
                 // Add all known Airtable column names here
-                'step', 'status', 'customerEmail', 'customerName', 'country',
+                'step', 'paymentStatus', 'customerEmail', 'customerName', 'country',
                 'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
-                'photoCount', 'packageKey', 'totalAmount', 'currency', 'paymentStatus',
+                'photoCount', 'packageKey', 'totalAmount', 'currency',
                 'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes',
                 'createdAt', 'updatedAt', 'paidAt'
             ]);
