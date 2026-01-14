@@ -74,44 +74,47 @@ exports.handler = async (event, context) => {
         }
 
         // Read and trim environment variables
-        const apiKey = String(process.env.PAYPLUS_API_KEY || '').trim();
-        const secretKey = String(process.env.PAYPLUS_SECRET_KEY || '').trim();
-        const baseUrl = String(process.env.PAYPLUS_BASE_URL || '').trim() || 'https://restapi.payplus.co.il/api/v1.0';
-        const siteUrl = String(process.env.SITE_URL || '').trim();
-        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || '').trim();
-        const paymentPageUid = String(process.env.PAYPLUS_PAYMENT_PAGE_UID || '').trim();
-
-        // Safety check for required variables
-        if (!apiKey) {
-            return createResponse(500, {
-                ok: false,
-                error: 'Missing PAYPLUS_API_KEY environment variable'
-            });
-        }
-
-        // Validate other required variables
+        const requiredVars = [
+            'PAYPLUS_API_KEY',
+            'PAYPLUS_SECRET_KEY',
+            'PAYPLUS_BASE_URL',
+            'SITE_URL',
+            'PAYPLUS_PAYMENT_PAGE_UID'
+        ];
+        
+        const env = {};
         const missingVars = [];
-        if (!paymentPageUid) missingVars.push('PAYPLUS_PAYMENT_PAGE_UID');
-        if (!secretKey) missingVars.push('PAYPLUS_SECRET_KEY');
-        if (!siteUrl) missingVars.push('SITE_URL');
-
+        
+        // Load and validate required variables
+        for (const varName of requiredVars) {
+            const value = String(process.env[varName] || '').trim();
+            if (!value) {
+                missingVars.push(varName);
+            }
+            env[varName] = value;
+        }
+        
         if (missingVars.length > 0) {
             return createResponse(500, {
                 ok: false,
                 error: `Missing required environment variables: ${missingVars.join(', ')}`
             });
         }
+        
+        // Optional variables
+        const successUrl = String(process.env.PAYPLUS_SUCCESS_URL || '').trim() || `${env.SITE_URL}/thank-you.html`;
+
 
         // Prepare PayPlus request payload
         const paymentData = {
-            payment_page_uid: paymentPageUid,
+            payment_page_uid: env.PAYPLUS_PAYMENT_PAGE_UID,
             amount: amount * 100, // Convert to agorot/cent
             currency_code: currency,
             item_name: 'Memory Book Order',
             item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
-            success_url: successUrl || `${siteUrl}/thank-you.html`,
-            cancel_url: `${siteUrl}/payment-failed.html`,
-            callback_url: `${siteUrl}/.netlify/functions/payplus-callback`,
+            success_url: successUrl,
+            cancel_url: `${env.SITE_URL}/payment-failed.html`,
+            callback_url: `${env.SITE_URL}/.netlify/functions/payplus-callback`,
             metadata: {
                 leadId: leadId || `lead_${Date.now()}`,
                 orderId: orderId,
@@ -121,12 +124,12 @@ exports.handler = async (event, context) => {
         };
 
         // Make request to PayPlus API
-        const response = await fetch(`${baseUrl}/PaymentPages/generateLink`, {
+        const response = await fetch(`${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'secret-key': secretKey
+                'Authorization': `Bearer ${env.PAYPLUS_API_KEY}`,
+                'secret-key': env.PAYPLUS_SECRET_KEY
             },
             body: JSON.stringify(paymentData)
         });
