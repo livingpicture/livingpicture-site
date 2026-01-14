@@ -509,21 +509,39 @@ async function syncLeadToAirtable() {
             leadData['Lead ID'] = window.leadTracker.leadId;
         }
 
-        // Call the Netlify function
-        const response = await fetch('/.netlify/functions/lead-upsert', {
+        // Log the payload before making the fetch call
+        console.log('Attempting to sync lead...', {
+            url: '/.netlify/functions/lead-upsert',
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(leadData)
+            payload: leadData
         });
 
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('Failed to sync lead to Airtable:', error);
-            // Don't show error to user as this is a background sync
-        } else {
-            console.log('Lead synced to Airtable successfully');
+        try {
+            // Call the Netlify function
+            const response = await fetch('/.netlify/functions/lead-upsert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(leadData)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Failed to sync lead to Airtable:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText
+                });
+            } else {
+                const responseData = await response.json().catch(() => ({}));
+                console.log('Lead synced to Airtable successfully', responseData);
+            }
+        } catch (error) {
+            console.error('Network error when syncing lead to Airtable:', {
+                error: error.message,
+                stack: error.stack
+            });
         }
     } catch (error) {
         console.error('Error syncing lead to Airtable:', error);
@@ -2258,6 +2276,16 @@ async function completePurchase() {
             formData.pricing.totalPrice = calculatedTotalPrice;
         }
 
+        // Log the order data before making the payment request
+        console.log('Attempting to create order and process payment...', {
+            url: '/.netlify/functions/payplus-create-payment',
+            method: 'POST',
+            payload: {
+                ...orderData,
+                imageUrls: orderData.imageUrls.slice(0, 2).concat(['...']) // Show first 2 URLs for logging
+            }
+        });
+
         try {
             // Update lead status to PENDING_PAYMENT
             await window.leadTracker?.updateLead({
@@ -2268,22 +2296,54 @@ async function completePurchase() {
             }, true);
 
             // Call the PayPlus create payment function to get payment URL
-            const response = await fetch('/.netlify/functions/payplus-create-payment', {
+            const paymentEndpoint = '/.netlify/functions/payplus-create-payment';
+            console.log('Sending payment request to:', paymentEndpoint);
+            
+            const response = await fetch(paymentEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(orderData)
+                body: JSON.stringify({
+                    ...orderData,
+                    // Ensure imageUrls is an array of strings
+                    imageUrls: Array.isArray(orderData.imageUrls) ? orderData.imageUrls : []
+                })
             });
 
-            const result = await response.json();
+            console.log('Payment request completed with status:', response.status);
+            
+            const result = await response.json().catch(e => ({
+                error: 'Failed to parse response',
+                details: e.message
+            }));
+
+            console.log('Payment API response:', {
+                status: response.status,
+                ok: response.ok,
+                result: result
+            });
 
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to create payment');
+                const errorMessage = result.message || 'Failed to process payment';
+                console.error('Payment processing failed:', {
+                    status: response.status,
+                    error: errorMessage,
+                    details: result.details || 'No additional details'
+                });
+                throw new Error(errorMessage);
             }
 
-            if (!result.paymentUrl) {
-                throw new Error('No payment URL received from payment provider');
+            // Log successful payment creation
+            console.log('Payment created successfully, redirecting to:', result.payment_url);
+
+            // Redirect to PayPlus payment page
+            if (result.payment_url) {
+                window.location.href = result.payment_url;
+            } else {
+                const errorMsg = 'No payment URL received from server';
+                console.error(errorMsg, { response: result });
+                throw new Error(errorMsg);
             }
 
             // Save order data to localStorage for the thank you page
@@ -2301,27 +2361,34 @@ async function completePurchase() {
 
             localStorage.setItem('livingPictureOrder', JSON.stringify(orderDisplayData));
             
-            // Redirect to PayPlus payment page
-            window.location.href = result.paymentUrl;
-            
         } catch (error) {
-            console.error('Payment initialization error:', error);
+            // Enhanced error logging
+            console.error('Error processing payment:', {
+                error: error.message,
+                stack: error.stack,
+                orderData: {
+                    ...orderData,
+                    imageUrls: orderData.imageUrls ? `[${orderData.imageUrls.length} URLs]` : 'none'
+                }
+            });
+            
+            // User-friendly error message
+            const errorMessage = error.message.includes('network') 
+                ? 'Network error. Please check your connection and try again.'
+                : `Payment processing failed: ${error.message}. Please try again or contact support.`;
+                
+            showError(errorMessage);
             
             // Update lead status to PAYMENT_FAILED
             try {
-                await window.leadTracker?.updateLead({
-                    ...orderData,
-                    step: 'CHECKOUT',
-                    status: 'PAYMENT_FAILED',
-                    paymentstatus: 'FAILED',
-                    paymentStatusRaw: {
-                        status: 'declined',
-                        reason: error.message || 'Payment initialization failed',
-                        timestamp: new Date().toISOString()
-                    }
-                }, true);
-            } catch (updateError) {
-                console.error('Failed to update lead status:', updateError);
+                console.log('Attempting to update lead status to PAYMENT_FAILED');
+                await syncLeadToAirtable();
+                console.log('Successfully updated lead status to PAYMENT_FAILED');
+            } catch (syncError) {
+                console.error('Failed to update lead status after payment failure:', {
+                    error: syncError.message,
+                    stack: syncError.stack
+                });
             }
             
             // Show error message
