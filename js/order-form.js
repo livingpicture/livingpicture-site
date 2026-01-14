@@ -1993,7 +1993,7 @@ async function completePurchase() {
             ...orderData,
             step: 'CHECKOUT',
             status: 'PENDING',
-            paymentStatus: 'PROCESSING'
+            paymentstatus: 'PROCESSING'
         }, true);
 
         // Simulate payment processing
@@ -2005,9 +2005,9 @@ async function completePurchase() {
                 ...orderData,
                 step: 'PAID',
                 status: 'PAID',
-                paymentStatus: 'PAID',
+                paymentstatus: 'PAID',
                 transactionId: `tx_${Date.now()}`,
-                paymentStatusRaw: {
+                paymentstatusRaw: {
                     status: 'approved',
                     amount: orderData.totalAmount,
                     currency: orderData.currency,
@@ -2041,8 +2041,8 @@ async function completePurchase() {
                 ...orderData,
                 step: 'FAILED',
                 status: 'FAILED',
-                paymentStatus: 'FAILED',
-                paymentStatusRaw: {
+                paymentstatus: 'FAILED',
+                paymentstatusRaw: {
                     status: 'declined',
                     reason: 'Insufficient funds',
                     timestamp: new Date().toISOString()

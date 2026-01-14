@@ -92,7 +92,7 @@ exports.handler = async (event, context) => {
         }
 
         // Handle payment success (create order and update lead)
-        if (orderData.paymentStatus === 'PAID') {
+        if (orderData.paymentstatus === 'PAID') {
             // Validate required fields for paid order
             const requiredFields = ['customerEmail', 'photoCount', 'totalAmount', 'currency', 'transactionId'];
             const missingFields = requiredFields.filter(field => !orderData[field]);
@@ -138,7 +138,7 @@ exports.handler = async (event, context) => {
             const leadUpdate = {
                 fields: {
                     step: 'PAID',
-                    paymentStatus: 'PAID',
+paymentstatus: 'PAID',
                     transactionId: orderData.transactionId,
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
@@ -215,7 +215,7 @@ exports.handler = async (event, context) => {
             };
         } 
         // Handle payment failure (update lead only)
-        else if (orderData.paymentStatus === 'FAILED') {
+        else if (orderData.paymentstatus === 'FAILED') {
             // Find lead record by leadId with proper escaping
             const safeLeadId = String(orderData.leadId).replace(/'/g, "\\'");
             const formula = `{leadId}='${safeLeadId}'`;
@@ -246,7 +246,7 @@ exports.handler = async (event, context) => {
             const leadUpdate = {
                 fields: {
                     step: 'FAILED',
-                    paymentStatus: 'FAILED',
+paymentstatus: 'FAILED',
                     transactionId: orderData.transactionId || '',
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
