@@ -108,7 +108,7 @@ exports.handler = async (event, context) => {
         // Prepare PayPlus request payload
         const paymentData = {
             payment_page_uid: env.PAYPLUS_PAYMENT_PAGE_UID,
-            amount: amount * 100, // Convert to agorot/cent
+            amount: Math.round(amount * 100), // Convert to agorot/cent (smallest currency unit)
             currency_code: currency,
             item_name: 'Memory Book Order',
             item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
@@ -158,45 +158,50 @@ exports.handler = async (event, context) => {
             body: JSON.stringify(paymentData)
         });
 
-        const responseData = await response.json();
-        console.log('PayPlus response keys:', responseData ? Object.keys(responseData) : 'No response data');
+        const result = await response.json();
+        console.log('PayPlus response:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: result?.data ? Object.keys(result.data) : 'No data in response',
+            hasPaymentLink: !!(result?.data?.payment_page_link)
+        });
 
-        if (!response.ok) {
+        if (!response.ok || !result?.data) {
             console.error('PayPlus API error:', {
                 status: response.status,
                 statusText: response.statusText,
-                data: responseData
+                data: result
             });
 
             return createResponse(500, {
                 ok: false,
                 error: 'Payment processing failed',
-                details: responseData?.error_description || 'Unknown error from payment provider',
-                raw: responseData
+                details: result?.error_description || result?.message || 'Unknown error from payment provider',
+                raw: result
             });
         }
 
-        // Extract relevant data from PayPlus response
-        const paymentUrl = responseData?.results?.url;
-        const transactionId = responseData?.results?.transaction_uid;
-
-        if (!paymentUrl || !transactionId) {
-            console.error('Invalid PayPlus response:', responseData);
-            throw new Error('Invalid response from payment provider');
+        // Check for payment page link in the response
+        if (result.data && result.data.payment_page_link) {
+            return createResponse(200, {
+                ok: true,
+                paymentUrl: result.data.payment_page_link,
+                transactionId: result.data.uid || `tx_${Date.now()}`,
+                debug: {
+                    leadId: leadId,
+                    orderId: orderId
+                }
+            });
         }
 
-        // Return success response
-        return createResponse(200, {
-            ok: true,
-            paymentUrl,
-            transactionId,
-            raw: responseData,
-            debug: {
-                requestKeys: Object.keys(paymentData),
-                responseKeys: responseData ? Object.keys(responseData) : []
-            }
+        // If we get here, the response format is unexpected
+        console.error('Unexpected PayPlus response format:', result);
+        return createResponse(500, {
+            ok: false,
+            error: 'Unexpected response format from payment provider',
+            details: 'Could not find payment page link in response',
+            raw: result
         });
-
     } catch (error) {
         console.error('Error in payplus-create-payment:', error);
 
