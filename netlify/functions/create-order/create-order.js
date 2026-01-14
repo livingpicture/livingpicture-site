@@ -1,12 +1,34 @@
 // Helper function to make Airtable API requests
 async function airtableRequest(config) {
     const { method, table, data, recordId, params } = config;
-    const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
-    
+    const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_LEADS_TABLE, AIRTABLE_ORDERS_TABLE } = process.env;
+
+    // Function version for tracking
+    const FUNC_VERSION = "create-order@2026-01-14-1";
+
+    // Helper function to create consistent responses
+    function createResponse(statusCode, body, headers = {}) {
+        return {
+            statusCode,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Func-Version': FUNC_VERSION,
+                ...headers
+            },
+            body: JSON.stringify({
+                ...(typeof body === 'string' ? { message: body } : body),
+                debug: {
+                    ...(typeof body === 'object' && body.debug ? body.debug : {}),
+                    version: FUNC_VERSION
+                }
+            })
+        };
+    }
+
     let url = recordId 
         ? `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(table)}/${recordId}`
         : `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(table)}`;
-    
+
     // Add query parameters if provided
     if (params) {
         const queryParams = new URLSearchParams();
@@ -17,7 +39,7 @@ async function airtableRequest(config) {
         });
         url += `?${queryParams.toString()}`;
     }
-    
+
     try {
         const response = await fetch(url, {
             method,
@@ -27,9 +49,9 @@ async function airtableRequest(config) {
             },
             body: data ? JSON.stringify(data) : undefined
         });
-        
+
         const responseData = await response.json();
-        
+
         if (!response.ok) {
             throw {
                 status: response.status,
@@ -40,7 +62,7 @@ async function airtableRequest(config) {
                 url: url.split('?')[0] // Don't include query params in error URL for security
             };
         }
-        
+
         return responseData;
     } catch (error) {
         // Re-throw with more context if it's not already our custom error
@@ -57,10 +79,10 @@ async function airtableRequest(config) {
 exports.handler = async (event, context) => {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: JSON.stringify({ ok: false, error: 'Method Not Allowed' })
-        };
+        return createResponse(405, { 
+            ok: false, 
+            error: 'Method Not Allowed' 
+        }, { 'Allow': 'POST' });
     }
 
     try {
@@ -80,14 +102,23 @@ exports.handler = async (event, context) => {
         if (!AIRTABLE_ORDERS_TABLE) missingVars.push('AIRTABLE_ORDERS_TABLE');
         
         if (missingVars.length > 0) {
-            throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+            throw {
+                status: 500,
+                message: 'Server configuration error',
+                details: {
+                    missingVars: missingVars.map(v => v.replace(/[A-Z]/g, '*'))
+                }
+            };
         }
 
         // Common validation for both leads and orders
         if (!orderData.leadId) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ ok: false, error: 'Missing required field: leadId' })
+                body: JSON.stringify({ 
+                    ok: false, 
+                    error: 'Missing required field: leadId' 
+                })
             };
         }
 
@@ -138,7 +169,7 @@ exports.handler = async (event, context) => {
             const leadUpdate = {
                 fields: {
                     step: 'PAID',
-paymentstatus: 'PAID',
+                    paymentstatus: 'PAID',
                     transactionId: orderData.transactionId,
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
@@ -189,30 +220,52 @@ paymentstatus: 'PAID',
             // Create order record with whitelisted fields
             const orderRecord = { fields: orderFields };
 
-            // Execute both operations in parallel
-            const [leadResult, orderResult] = await Promise.all([
-                airtableRequest({
-                    method: 'PATCH',
-                    table: AIRTABLE_LEADS_TABLE,
-                    data: leadUpdate,
-                    recordId: leadRecordId
-                }),
-                airtableRequest({
-                    method: 'POST',
-                    table: AIRTABLE_ORDERS_TABLE,
-                    data: { fields: orderRecord.fields }
-                })
-            ]);
+            // Log field keys before making API calls
+            const leadFieldKeys = Object.keys(leadUpdate.fields || {});
+            const orderFieldKeys = Object.keys(orderRecord.fields || {});
+            
+            console.log('Sending to Airtable - Lead fields:', leadFieldKeys);
+            console.log('Sending to Airtable - Order fields:', orderFieldKeys);
 
-            return {
-                statusCode: 200,
-                body: JSON.stringify({
+            // Execute both operations in parallel
+            try {
+                const [leadResult, orderResult] = await Promise.all([
+                    airtableRequest({
+                        method: 'PATCH',
+                        table: AIRTABLE_LEADS_TABLE,
+                        data: leadUpdate,
+                        recordId: leadRecordId
+                    }),
+                    airtableRequest({
+                        method: 'POST',
+                        table: AIRTABLE_ORDERS_TABLE,
+                        data: { fields: orderRecord.fields }
+                    })
+                ]);
+
+                return createResponse(200, {
                     ok: true,
                     lead: leadResult,
                     order: orderResult,
-                    action: 'order_created'
-                })
-            };
+                    action: 'order_created',
+                    debug: {
+                        sentLeadFields: leadFieldKeys,
+                        sentOrderFields: orderFieldKeys,
+                        receivedKeys: Object.keys(orderData || {})
+                    }
+                });
+            } catch (error) {
+                console.error('Error in parallel operations:', error);
+                throw {
+                    ...error,
+                    debug: {
+                        ...(error.debug || {}),
+                        sentLeadFields: leadFieldKeys,
+                        sentOrderFields: orderFieldKeys,
+                        receivedKeys: Object.keys(orderData || {})
+                    }
+                };
+            }
         } 
         // Handle payment failure (update lead only)
         else if (orderData.paymentstatus === 'FAILED') {
@@ -246,7 +299,7 @@ paymentstatus: 'PAID',
             const leadUpdate = {
                 fields: {
                     step: 'FAILED',
-paymentstatus: 'FAILED',
+                    paymentstatus: 'FAILED',
                     transactionId: orderData.transactionId || '',
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
@@ -262,14 +315,15 @@ paymentstatus: 'FAILED',
                 recordId: leadRecordId
             });
 
-            return {
-                statusCode: 200,
-                body: JSON.stringify({
-                    ok: true,
-                    lead: leadResult,
-                    action: 'lead_updated_failed'
-                })
-            };
+            return createResponse(200, {
+                ok: true,
+                lead: leadResult,
+                action: 'lead_updated_failed',
+                debug: {
+                    sentLeadFields: leadFieldKeys,
+                    receivedKeys: Object.keys(orderData || {})
+                }
+            });
         }
         // Regular lead update (not a payment event)
         else {
@@ -352,29 +406,35 @@ paymentstatus: 'FAILED',
                 recordId: leadRecordId
             });
 
-            return {
-                statusCode: 200,
-                body: JSON.stringify({
-                    ok: true,
-                    lead: leadResult,
-                    action: 'lead_updated'
-                })
-            };
+            return createResponse(200, {
+                ok: true,
+                lead: leadResult,
+                action: 'lead_updated',
+                debug: {
+                    sentLeadFields: leadFieldKeys,
+                    receivedKeys: Object.keys(orderData || {})
+                }
+            });
         }
         
         // This block intentionally left blank - redundant code removed
 
     } catch (error) {
-        console.error('Error processing order:', error);
+        console.error('Error processing order:', {
+            message: error.message,
+            type: error.type,
+            status: error.status,
+            details: error.details ? 'Details available in response' : undefined
+        });
         
         // Handle Airtable API errors
         if (error.type === 'AirtableError') {
             const statusCode = error.statusCode || 500;
             const errorMessage = error.message || 'Airtable API error';
             
-            return {
-                statusCode,
-                body: JSON.stringify({
+            return createResponse(
+                error.statusCode || 500,
+                {
                     ok: false,
                     error: errorMessage,
                     details: {
@@ -384,37 +444,45 @@ paymentstatus: 'FAILED',
                         code: error.details?.code,
                         raw: process.env.NODE_ENV === 'development' ? error.details : undefined
                     },
-                    status: statusCode
-                })
-            };
+                    debug: {
+                        ...(error.debug || {}),
+                        errorType: 'AirtableError',
+                        statusCode: error.statusCode || 500
+                    }
+                }
+            );
         }
         
         // Handle our custom error format
         if (error.status) {
-            return {
-                statusCode: error.status,
-                body: JSON.stringify({
+            return createResponse(
+                error.status || 500,
+                {
                     ok: false,
                     error: error.message || 'Error processing request',
                     details: error.details || {},
-                    status: error.status,
-                    type: error.type || 'RequestError'
-                })
-            };
+                    type: error.type || 'RequestError',
+                    debug: {
+                        ...(error.debug || {}),
+                        errorType: error.type || 'RequestError'
+                    }
+                }
+            );
         }
         
         // Handle standard errors
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ 
-                ok: false, 
-                error: 'Internal server error',
-                details: {
-                    message: error.message || 'An unknown error occurred',
-                    type: 'ServerError'
-                },
-                status: 500
-            })
-        };
+        return createResponse(500, {
+            ok: false, 
+            error: 'Internal server error',
+            details: {
+                message: error.message || 'An unknown error occurred',
+                type: 'ServerError'
+            },
+            debug: {
+                errorType: 'ServerError',
+                errorMessage: error.message || 'No error message',
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            }
+        });
     }
 };
