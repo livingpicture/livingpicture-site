@@ -123,27 +123,36 @@ exports.handler = async (event, context) => {
             }
         };
 
-        // Sanitize API key to avoid common formatting issues
-        const raw = String(env.PAYPLUS_API_KEY || "");
-        const apiKey = raw
-            .replace(/^Bearer\s+/i, "")  // Remove any existing Bearer prefix
-            .replace(/^["']|["']$/g, "")  // Remove any surrounding quotes
-            .trim()
-            .replace(/\s+/g, "");  // Remove any internal whitespace
+        // Read and sanitize API key and secret key
+        const apiKey = String(env.PAYPLUS_API_KEY || "").trim().replace(/^["']|["']$/g, "").replace(/\s+/g, "");
+        const secretKey = String(env.PAYPLUS_SECRET_KEY || "").trim().replace(/^["']|["']$/g, "").replace(/\s+/g, "");
 
-        // Prepare headers
+        // Validate required credentials
+        if (!apiKey || !secretKey) {
+            return createResponse(500, {
+                ok: false,
+                error: 'Missing required credentials. Please check PAYPLUS_API_KEY and PAYPLUS_SECRET_KEY environment variables.'
+            });
+        }
+
+        // Prepare the Authorization header as required by PayPlus
+        const authData = {
+            api_key: apiKey,
+            secret_key: secretKey
+        };
+        
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            'Authorization': JSON.stringify(authData)
         };
 
-        // Safe debug logging (no secrets)
-        console.log("Auth header format:", "Bearer " + "*".repeat(Math.min(apiKey.length, 6)));
+        // Safe debug logging (no sensitive values)
         console.log("Sending headers keys:", Object.keys(headers));
-        console.log("Request URL:", `${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`);
+        const requestUrl = `${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`;
+        console.log("Request URL:", requestUrl);
 
         // Make request to PayPlus API
-        const response = await fetch(`${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
+        const response = await fetch(requestUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(paymentData)
