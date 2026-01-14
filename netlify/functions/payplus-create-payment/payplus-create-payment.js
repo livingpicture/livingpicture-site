@@ -108,7 +108,7 @@ exports.handler = async (event, context) => {
         // Prepare PayPlus request payload
         const paymentData = {
             payment_page_uid: env.PAYPLUS_PAYMENT_PAGE_UID,
-            amount: Math.round(amount * 100), // Convert to agorot/cent (smallest currency unit)
+            amount: amount, // Convert to agorot/cent (smallest currency unit)
             currency_code: currency,
             item_name: 'Memory Book Order',
             item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
