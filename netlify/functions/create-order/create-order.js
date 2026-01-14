@@ -1,27 +1,57 @@
 // Helper function to make Airtable API requests
 async function airtableRequest(config) {
-    const { method, table, data, recordId } = config;
+    const { method, table, data, recordId, params } = config;
     const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
     
-    const url = recordId 
+    let url = recordId 
         ? `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(table)}/${recordId}`
         : `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(table)}`;
     
-    const response = await fetch(url, {
-        method,
-        headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: data ? JSON.stringify(data) : undefined
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Airtable API error');
+    // Add query parameters if provided
+    if (params) {
+        const queryParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                queryParams.append(key, value);
+            }
+        });
+        url += `?${queryParams.toString()}`;
     }
     
-    return response.json();
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: data ? JSON.stringify(data) : undefined
+        });
+        
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+            throw {
+                status: response.status,
+                message: responseData.error?.message || 'Airtable API error',
+                details: responseData.error || { message: responseData.message || 'Unknown error' },
+                type: 'AirtableError',
+                statusCode: response.status,
+                url: url.split('?')[0] // Don't include query params in error URL for security
+            };
+        }
+        
+        return responseData;
+    } catch (error) {
+        // Re-throw with more context if it's not already our custom error
+        if (error.type) throw error;
+        throw {
+            status: 500,
+            message: 'Failed to complete Airtable request',
+            details: error.message || 'Unknown error',
+            type: 'AirtableRequestError'
+        };
+    }
 }
 
 exports.handler = async (event, context) => {
@@ -78,7 +108,33 @@ exports.handler = async (event, context) => {
                 };
             }
 
-            // 1. Update the lead to mark as PAID
+            // 1. Find lead record by leadId with proper escaping
+            const safeLeadId = String(orderData.leadId).replace(/'/g, "\\'");
+            const formula = `{leadId}='${safeLeadId}'`;
+            
+            const findLeadResult = await airtableRequest({
+                method: 'GET',
+                table: AIRTABLE_LEADS_TABLE,
+                params: {
+                    filterByFormula: formula,
+                    maxRecords: 1
+                }
+            });
+            
+            if (!findLeadResult.records || findLeadResult.records.length === 0) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ 
+                        ok: false, 
+                        error: 'Lead not found',
+                        details: `No lead found with leadId: ${orderData.leadId}`
+                    })
+                };
+            }
+
+            const leadRecordId = findLeadResult.records[0].id;
+
+            // 2. Update the lead to mark as PAID
             const leadUpdate = {
                 fields: {
                     step: 'PAID',
@@ -92,33 +148,34 @@ exports.handler = async (event, context) => {
                 }
             };
 
-            // 2. Create order record
-            const orderRecord = {
-                fields: {
-                    leadId: orderData.leadId,
-                    orderId: orderData.orderId || `ORD-${Date.now()}`,
-                    status: 'PAID',
-                    customerEmail: orderData.customerEmail,
-                    customerName: orderData.customerName || '',
-                    country: orderData.country || '',
-                    memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
-                    songChoice: orderData.songChoice || '',
-                    photoCount: Number(orderData.photoCount) || 0,
-                    packageKey: orderData.packageKey || '',
-                    totalAmount: Number(orderData.totalAmount) || 0,
-                    currency: orderData.currency || 'USD',
-                    imageUrls: Array.isArray(orderData.imageUrls) 
-                        ? JSON.stringify(orderData.imageUrls) 
-                        : (orderData.imageUrls || ''),
-                    transactionId: orderData.transactionId,
-                    paymentProvider: orderData.paymentProvider || 'payplus',
-                    paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
-                        ? JSON.stringify(orderData.paymentStatusRaw) 
-                        : String(orderData.paymentStatusRaw || ''),
-                    createdAt: orderData.createdAt || new Date().toISOString(),
-                    paidAt: new Date().toISOString()
-                }
+            // Whitelisted fields for order creation
+            const orderFields = {
+                leadId: orderData.leadId,
+                orderId: orderData.orderId || `ORD-${Date.now()}`,
+                status: 'PAID',
+                customerEmail: orderData.customerEmail || '',
+                customerName: orderData.customerName || '',
+                country: orderData.country || '',
+                memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
+                songChoice: orderData.songChoice || '',
+                photoCount: Number(orderData.photoCount) || 0,
+                packageKey: orderData.packageKey || '',
+                totalAmount: Number(orderData.totalAmount) || 0,
+                currency: orderData.currency || 'USD',
+                imageUrls: Array.isArray(orderData.imageUrls) 
+                    ? JSON.stringify(orderData.imageUrls) 
+                    : (orderData.imageUrls || ''),
+                transactionId: orderData.transactionId || '',
+                paymentProvider: orderData.paymentProvider || 'payplus',
+                paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
+                    ? JSON.stringify(orderData.paymentStatusRaw) 
+                    : String(orderData.paymentStatusRaw || ''),
+                createdAt: orderData.createdAt || new Date().toISOString(),
+                paidAt: new Date().toISOString()
             };
+
+            // Create order record with whitelisted fields
+            const orderRecord = { fields: orderFields };
 
             // Execute both operations in parallel
             const [leadResult, orderResult] = await Promise.all([
@@ -126,7 +183,7 @@ exports.handler = async (event, context) => {
                     method: 'PATCH',
                     table: AIRTABLE_LEADS_TABLE,
                     data: leadUpdate,
-                    recordId: orderData.leadId
+                    recordId: leadRecordId
                 }),
                 airtableRequest({
                     method: 'POST',
@@ -147,10 +204,38 @@ exports.handler = async (event, context) => {
         } 
         // Handle payment failure (update lead only)
         else if (orderData.paymentStatus === 'FAILED') {
+            // Find lead record by leadId with proper escaping
+            const safeLeadId = String(orderData.leadId).replace(/'/g, "\\'");
+            const formula = `{leadId}='${safeLeadId}'`;
+            
+            const findLeadResult = await airtableRequest({
+                method: 'GET',
+                table: AIRTABLE_LEADS_TABLE,
+                params: {
+                    filterByFormula: formula,
+                    maxRecords: 1
+                }
+            });
+            
+            if (!findLeadResult.records || findLeadResult.records.length === 0) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ 
+                        ok: false, 
+                        error: 'Lead not found',
+                        details: `No lead found with leadId: ${orderData.leadId}`
+                    })
+                };
+            }
+
+            const leadRecordId = findLeadResult.records[0].id;
+            
+            // Whitelisted fields for failed payment update
             const leadUpdate = {
                 fields: {
                     step: 'FAILED',
                     status: 'FAILED',
+                    transactionId: orderData.transactionId || '',
                     paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                         ? JSON.stringify(orderData.paymentStatusRaw) 
                         : String(orderData.paymentStatusRaw || 'Payment failed'),
@@ -162,7 +247,7 @@ exports.handler = async (event, context) => {
                 method: 'PATCH',
                 table: AIRTABLE_LEADS_TABLE,
                 data: leadUpdate,
-                recordId: orderData.leadId
+                recordId: leadRecordId
             });
 
             return {
@@ -176,26 +261,78 @@ exports.handler = async (event, context) => {
         }
         // Regular lead update (not a payment event)
         else {
-            // Only update the lead, not the orders table
+            // Find lead record by leadId with proper escaping
+            const safeLeadId = String(orderData.leadId).replace(/'/g, "\\'");
+            const formula = `{leadId}='${safeLeadId}'`;
+            
+            const findLeadResult = await airtableRequest({
+                method: 'GET',
+                table: AIRTABLE_LEADS_TABLE,
+                params: {
+                    filterByFormula: formula,
+                    maxRecords: 1
+                }
+            });
+            
+            if (!findLeadResult.records || findLeadResult.records.length === 0) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ 
+                        ok: false, 
+                        error: 'Lead not found',
+                        details: `No lead found with leadId: ${orderData.leadId}`
+                    })
+                };
+            }
+
+            const leadRecordId = findLeadResult.records[0].id;
+
+            // Whitelist of allowed lead fields (only fields that exist in Airtable)
+            const allowedLeadFields = [
+                'step', 'status', 'customerEmail', 'customerName', 'country',
+                'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
+                'photoCount', 'packageKey', 'totalAmount', 'currency', 'paymentStatus',
+                'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes'
+            ];
+            
+            // Only include fields that exist in the Airtable schema
+            const existingLeadFields = new Set([
+                // Add all known Airtable column names here
+                'step', 'status', 'customerEmail', 'customerName', 'country',
+                'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
+                'photoCount', 'packageKey', 'totalAmount', 'currency', 'paymentStatus',
+                'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes',
+                'createdAt', 'updatedAt', 'paidAt'
+            ]);
+            
+            const filteredLeadFields = allowedLeadFields.filter(field => existingLeadFields.has(field));
+
+            // Prepare lead update with only whitelisted fields
             const leadUpdate = {
                 fields: {
-                    ...orderData,
                     step: orderData.step || 'STEP_1',
                     updatedAt: new Date().toISOString(),
                     createdAt: orderData.createdAt || new Date().toISOString()
                 }
             };
 
-            // Handle imageUrls if it's an array
-            if (leadUpdate.fields.imageUrls && Array.isArray(leadUpdate.fields.imageUrls)) {
-                leadUpdate.fields.imageUrls = JSON.stringify(leadUpdate.fields.imageUrls);
-            }
+            // Copy only whitelisted and existing fields from orderData to leadUpdate
+            filteredLeadFields.forEach(field => {
+                if (orderData[field] !== undefined && orderData[field] !== null) {
+                    // Special handling for imageUrls array
+                    if (field === 'imageUrls' && Array.isArray(orderData[field])) {
+                        leadUpdate.fields[field] = JSON.stringify(orderData[field]);
+                    } else {
+                        leadUpdate.fields[field] = orderData[field];
+                    }
+                }
+            });
 
             const leadResult = await airtableRequest({
                 method: 'PATCH',
                 table: AIRTABLE_LEADS_TABLE,
                 data: leadUpdate,
-                recordId: orderData.leadId
+                recordId: leadRecordId
             });
 
             return {
@@ -212,12 +349,54 @@ exports.handler = async (event, context) => {
 
     } catch (error) {
         console.error('Error processing order:', error);
+        
+        // Handle Airtable API errors
+        if (error.type === 'AirtableError') {
+            const statusCode = error.statusCode || 500;
+            const errorMessage = error.message || 'Airtable API error';
+            
+            return {
+                statusCode,
+                body: JSON.stringify({
+                    ok: false,
+                    error: errorMessage,
+                    details: {
+                        message: error.details?.message || errorMessage,
+                        type: error.type,
+                        status: statusCode,
+                        code: error.details?.code,
+                        raw: process.env.NODE_ENV === 'development' ? error.details : undefined
+                    },
+                    status: statusCode
+                })
+            };
+        }
+        
+        // Handle our custom error format
+        if (error.status) {
+            return {
+                statusCode: error.status,
+                body: JSON.stringify({
+                    ok: false,
+                    error: error.message || 'Error processing request',
+                    details: error.details || {},
+                    status: error.status,
+                    type: error.type || 'RequestError'
+                })
+            };
+        }
+        
+        // Handle standard errors
         return {
             statusCode: 500,
             body: JSON.stringify({ 
                 ok: false, 
                 error: 'Internal server error',
-                details: error.message
+                details: {
+                    message: error.message || 'An unknown error occurred',
+                    type: 'ServerError'
+                },
+                status: 500
             })
         };
     }
