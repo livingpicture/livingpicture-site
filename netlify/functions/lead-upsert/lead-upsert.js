@@ -19,6 +19,7 @@ exports.handler = async (event, context) => {
         console.error(errorMessage, parseError);
         return {
             statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 ok: false,
                 error: 'Invalid JSON',
@@ -104,19 +105,7 @@ exports.handler = async (event, context) => {
         // Validate step format
         const validSteps = ['STEP_1', 'STEP_2', 'STEP_3', 'CHECKOUT'];
         if (!validSteps.includes(step)) {
-            const errorMessage = `Invalid step value. Must be one of: ${validSteps.join(', ')}`;
-            console.error('Validation error:', errorMessage);
-            return {
-                statusCode: 400,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ok: false,
-                    error: 'Validation Error',
-                    message: errorMessage,
-                    receivedStep: step,
-                    validSteps
-                })
-            };
+            console.warn(`Invalid step value received: ${step}. Proceeding anyway.`);
         }
         
         console.log('Processing lead with ID:', leadId, 'Step:', step);
@@ -128,73 +117,83 @@ exports.handler = async (event, context) => {
                 // Required fields
                 leadId: String(leadId).trim(),
                 step: step,
-                updatedAt: now,
-                
-                // Map and sanitize other fields
-                ...(otherFields.customerEmail && { 
-                    customerEmail: String(otherFields.customerEmail).trim() 
-                }),
-                ...(otherFields.memoryTitle && { 
-                    memoryTitle: String(otherFields.memoryTitle).trim() 
-                }),
-                
-                // Handle imageUrls - ensure it's a string
-                ...(otherFields.imageUrls !== undefined && { 
-                    imageUrls: Array.isArray(otherFields.imageUrls) 
-                        ? otherFields.imageUrls.join(',')
-                        : String(otherFields.imageUrls)
-                }),
-                
-                // Include all other fields with basic string conversion
-                ...Object.fromEntries(
-                    Object.entries(otherFields)
-                        .filter(([key]) => !['leadId', 'step', 'customerEmail', 'memoryTitle', 'imageUrls'].includes(key))
-                        .map(([key, value]) => [
-                            key,
-                            typeof value === 'object' ? JSON.stringify(value) : String(value)
-                        ])
-                )
+                updatedAt: now
             }
         };
+
+        // Add optional fields only if they exist and are not empty
+        if (otherFields.customerEmail) {
+            recordData.fields.customerEmail = String(otherFields.customerEmail).trim();
+        }
+        if (otherFields.customerName) {
+            recordData.fields.customerName = String(otherFields.customerName).trim();
+        }
+        if (otherFields.customerPhone) {
+            recordData.fields.customerPhone = String(otherFields.customerPhone).trim();
+        }
+        if (otherFields.country) {
+            recordData.fields.country = String(otherFields.country).trim();
+        }
+        if (otherFields.memoryTitle) {
+            recordData.fields.memoryTitle = String(otherFields.memoryTitle).trim();
+        }
+        if (otherFields.songChoice) {
+            recordData.fields.songChoice = String(otherFields.songChoice).trim();
+        }
+        if (otherFields.photoCount !== undefined) {
+            recordData.fields.photoCount = Number(otherFields.photoCount) || 0;
+        }
+        if (otherFields.packageKey) {
+            recordData.fields.packageKey = String(otherFields.packageKey).trim();
+        }
+        if (otherFields.totalAmount !== undefined) {
+            recordData.fields.totalAmount = Number(otherFields.totalAmount) || 0;
+        }
+        if (otherFields.currency) {
+            recordData.fields.currency = String(otherFields.currency).toUpperCase().trim();
+        }
+        if (otherFields.paymentstatus) {
+            recordData.fields.paymentstatus = String(otherFields.paymentstatus).toLowerCase();
+        }
+        
+        // Handle imageUrls - ensure it's a comma-separated string
+        if (otherFields.imageUrls !== undefined && otherFields.imageUrls !== null) {
+            if (Array.isArray(otherFields.imageUrls)) {
+                recordData.fields.imageUrls = otherFields.imageUrls
+                    .filter(url => url && typeof url === 'string')
+                    .join(',');
+            } else {
+                recordData.fields.imageUrls = String(otherFields.imageUrls);
+            }
+        }
         
         console.log('Prepared record data for Airtable:', JSON.stringify(recordData, null, 2));
 
-        // First, try to find an existing record with this leadId
-        // Escape single quotes in leadId for the Airtable formula
-        const escapedLeadId = escapeSingleQuotes(leadId);
+        // Search for existing record with this leadId
+        const escapedLeadId = escapeSingleQuotes(String(leadId));
         const filterFormula = `{leadId}='${escapedLeadId}'`;
-        const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+        const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}?filterByFormula=${encodeURIComponent(filterFormula)}&maxRecords=1`;
         
         console.log('Searching for existing lead with filter:', filterFormula);
         
-        let findResponse;
-        try {
-            findResponse = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!findResponse.ok) {
-                const errorText = await findResponse.text();
-                throw new Error(`Airtable API error (${findResponse.status}): ${errorText}`);
+        const findResponse = await fetch(searchUrl, {
+            headers: {
+                'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                'Content-Type': 'application/json'
             }
-        } catch (error) {
-            console.error('Error searching for existing lead:', error);
-            throw new Error(`Failed to search for existing lead: ${error.message}`);
+        });
+
+        if (!findResponse.ok) {
+            const errorText = await findResponse.text();
+            console.error('Airtable search error:', errorText);
+            throw new Error(`Airtable API error (${findResponse.status}): ${errorText}`);
         }
 
-        let findResult;
-        try {
-            findResult = await findResponse.json();
-            console.log(`Found ${findResult.records ? findResult.records.length : 0} matching records`);
-        } catch (parseError) {
-            console.error('Failed to parse find response:', parseError);
-            throw new Error(`Failed to parse Airtable response: ${parseError.message}`);
-        }
+        const findResult = await findResponse.json();
+        console.log(`Found ${findResult.records ? findResult.records.length : 0} matching records`);
         
         let response;
+        let action;
 
         if (findResult.records && findResult.records.length > 0) {
             // Update existing record
@@ -204,35 +203,27 @@ exports.handler = async (event, context) => {
             console.log(`Updating existing record ${recordId} for lead ${leadId}`);
             
             // Keep the original createdAt if it exists
-            recordData.fields.createdAt = existingRecord.fields.createdAt || now;
-            
-            try {
-                response = await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}/${recordId}`,
-                    {
-                        method: 'PATCH',
-                        headers: {
-                            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            fields: recordData.fields,
-                            typecast: true
-                        })
-                    }
-                );
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Failed to update record (${response.status}): ${errorText}`);
-                }
-                
-                console.log(`Successfully updated record ${recordId} for lead ${leadId}`);
-                
-            } catch (error) {
-                console.error(`Error updating record ${recordId}:`, error);
-                throw new Error(`Failed to update lead: ${error.message}`);
+            if (existingRecord.fields.createdAt) {
+                recordData.fields.createdAt = existingRecord.fields.createdAt;
+            } else {
+                recordData.fields.createdAt = now;
             }
+            
+            response = await fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}/${recordId}`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fields: recordData.fields
+                    })
+                }
+            );
+            
+            action = 'updated';
             
         } else {
             // Create new record
@@ -240,190 +231,68 @@ exports.handler = async (event, context) => {
             
             console.log(`Creating new record for lead ${leadId}`);
             
-            try {
-                response = await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            fields: recordData.fields,
-                            typecast: true
-                        })
-                    }
-                );
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Failed to create record (${response.status}): ${errorText}`);
-                }
-                
-                console.log(`Successfully created new record for lead ${leadId}`);
-                
-            } catch (error) {
-                console.error('Error creating new record:', error);
-                throw new Error(`Failed to create lead: ${error.message}`);
-            }
-        }
-
-        let result;
-        try {
-            result = await response.json();
-            console.log('Airtable API response:', JSON.stringify(result, null, 2));
-            
-            if (!response.ok) {
-                console.error('Airtable API error response:', result);
-                return {
-                    statusCode: response.status,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        ok: false, 
-                        error: 'Airtable API Error',
-                        message: 'Failed to save lead data',
-                        status: response.status,
-                        details: result.error || 'Unknown error',
-                        requestId: response.headers.get('x-request-id')
+            response = await fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fields: recordData.fields
                     })
-                };
-            }
+                }
+            );
             
-            console.log(`Successfully processed lead ${leadId}`);
-            
-        } catch (parseError) {
-            console.error('Failed to parse Airtable response:', parseError);
+            action = 'created';
+        }
+
+        const result = await response.json();
+        console.log('Airtable API response:', JSON.stringify(result, null, 2));
+        
+        if (!response.ok) {
+            console.error('Airtable API error response:', result);
             return {
-                statusCode: 500,
+                statusCode: response.status,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ok: false,
-                    error: 'Response Parse Error',
-                    message: 'Failed to parse Airtable response',
-
-let findResponse;
-try {
-    findResponse = await fetch(url, {
-        headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json'
-        }
-    });
-
-    if (!findResponse.ok) {
-        const errorText = await findResponse.text();
-        throw new Error(`Airtable API error (${findResponse.status}): ${errorText}`);
-    }
-} catch (error) {
-    console.error('Error searching for existing lead:', error);
-    throw new Error(`Failed to search for existing lead: ${error.message}`);
-}
-
-let findResult;
-try {
-    findResult = await findResponse.json();
-    console.log(`Found ${findResult.records ? findResult.records.length : 0} matching records`);
-} catch (parseError) {
-    console.error('Failed to parse find response:', parseError);
-    throw new Error(`Failed to parse Airtable response: ${parseError.message}`);
-}
-
-let response;
-
-if (findResult.records && findResult.records.length > 0) {
-    // Update existing record
-    const existingRecord = findResult.records[0];
-    const recordId = existingRecord.id;
-    
-    console.log(`Updating existing record ${recordId} for lead ${leadId}`);
-    
-    // Keep the original createdAt if it exists
-    recordData.fields.createdAt = existingRecord.fields.createdAt || now;
-    
-    try {
-        response = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}/${recordId}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    fields: recordData.fields,
-                    typecast: true
+                body: JSON.stringify({ 
+                    ok: false, 
+                    error: 'Airtable API Error',
+                    message: 'Failed to save lead data',
+                    status: response.status,
+                    details: result.error?.message || result.error || 'Unknown error',
+                    action: action
                 })
-            }
-        );
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update record (${response.status}): ${errorText}`);
+            };
         }
         
-        console.log(`Successfully updated record ${recordId} for lead ${leadId}`);
+        console.log(`=== Successfully ${action} lead ${leadId} ===`);
         
-    } catch (error) {
-        console.error(`Error updating record ${recordId}:`, error);
-        throw new Error(`Failed to update lead: ${error.message}`);
-    }
-    
-} else {
-    // Create new record
-    recordData.fields.createdAt = now;
-    
-    console.log(`Creating new record for lead ${leadId}`);
-    
-    try {
-        response = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_LEADS_TABLE)}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    fields: recordData.fields,
-                    typecast: true
-                })
-            }
-        );
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create record (${response.status}): ${errorText}`);
-        }
-        
-        console.log(`Successfully created new record for lead ${leadId}`);
-        
-    } catch (error) {
-        console.error('Error creating new record:', error);
-        throw new Error(`Failed to create lead: ${error.message}`);
-    }
-}
-
-let result;
-try {
-    result = await response.json();
-    console.log('Airtable API response:', JSON.stringify(result, null, 2));
-    
-    if (!response.ok) {
-        console.error('Airtable API error response:', result);
         return {
-            statusCode: response.status,
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ok: true,
+                record: result,
+                action: action,
+                leadId: leadId
+            })
+        };
+
+    } catch (error) {
+        console.error('=== Error processing lead ===');
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        return {
+            statusCode: error.statusCode || 500,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 ok: false, 
-                error: 'Airtable API Error',
-                message: 'Failed to save lead data',
-                status: response.status,
-                details: result.error || 'Unknown error',
-                requestId: response.headers.get('x-request-id')
+                error: 'Internal Server Error',
+                message: error.message,
                 details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-                leadId: leadId || 'unknown',
-                step: step || 'unknown',
                 timestamp: new Date().toISOString()
             })
         };

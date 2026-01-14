@@ -116,7 +116,7 @@ exports.handler = async (event, context) => {
             cancel_url: `${env.SITE_URL}/payment-failed.html`,
             callback_url: `${env.SITE_URL}/.netlify/functions/payplus-callback`,
             metadata: {
-                leadId: leadId || `lead_${Date.now()}`,
+                leadId: leadId || `lead_${Date.now()}git`,
                 orderId: orderId,
                 source: 'memory-book-order',
                 timestamp: new Date().toISOString()
