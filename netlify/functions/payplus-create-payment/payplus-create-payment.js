@@ -123,13 +123,29 @@ exports.handler = async (event, context) => {
             }
         };
 
+        // Sanitize API key to avoid common formatting issues
+        const raw = String(env.PAYPLUS_API_KEY || "");
+        const apiKey = raw
+            .replace(/^Bearer\s+/i, "")  // Remove any existing Bearer prefix
+            .replace(/^["']|["']$/g, "")  // Remove any surrounding quotes
+            .trim()
+            .replace(/\s+/g, "");  // Remove any internal whitespace
+
+        // Prepare headers
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        };
+
+        // Safe debug logging (no secrets)
+        console.log("Auth header format:", "Bearer " + "*".repeat(Math.min(apiKey.length, 6)));
+        console.log("Sending headers keys:", Object.keys(headers));
+        console.log("Request URL:", `${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`);
+
         // Make request to PayPlus API
         const response = await fetch(`${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${env.PAYPLUS_API_KEY}`
-            },
+            headers: headers,
             body: JSON.stringify(paymentData)
         });
 
