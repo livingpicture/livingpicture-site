@@ -208,52 +208,7 @@ exports.handler = async (event, context) => {
             };
         }
         
-        if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_NAME) {
-            console.error('Missing required environment variables');
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ ok: false, error: 'Server configuration error' })
-            };
-        }
-
-        // Create record in Airtable
-        const response = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(recordData)
-            }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error('Airtable API error:', data);
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ 
-                    ok: false, 
-                    error: 'Failed to create order',
-                    details: data.error?.message || 'Unknown error'
-                })
-            };
-        }
-
-        // Generate a simple order ID if not provided
-        const orderId = orderData.orderId || `LP-${Math.floor(100000 + Math.random() * 900000)}`;
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                ok: true,
-                orderId: orderId,
-                airtableRecordId: data.id
-            })
-        };
+        // This block intentionally left blank - redundant code removed
 
     } catch (error) {
         console.error('Error processing order:', error);
