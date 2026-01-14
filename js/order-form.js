@@ -491,10 +491,11 @@ async function syncLeadToAirtable() {
         // Get current step in the correct format
         const currentStepValue = stepMapping[currentStep] || 'STEP_1';
         
-        // Get all image URLs, ensuring they're valid Cloudinary URLs
+        // Get all image URLs, ensuring they're valid Cloudinary URLs and convert to comma-separated string
         const imageUrls = (formData.photos || [])
-            .map(photo => photo.permanentUrl || '')
-            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'));
+            .map(photo => (photo.permanentUrl || '').trim())
+            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'))
+            .join(','); // Convert array to comma-separated string
 
         // Prepare lead data according to Airtable Leads schema (16 fields)
         const leadData = {
@@ -520,7 +521,7 @@ async function syncLeadToAirtable() {
             
             // Music selection (field 16)
             songChoice: formData.music?.songName 
-                ? `${formData.music.songName} by ${formData.music.artistName || 'Unknown Artist'}` 
+                ? `${formData.music.songName}${formData.music.artistName ? ' by ' + formData.music.artistName : ''}`.trim()
                 : '',
                 
             // System fields
@@ -542,7 +543,9 @@ async function syncLeadToAirtable() {
         console.log('Syncing lead to Airtable:', {
             leadId: leadData.leadId,
             step: leadData.step,
-            hasImages: imageUrls.length > 0
+            hasImages: imageUrls ? imageUrls.split(',').length > 0 : false,
+            imageUrlCount: imageUrls ? imageUrls.split(',').length : 0,
+            fields: Object.keys(leadData)
         });
 
         try {
@@ -592,12 +595,22 @@ async function syncLeadToAirtable() {
 async function showStep(stepNumber) {
     // 1. First, sync with Airtable at the beginning of step transition
     try {
-        console.log(`Syncing lead data before step transition from ${currentStep} to ${stepNumber}...`);
-        await syncLeadToAirtable();
-        console.log('Lead data synced successfully before step change');
+        console.log(`[Airtable Sync] Starting sync before step transition from ${currentStep} to ${stepNumber}...`);
+        const syncResult = await syncLeadToAirtable();
+        if (syncResult && syncResult.leadId) {
+            console.log(`[Airtable Sync] Successfully synced lead ${syncResult.leadId} at step ${currentStep}`);
+        } else {
+            console.warn('[Airtable Sync] Sync completed but no lead ID was returned');
+        }
     } catch (error) {
-        console.error('Error syncing lead data before step change:', error);
-        // Continue with step change even if sync fails
+        console.error('[Airtable Sync] Error during sync before step change:', {
+            error: error.message,
+            step: currentStep,
+            nextStep: stepNumber,
+            timestamp: new Date().toISOString()
+        });
+        // Continue with step change even if sync fails, but show a warning
+        showError('Warning: Could not save progress to our servers. Your data will be saved locally.');
     }
     
     // 2. Validate current step before proceeding
