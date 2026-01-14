@@ -1500,7 +1500,11 @@ async function completePurchase() {
         localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
 
         // Call Netlify function to create PayPlus payment
-        const response = await fetch('/.netlify/functions/payplus-create-payment', {
+        const functionUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+            ? 'https://livingpicture.netlify.app/.netlify/functions/payplus-create-payment'
+            : '/.netlify/functions/payplus-create-payment';
+            
+        const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

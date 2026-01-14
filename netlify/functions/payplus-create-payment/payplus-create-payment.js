@@ -78,6 +78,9 @@ exports.handler = async (event, context) => {
             PAYPLUS_API_KEY,
             PAYPLUS_PAYMENT_PAGE_UID,
             PAYPLUS_SECRET_KEY,
+            SITE_URL,
+            PAYPLUS_SUCCESS_URL,
+            PAYPLUS_FAILURE_URL,
             PAYPLUS_BASE_URL = 'https://restapidev.payplus.co.il/api/v1.0'
         } = process.env;
 
@@ -86,6 +89,7 @@ exports.handler = async (event, context) => {
         if (!PAYPLUS_API_KEY) missingVars.push('PAYPLUS_API_KEY');
         if (!PAYPLUS_PAYMENT_PAGE_UID) missingVars.push('PAYPLUS_PAYMENT_PAGE_UID');
         if (!PAYPLUS_SECRET_KEY) missingVars.push('PAYPLUS_SECRET_KEY');
+        if (!SITE_URL) missingVars.push('SITE_URL');
 
         if (missingVars.length > 0) {
             throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
@@ -98,9 +102,9 @@ exports.handler = async (event, context) => {
             currency_code: currency,
             item_name: 'Memory Book Order',
             item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
-            success_url: `${process.env.URL || 'https://www.livingpicture.net'}/thank-you.html`,
-            cancel_url: `${process.env.URL || 'https://www.livingpicture.net'}/payment-failed.html`,
-            callback_url: `${process.env.URL || 'https://www.livingpicture.net'}/.netlify/functions/payplus-callback`,
+            success_url: PAYPLUS_SUCCESS_URL || `${SITE_URL}/thank-you.html`,
+            cancel_url: PAYPLUS_FAILURE_URL || `${SITE_URL}/payment-failed.html`,
+            callback_url: `${SITE_URL}/.netlify/functions/payplus-callback`,
             metadata: {
                 leadId: leadId || `lead_${Date.now()}`,
                 orderId: orderId,
@@ -110,7 +114,7 @@ exports.handler = async (event, context) => {
         };
 
         // Make request to PayPlus API
-        const authString = Buffer.from(`${NETLIFY_PAYPLUS_API_KEY}:${NETLIFY_PAYPLUS_SECRET_KEY}`).toString('base64');
+        const authString = Buffer.from(`${PAYPLUS_API_KEY}:${PAYPLUS_SECRET_KEY}`).toString('base64');
         const response = await fetch(`${PAYPLUS_BASE_URL}/PaymentPages/generateLink`, {
             method: 'POST',
             headers: {
