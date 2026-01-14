@@ -128,8 +128,7 @@ exports.handler = async (event, context) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${env.PAYPLUS_API_KEY}`,
-                'secret-key': env.PAYPLUS_SECRET_KEY
+                'Authorization': `Bearer ${env.PAYPLUS_API_KEY}`
             },
             body: JSON.stringify(paymentData)
         });
