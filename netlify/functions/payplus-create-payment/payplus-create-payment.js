@@ -50,8 +50,11 @@ exports.handler = async (event, context) => {
         console.log('Received request with keys:', Object.keys(requestBody));
 
         // Validate required fields
-        const { amount, currency = 'USD', leadId } = requestBody;
+        const { amount, currency = 'USD', leadId, orderId } = requestBody;
         const errors = [];
+
+        // Log received orderId for debugging
+        console.log('Received orderId:', orderId);
 
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             errors.push('amount must be a positive number');
@@ -94,12 +97,13 @@ exports.handler = async (event, context) => {
             amount: amount * 100, // Convert to agorot/cent
             currency_code: currency,
             item_name: 'Memory Book Order',
-            item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}`,
-            success_url: `${process.env.URL || 'https://your-site.com'}/payment/success`,
-            cancel_url: `${process.env.URL || 'https://your-site.com'}/payment/cancel`,
-            callback_url: `${process.env.URL || 'https://your-site.com'}/.netlify/functions/create-order`,
+            item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
+            success_url: `${process.env.URL || 'https://www.livingpicture.net'}/thank-you.html`,
+            cancel_url: `${process.env.URL || 'https://www.livingpicture.net'}/payment-failed.html`,
+            callback_url: `${process.env.URL || 'https://www.livingpicture.net'}/.netlify/functions/payplus-callback`,
             metadata: {
-                leadId,
+                leadId: leadId || `lead_${Date.now()}`,
+                orderId: orderId,
                 source: 'memory-book-order',
                 timestamp: new Date().toISOString()
             }

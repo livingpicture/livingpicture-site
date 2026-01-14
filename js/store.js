@@ -1458,7 +1458,7 @@ function updateOrderSummary() {
 }
 
 // Complete purchase
-function completePurchase() {
+async function completePurchase() {
     // Show loading state
     const completeBtn = document.getElementById('complete-purchase');
     const originalBtnText = completeBtn ? completeBtn.innerHTML : '';
@@ -1472,52 +1472,74 @@ function completePurchase() {
         completeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     }
 
-    // In a real app, this would process the payment
-    // For demonstration, we'll simulate a payment process with a 90% success rate
-    const isPaymentSuccessful = Math.random() < 0.9; // 90% success rate for demo
+    try {
+        // Generate order ID using crypto.randomUUID if available, or fallback to timestamp
+        const orderId = typeof crypto !== 'undefined' && crypto.randomUUID 
+            ? `LP-${crypto.randomUUID()}` 
+            : `LP-${Date.now()}-${Math.floor(Math.random()*1e6)}`;
 
-    // Generate a random order ID
-    const orderId = 'LP-' + Math.floor(100000 + Math.random() * 900000);
+        // Save order data to localStorage for the thank you page
+        const orderData = {
+            orderId: orderId,
+            date: new Date().toISOString(),
+            email: formData.customer?.email || '',
+            memoryName: formData.memoryName || 'My Memory',
+            photoCount: formData.photos?.length || 0,
+            items: formData.photos || [],
+            total: formData.pricing?.totalPrice || 0,
+            currency: currency,
+            currencySymbol: currencySymbol,
+            pricing: {
+                tier: formData.pricing?.currentTier || '1-5',
+                pricePerPhoto: formData.pricing?.pricePerPhoto || 0,
+                totalPrice: formData.pricing?.totalPrice || 0
+            },
+            customer: formData.customer || {}
+        };
 
-    // Save order data to localStorage for the thank you page
-    const orderData = {
-        orderId: orderId,
-        date: new Date().toISOString(),
-        email: formData.customer?.email || '',
-        memoryName: formData.memoryName || 'My Memory',
-        photoCount: formData.photos?.length || 0,
-        items: formData.photos || [],
-        total: formData.pricing?.totalPrice || 0,
-        currency: currency,
-        currencySymbol: currencySymbol,
-        pricing: {
-            tier: formData.pricing?.currentTier || '1-5',
-            pricePerPhoto: formData.pricing?.pricePerPhoto || 0,
-            totalPrice: formData.pricing?.totalPrice || 0
-        },
-        customer: formData.customer || {}
-    };
+        localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
 
-    localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
+        // Call Netlify function to create PayPlus payment
+        const response = await fetch('/.netlify/functions/payplus-create-payment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                amount: formData.pricing?.totalPrice || 0,
+                currency: currency,
+                leadId: window.leadTracker?.leadId || `lead_${Date.now()}`,
+                orderId: orderId
+            })
+        });
 
-    // Simulate API call delay (1-2 seconds)
-    setTimeout(() => {
-        if (isPaymentSuccessful) {
-            // Payment successful - redirect to thanks.html
-            window.location.href = 'thanks.html?order=' + orderId;
-            // Clear the form data after successful purchase
-            clearFormData();
+        const result = await response.json();
+
+        if (result.ok && result.paymentUrl) {
+            // Redirect to PayPlus payment page
+            window.location.href = result.paymentUrl;
         } else {
-            // Payment failed - redirect to payment-failed.html
-            window.location.href = 'payment-failed.html';
-
-            // Restore button state if still on the same page
-            if (completeBtn) {
-                completeBtn.disabled = false;
-                completeBtn.innerHTML = originalBtnText;
-            }
+            throw new Error(result.error || 'Failed to create payment');
         }
-    }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+    } catch (error) {
+        console.error('Payment error:', error);
+        
+        // Show error to user
+        if (typeof showError === 'function') {
+            showError('Payment processing failed. Please try again.');
+        } else {
+            alert('Payment processing failed. Please try again.');
+        }
+
+        // Restore button state
+        if (completeBtn) {
+            completeBtn.disabled = false;
+            completeBtn.innerHTML = originalBtnText;
+        }
+
+        // Optionally redirect to payment failed page
+        // window.location.href = 'payment-failed.html';
+    }
 }
 
 // Handle payment retry from payment-failed.html
