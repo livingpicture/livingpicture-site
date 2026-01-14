@@ -505,7 +505,7 @@ async function syncLeadToAirtable() {
             country: (formData.customer?.country || 'Israel').trim(),
             
             // Memory information (fields 6-10)
-            memoryTitle: (formData.memoryName || '').trim(),
+            memoryTitle: (formData.memoryTitle || formData.memoryName || '').trim(),
             photoCount: formData.photos?.length || 0,
             packageKey: formData.pricing?.currentTier || '1-5',
             imageUrls: imageUrls.join(','), // Convert array to comma-separated string
