@@ -150,26 +150,38 @@ exports.handler = async (event, context) => {
 
             // Whitelisted fields for order creation
             const orderFields = {
-                leadId: orderData.leadId,
+                // Primary field
                 orderId: orderData.orderId || `ORD-${Date.now()}`,
-                paymentStatus: 'PAID',
+                
+                // Customer Information
                 customerEmail: orderData.customerEmail || '',
                 customerName: orderData.customerName || '',
                 country: orderData.country || '',
+                
+                // Order Details
                 memoryTitle: orderData.memoryTitle || orderData.memoryName || '',
                 songChoice: orderData.songChoice || '',
                 photoCount: Number(orderData.photoCount) || 0,
                 packageKey: orderData.packageKey || '',
-                totalAmount: Number(orderData.totalAmount) || 0,
-                currency: orderData.currency || 'USD',
                 imageUrls: Array.isArray(orderData.imageUrls) 
                     ? JSON.stringify(orderData.imageUrls) 
                     : (orderData.imageUrls || ''),
+                totalAmount: Number(orderData.totalAmount) || 0,
+                currency: orderData.currency || 'USD',
+                
+                // Payment Information
+                paymentstatus: 'PAID', // Note: all lowercase as per schema
                 transactionId: orderData.transactionId || '',
                 paymentProvider: orderData.paymentProvider || 'payplus',
                 paymentStatusRaw: typeof orderData.paymentStatusRaw === 'object' 
                     ? JSON.stringify(orderData.paymentStatusRaw) 
                     : String(orderData.paymentStatusRaw || ''),
+                payplusPaymentLink: orderData.payplusPaymentLink || '',
+                
+                // Order Management
+                fulfillmentStatus: 'NEW',
+                
+                // Timestamps
                 createdAt: orderData.createdAt || new Date().toISOString(),
                 paidAt: new Date().toISOString()
             };
@@ -289,21 +301,26 @@ exports.handler = async (event, context) => {
 
             // Whitelist of allowed lead fields (only fields that exist in Airtable)
             const allowedLeadFields = [
-                'step', 'paymentStatus', 'customerEmail', 'customerName', 'country',
+                // Customer Information
+                'customerEmail', 'customerName', 'country',
+                
+                // Order Details
                 'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
                 'photoCount', 'packageKey', 'totalAmount', 'currency',
-                'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes'
+                
+                // Payment Information
+                'paymentstatus', 'paymentProvider', 'paymentStatusRaw', 'transactionId',
+                'payplusPaymentLink',
+                
+                // Order Management
+                'fulfillmentStatus',
+                
+                // System fields
+                'step', 'notes', 'createdAt', 'updatedAt', 'paidAt'
             ];
             
             // Only include fields that exist in the Airtable schema
-            const existingLeadFields = new Set([
-                // Add all known Airtable column names here
-                'step', 'paymentStatus', 'customerEmail', 'customerName', 'country',
-                'memoryName', 'memoryTitle', 'songName', 'artistName', 'imageUrls',
-                'photoCount', 'packageKey', 'totalAmount', 'currency',
-                'paymentProvider', 'paymentStatusRaw', 'transactionId', 'notes',
-                'createdAt', 'updatedAt', 'paidAt'
-            ]);
+            const existingLeadFields = new Set(allowedLeadFields);
             
             const filteredLeadFields = allowedLeadFields.filter(field => existingLeadFields.has(field));
 
