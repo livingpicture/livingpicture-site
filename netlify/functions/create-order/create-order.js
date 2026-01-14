@@ -1,5 +1,3 @@
-const fetch = require('node-fetch');
-
 // Helper function to make Airtable API requests
 async function airtableRequest(config) {
     const { method, table, data, recordId } = config;
