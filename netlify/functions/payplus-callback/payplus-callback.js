@@ -40,35 +40,39 @@ async function moveLeadToOrders(leadId, paymentData) {
       // Primary field - first column in Airtable is the record name
       'orderId': orderId,
       
-      // Customer information (fields 1-5)
+      // ===== CUSTOMER INFORMATION =====
       'customerEmail': leadData['customerEmail'] || '',
       'customerName': leadData['customerName'] || leadData['Name'] || '',
       'customerPhone': leadData['customerPhone'] || leadData['Phone'] || '',
       'country': leadData['country'] || leadData['Country'] || 'Israel',
       
-      // Order details (fields 6-13)
+      // ===== ORDER DETAILS =====
+      // Pulled from lead data
       'memoryTitle': leadData['memoryTitle'] || leadData['Memory Name'] || '',
       'photoCount': Number(leadData['photoCount'] || leadData['Photo Count'] || 0),
       'packageKey': leadData['packageKey'] || 'basic',
       'totalAmount': Number(leadData['totalAmount'] || leadData['Total Amount'] || 0),
-      'currency': (leadData['currency'] || leadData['Currency'] || 'ILS').toUpperCase(),
+      // Image URLs from lead data, properly formatted as comma-separated string
       'imageUrls': Array.isArray(leadData['imageUrls']) 
         ? leadData['imageUrls'].join(',') 
         : (leadData['imageUrls'] || leadData['Image URLs'] || ''),
       'source': leadData['source'] || 'website',
       'notes': leadData['notes'] || leadData['Notes'] || '',
       
-      // Payment information (fields 14-17)
-      'paymentstatus': 'paid', // all lowercase as per schema
-      'amount': Number(paymentData.amount || 0),
-      'currency': paymentData.currency || 'ILS',
-      'transactionId': paymentData.transaction_uid || paymentData.id || '',
-      'paymentStatus': 'paid',
-      'paymentProvider': 'payplus',
-      'paymentStatusRaw': JSON.stringify(paymentData) || '{}',
+      // ===== PAYMENT INFORMATION =====
+      // Payment data from PayPlus
+      'amount': Number(paymentData.amount || 0),  // From paymentData
+      'currency': paymentData.currency || 'ILS',  // From paymentData
+      'transactionId': paymentData.transaction_uid || paymentData.id || '',  // From paymentData
       
-      // Order status (fields 18-20)
-      'fulfillmentStatus': 'NEW',
+      // Payment status (both variants for compatibility)
+      'paymentstatus': 'paid',  // all lowercase as per schema
+      'paymentStatus': 'paid',  // alternate casing
+      'paymentProvider': 'payplus',
+      'paymentStatusRaw': JSON.stringify(paymentData) || '{}',  // Store full payment data
+      
+      // ===== ORDER STATUS =====
+      'fulfillmentStatus': 'NEW',  // Initial fulfillment status
       'createdAt': new Date().toISOString(),
       'updatedAt': now
     };

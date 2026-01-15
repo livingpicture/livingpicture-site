@@ -239,10 +239,15 @@ function setupEventListeners() {
                 e.preventDefault();
                 
                 const nextStep = nextButtons[buttonId];
+                console.log(`Button ${buttonId} clicked, current step: ${currentStep}, navigating to:`, nextStep);
                 
                 // Step 1: Memory Name → Photos
                 if (currentStep === 1) {
-                    if (!saveCurrentStep()) return;
+                    console.log('Processing step 1 → 2 transition');
+                    if (!saveCurrentStep()) {
+                        console.log('Step 1 validation failed');
+                        return;
+                    }
                     
                     try {
                         console.log('Syncing memory name to Airtable...');
@@ -252,35 +257,45 @@ function setupEventListeners() {
                         console.error('Error syncing memory name:', error);
                         showError('Warning: Could not save progress. Your data will be saved locally.');
                     }
+                    console.log('Calling showStep(2)');
                     await showStep(2);
                     return;
                 }
                 
                 // Step 2: Photos → Music
                 if (currentStep === 2) {
-                    // Only validate if no photos are selected at all
+                    console.log('Processing step 2 → 3 transition');
+                    
+                    // Allow proceeding if we have any photos, even if processing isn't complete
                     if (!formData.photos || formData.photos.length === 0) {
+                        console.log('No photos selected, showing validation error');
                         validatePhotoUpload();
                         return;
                     }
                     
-                    // If we have photos, proceed even if files are still processing
+                    console.log(`Found ${formData.photos.length} photos, proceeding to next step`);
                     saveCurrentStep();
-                    try {
-                        console.log('Syncing photos to Airtable before music step...');
-                        await syncLeadToAirtable();
-                        console.log('Photos synced successfully, proceeding to music step');
-                    } catch (error) {
-                        console.error('Error syncing photos:', error);
-                        showError('Warning: Could not save photos. Your data will be saved locally.');
-                    }
+                    
+                    // Sync in the background but don't wait for it to complete
+                    syncLeadToAirtable()
+                        .then(() => console.log('Background sync completed successfully'))
+                        .catch(error => {
+                            console.error('Background sync error:', error);
+                            showError('Warning: Could not save photos to server. Your data will be saved locally.');
+                        });
+                    
+                    console.log('Proceeding to music step');
                     await showStep(3);
                     return;
                 }
                 
                 // Step 3: Music → Checkout
                 if (currentStep === 3) {
-                    if (!validateMusicInputs() || !saveCurrentStep()) return;
+                    console.log('Processing step 3 → 4 transition');
+                    if (!validateMusicInputs() || !saveCurrentStep()) {
+                        console.log('Step 3 validation failed');
+                        return;
+                    }
                     
                     try {
                         console.log('Syncing music selection to Airtable...');
@@ -290,12 +305,14 @@ function setupEventListeners() {
                         console.error('Error syncing music selection:', error);
                         showError('Warning: Could not save music selection. Your data will be saved locally.');
                     }
+                    console.log('Calling showStep(4)');
                     await showStep(4);
                     return;
                 }
                 
                 // Step 4: Checkout → Complete
                 if (currentStep === 4 && nextStep === 'complete') {
+                    console.log('Processing step 4 → complete');
                     try {
                         // Update status to PENDING_PAYMENT before payment
                         console.log('Updating lead status to PENDING_PAYMENT...');
@@ -306,6 +323,7 @@ function setupEventListeners() {
                         console.error('Error updating lead status:', error);
                         // Still proceed with payment
                     }
+                    console.log('Calling completePurchase()');
                     completePurchase();
                     return;
                 }
@@ -472,150 +490,66 @@ function validatePhotoUpload() {
     return true;
 }
 
-// Sync lead data to Airtable
+// Update the syncLeadToAirtable function
 async function syncLeadToAirtable() {
+    console.log('[Airtable Sync] Starting sync...');
+    
     try {
-        // Only sync if we have at least some data
-        if (!formData) {
-            console.log('[Airtable Sync] No form data available for sync');
-            return null;
-        }
+        // ... (existing code to prepare leadData)
 
-        // Map step number to Single Select values
-        const stepMapping = {
-            1: 'STEP_1',
-            2: 'STEP_2',
-            3: 'STEP_3',
-            4: 'CHECKOUT'
-        };
-        
-        // Get current step in the correct format
-        const currentStepValue = stepMapping[currentStep] || 'STEP_1';
-        
-        // Get all image URLs, ensuring they're valid Cloudinary URLs and convert to comma-separated string
-        const imageUrlsArray = (formData.photos || [])
-            .map(photo => (photo.permanentUrl || '').trim())
-            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'));
-        
-        const imageUrlsString = imageUrlsArray.join(','); // Convert to comma-separated string
+        // Use relative URL for Netlify functions
+        const functionUrl = '/.netlify/functions/lead-upsert';
+        console.log(`Calling Netlify function at: ${functionUrl}`);
 
-        // Prepare lead data according to Airtable Leads schema
-        const leadData = {
-            // Required fields
-            leadId: window.leadTracker?.leadId || `lead_${Math.random().toString(36).substr(2, 9)}`,
-            step: currentStepValue,
-            
-            // Customer information
-            customerEmail: (formData.customer?.email || '').trim(),
-            customerName: (formData.customer?.name || '').trim(),
-            customerPhone: (formData.customer?.phone || '').trim(),
-            country: (formData.customer?.country || 'Israel').trim(),
-            
-            // Memory information
-            memoryTitle: (formData.memoryTitle || formData.memoryName || '').trim(),
-            photoCount: formData.photos?.length || 0,
-            packageKey: formData.pricing?.currentTier || '1-5',
-            imageUrls: imageUrlsString, // ✅ Already a comma-separated string
-            
-            // Financial information
-            totalAmount: formData.pricing?.totalPrice || 0,
-            currency: (formData.currency || 'ILS').toUpperCase(),
-            
-            // Music selection
-            songChoice: formData.music?.songName 
-                ? `${formData.music.songName}${formData.music.artistName ? ' by ' + formData.music.artistName : ''}`.trim()
-                : '',
-                
-            // System fields
-            updatedAt: new Date().toISOString(),
-            createdAt: formData.createdAt || new Date().toISOString()
-        };
-        
-        // Update leadTracker with the leadId
-        if (window.leadTracker && !window.leadTracker.leadId) {
-            window.leadTracker.leadId = leadData.leadId;
-        }
-
-        console.log('[Airtable Sync] Syncing lead to Airtable:', {
-            leadId: leadData.leadId,
-            step: leadData.step,
-            imageUrlCount: imageUrlsArray.length,
-            hasEmail: !!leadData.customerEmail,
-            hasMemoryTitle: !!leadData.memoryTitle,
-            photoCount: leadData.photoCount,
-            fields: Object.keys(leadData)
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(leadData)
         });
 
-        // Call the Netlify function with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-        try {
-            const response = await fetch('/.netlify/functions/lead-upsert', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(leadData),
-                signal: controller.signal
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: errorText
             });
-
-            clearTimeout(timeoutId);
-
-            // Log response status
-            console.log('[Airtable Sync] Response status:', response.status, response.statusText);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[Airtable Sync] HTTP error response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    body: errorText
-                });
-                
-                const error = new Error(`HTTP error! status: ${response.status}`);
-                error.response = { 
-                    status: response.status, 
-                    statusText: response.statusText, 
-                    data: errorText 
-                };
-                throw error;
-            }
-
-            const responseData = await response.json();
-            console.log('[Airtable Sync] ✅ Lead synced successfully:', { 
-                leadId: leadData.leadId, 
-                step: leadData.step,
-                action: responseData.action 
-            });
-            
-            return responseData;
-            
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.error('[Airtable Sync] Request timeout after 15 seconds');
-                throw new Error('Request timeout - please check your connection');
-            }
-            
-            console.error('[Airtable Sync] Error in sync request:', {
-                error: error.message,
-                name: error.name,
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                leadId: leadData.leadId,
-                step: leadData.step
-            });
-            throw error;
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const data = await response.json();
+        console.log('Sync successful:', data);
+        return data;
+
     } catch (error) {
-        console.error('[Airtable Sync] ❌ Error in syncLeadToAirtable:', {
-            message: error.message,
-            stack: error.stack,
-            currentStep: currentStep
+        console.error('Error in syncLeadToAirtable:', {
+            error: error.message,
+            stack: error.stack
         });
-        // Don't show error to user as this is a background sync
-        return null;
+        throw error;
+    }
+}
+
+// Update the showStep function to handle the sync properly
+async function showStep(stepNumber) {
+    try {
+        console.log(`Transitioning to step ${stepNumber}`);
+        await syncLeadToAirtable();
+        console.log('Sync completed, showing step:', stepNumber);
+        
+        // Your existing step transition logic here
+        document.querySelectorAll('.form-step').forEach(step => {
+            step.classList.remove('active');
+        });
+        document.getElementById(`step-${stepNumber}`).classList.add('active');
+        
+    } catch (error) {
+        console.error('Error during step transition:', error);
+        // Show user-friendly error message
+        alert('There was an error saving your progress. Please try again.');
     }
 }
 

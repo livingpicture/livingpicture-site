@@ -172,4 +172,61 @@ window.addEventListener('beforeunload', () => {
         clearTimeout(window.leadTracker.pendingUpdate);
         window.leadTracker.sendLeadData();
     }
+
+    // Add contact form submission handler
+    const contactForm = document.querySelector('form:not([action*="#"])'); // Exclude forms with # in action
+    if (contactForm) {
+        contactForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                // Get form data
+                const formData = new FormData(contactForm);
+                const formValues = Object.fromEntries(formData.entries());
+                
+                // Update lead with form data
+                await window.leadTracker.updateLead({
+                    ...formValues,
+                    formType: 'contact',
+                    formName: contactForm.getAttribute('name') || 'contactForm',
+                    pageUrl: window.location.href,
+                    timestamp: new Date().toISOString()
+                }, true); // Immediate update for form submissions
+
+                // Show success message
+                const submitButton = contactForm.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                
+                submitButton.disabled = true;
+                submitButton.textContent = 'Sending...';
+                
+                // Optional: You can add a more sophisticated success message
+                setTimeout(() => {
+                    submitButton.textContent = 'Message Sent!';
+                    contactForm.reset();
+                    
+                    // Reset button after 3 seconds
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                    }, 3000);
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Form submission error:', error);
+                alert('There was an error sending your message. Please try again.');
+                
+                // Re-enable the submit button
+                const submitButton = contactForm.querySelector('button[type="submit"]');
+                submitButton.disabled = false;
+                submitButton.textContent = submitButton.getAttribute('data-original-text') || 'Send Message';
+            }
+        });
+        
+        // Store original button text for later restoration
+        const submitButton = contactForm.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.setAttribute('data-original-text', submitButton.textContent);
+        }
+    }
 });
