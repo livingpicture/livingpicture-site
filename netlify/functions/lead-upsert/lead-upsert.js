@@ -120,12 +120,10 @@ exports.handler = async (event, context) => {
         const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
         const table = base(AIRTABLE_LEADS_TABLE);
 
-        // Prepare record data - using exact field names from Airtable schema
+        // Prepare record data - only including fields that exist in Airtable schema
         const recordData = {
             leadId,
             step,
-            ...otherFields,
-            // Include all possible fields from the form
             sessionId: otherFields.sessionId || '',
             country: otherFields.country || '',
             currency: otherFields.currency || 'ILS',
@@ -135,8 +133,13 @@ exports.handler = async (event, context) => {
             songChoice: otherFields.songChoice || '',
             photoCount: otherFields.photoCount || 0,
             totalAmount: otherFields.totalAmount || 0,
-            imageUrls: otherFields.imageUrls || []
+            imageUrls: otherFields.imageUrls || [],
+            utmSource: otherFields.utmSource || (otherFields.utmParams && otherFields.utmParams.utm_source) || '',
+            utmCampaign: otherFields.utmCampaign || (otherFields.utmParams && otherFields.utmParams.utm_campaign) || ''
         };
+
+        // Log the final data being sent to Airtable for debugging
+        console.log('Processed record data for Airtable:', JSON.stringify(recordData, null, 2));
 
         // Log the data being sent to Airtable
         console.log('Preparing to upsert record with data:', JSON.stringify(recordData, null, 2));
