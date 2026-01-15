@@ -23,6 +23,9 @@ function createResponse(statusCode, body) {
     };
 }
 
+// Import Airtable
+const Airtable = require('airtable');
+
 exports.handler = async (event, context) => {
     console.log('=== Lead Upsert Function Started ===');
     console.log('HTTP Method:', event.httpMethod);
@@ -113,19 +116,84 @@ exports.handler = async (event, context) => {
             });
         }
 
-        // Rest of your function logic here...
-        // [Previous code continues...]
+        // Initialize Airtable
+        const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
+        const table = base(AIRTABLE_LEADS_TABLE);
+
+        // Prepare record data - map fields to match Airtable column names
+        const recordData = {
+            'Lead ID': leadId,
+            'Step': step,
+            ...otherFields,
+            'Last Updated': new Date().toISOString()
+        };
+
+        // Log the data being sent to Airtable
+        console.log('Preparing to upsert record with data:', JSON.stringify(recordData, null, 2));
+
+        let result;
+        try {
+            // Check if a record with this leadId already exists
+            const existingRecords = await table.select({
+                filterByFormula: `{Lead ID} = '${escapeSingleQuotes(leadId)}'`,
+                maxRecords: 1
+            }).firstPage();
+
+            if (existingRecords && existingRecords.length > 0) {
+                // Update existing record
+                const recordId = existingRecords[0].id;
+                console.log(`Updating existing record ${recordId} for lead ${leadId}`);
+                result = await table.update(recordId, recordData);
+            } else {
+                // Create new record
+                console.log(`Creating new record for lead ${leadId}`);
+                result = await table.create(recordData);
+            }
+
+            // Log the Airtable response
+            console.log('Airtable response:', JSON.stringify(result, null, 2));
+
+            return createResponse(200, {
+                ok: true,
+                message: 'Lead data processed successfully',
+                recordId: result.id
+            });
+
+        } catch (airtableError) {
+            console.error('Airtable operation failed:', airtableError);
+            if (airtableError.error) {
+                console.error('Airtable error details:', JSON.stringify(airtableError.error, null, 2));
+            }
+            throw airtableError; // Re-throw to be caught by the outer catch
+        }
 
     } catch (error) {
         console.error('=== Error processing lead ===');
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         
-        return createResponse(500, {
+        // Enhanced error details for debugging
+        const errorResponse = {
             ok: false,
             error: 'Internal Server Error',
             message: 'An unexpected error occurred while processing your request',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+            details: {
+                message: error.message,
+                type: error.name
+            }
+        };
+
+        // Add more details in development
+        if (process.env.NODE_ENV === 'development') {
+            errorResponse.details.stack = error.stack;
+            if (error.error) {
+                errorResponse.details.airtableError = error.error;
+            }
+        } else {
+            // In production, only include non-sensitive error information
+            errorResponse.details = undefined;
+        }
+
+        return createResponse(500, errorResponse);
     }
 };
