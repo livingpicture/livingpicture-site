@@ -13,7 +13,7 @@
 </head>
 <body class="store-page">
     <!-- Back Button -->
-    <a href="index.html" class="back-button">
+    <a href="./index.html" class="back-button" aria-label="Back to home">
         <i class="fas fa-arrow-left"></i>
     </a>
 
@@ -58,7 +58,7 @@
             <p class="step-description">Give your memory a special name that speaks to you.</p>
             
             <div class="form-group">
-                <input type="text" id="memory-name" name="memory-name" placeholder="e.g., 'Our Story', 'Galina's Gift Book'" autocomplete="off">
+                <input type="text" id="memoryName" name="memoryName" placeholder="e.g., 'Our Story', 'Galina's Gift Book'" autocomplete="off">
                 <div class="input-underline"></div>
             </div>
             
@@ -82,7 +82,8 @@
             </div>
             
             <div class="photo-upload-container">
-                <input type="file" id="photo-upload" name="photo-upload" multiple accept="image/*" style="display: none;">
+                <input type="file" id="photoUpload" name="photoUpload" multiple accept="image/*" style="display: none;">
+                <div id="photoPreview" class="photo-preview-container"></div>
                 <button class="btn btn-primary" id="browse-files">
                     <i class="fas fa-plus"></i> Add Photos
                 </button>
@@ -483,5 +484,10 @@
     </div>
 
     <script src="js/store.js"></script>
+    <script src="js/currency.js"></script>
+    <script src="js/order-form.js"></script>
+    <script src="js/script.js"></script>
+    <script src="js/lead-tracking.js"></script>
+    <script src="js/memory-form.js"></script>
 </body>
 </html>

@@ -56,8 +56,64 @@ function updatePricing() {
     }
 }
 
+// Function to force videos to play on mobile
+function forceVideoPlay(video) {
+    if (video.paused) {
+        const playPromise = video.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                // Autoplay was prevented, try muting and playing
+                video.muted = true;
+                video.play();
+            });
+        }
+    }
+}
+
+// Function to handle video autoplay on mobile
+function setupVideoAutoplay() {
+    const videos = document.querySelectorAll('video[autoplay]');
+    
+    // Try to play all autoplay videos
+    videos.forEach(video => {
+        // Ensure videos are muted for autoplay
+        video.muted = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        
+        // Try to play the video
+        forceVideoPlay(video);
+        
+        // Handle iOS webkit-paused state
+        video.addEventListener('loadedmetadata', function() {
+            forceVideoPlay(video);
+        });
+        
+        // Handle visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                forceVideoPlay(video);
+            }
+        });
+    });
+    
+    // For iOS, handle the play/pause on touch events
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        document.body.addEventListener('touchend', function touchHandler() {
+            videos.forEach(video => {
+                forceVideoPlay(video);
+            });
+            document.body.removeEventListener('touchend', touchHandler);
+        }, { once: true });
+    }
+}
+
 // Function to create currency selector
 document.addEventListener('DOMContentLoaded', function() {
+    // Setup video autoplay
+    setupVideoAutoplay();
+    
     // Create currency selector if it doesn't exist
     const currencySelectorContainer = document.getElementById('pricing-currency-selector');
     if (currencySelectorContainer && !document.getElementById('pricing-currency')) {
