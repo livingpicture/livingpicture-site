@@ -476,7 +476,7 @@ async function syncLeadToAirtable() {
     try {
         // Only sync if we have at least some data
         if (!formData) {
-            console.log('No form data available for sync');
+            console.log('[Airtable Sync] No form data available for sync');
             return null;
         }
 
@@ -492,34 +492,35 @@ async function syncLeadToAirtable() {
         const currentStepValue = stepMapping[currentStep] || 'STEP_1';
         
         // Get all image URLs, ensuring they're valid Cloudinary URLs and convert to comma-separated string
-        const imageUrls = (formData.photos || [])
+        const imageUrlsArray = (formData.photos || [])
             .map(photo => (photo.permanentUrl || '').trim())
-            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'))
-            .join(','); // Convert array to comma-separated string
+            .filter(url => url && typeof url === 'string' && url.startsWith('https://res.cloudinary.com'));
+        
+        const imageUrlsString = imageUrlsArray.join(','); // Convert to comma-separated string
 
-        // Prepare lead data according to Airtable Leads schema (16 fields)
+        // Prepare lead data according to Airtable Leads schema
         const leadData = {
-            // Customer information (fields 1-5)
+            // Required fields
+            leadId: window.leadTracker?.leadId || `lead_${Math.random().toString(36).substr(2, 9)}`,
+            step: currentStepValue,
+            
+            // Customer information
             customerEmail: (formData.customer?.email || '').trim(),
             customerName: (formData.customer?.name || '').trim(),
             customerPhone: (formData.customer?.phone || '').trim(),
             country: (formData.customer?.country || 'Israel').trim(),
             
-            // Memory information (fields 6-10)
+            // Memory information
             memoryTitle: (formData.memoryTitle || formData.memoryName || '').trim(),
             photoCount: formData.photos?.length || 0,
             packageKey: formData.pricing?.currentTier || '1-5',
-            imageUrls: imageUrls.join(','), // Convert array to comma-separated string
+            imageUrls: imageUrlsString, // ✅ Already a comma-separated string
             
-            // Step and status (fields 11-13)
-            step: currentStepValue,
-            status: currentStep === 4 ? 'PENDING_PAYMENT' : 'IN_PROGRESS',
-            
-            // Financial information (fields 14-15)
+            // Financial information
             totalAmount: formData.pricing?.totalPrice || 0,
-            currency: (formData.pricing?.currency || 'ILS').toUpperCase(),
+            currency: (formData.currency || 'ILS').toUpperCase(),
             
-            // Music selection (field 16)
+            // Music selection
             songChoice: formData.music?.songName 
                 ? `${formData.music.songName}${formData.music.artistName ? ' by ' + formData.music.artistName : ''}`.trim()
                 : '',
@@ -529,52 +530,74 @@ async function syncLeadToAirtable() {
             createdAt: formData.createdAt || new Date().toISOString()
         };
         
-        // Add lead ID if available, or generate a new one
-        if (window.leadTracker?.leadId) {
-            leadData.leadId = window.leadTracker.leadId;
-        } else {
-            const newLeadId = 'lead_' + Math.random().toString(36).substr(2, 9);
-            leadData.leadId = newLeadId;
-            if (window.leadTracker) {
-                window.leadTracker.leadId = newLeadId;
-            }
+        // Update leadTracker with the leadId
+        if (window.leadTracker && !window.leadTracker.leadId) {
+            window.leadTracker.leadId = leadData.leadId;
         }
 
-        console.log('Syncing lead to Airtable:', {
+        console.log('[Airtable Sync] Syncing lead to Airtable:', {
             leadId: leadData.leadId,
             step: leadData.step,
-            hasImages: imageUrls ? imageUrls.split(',').length > 0 : false,
-            imageUrlCount: imageUrls ? imageUrls.split(',').length : 0,
+            imageUrlCount: imageUrlsArray.length,
+            hasEmail: !!leadData.customerEmail,
+            hasMemoryTitle: !!leadData.memoryTitle,
+            photoCount: leadData.photoCount,
             fields: Object.keys(leadData)
         });
 
-        try {
-            // Call the Netlify function with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+        // Call the Netlify function with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
+        try {
             const response = await fetch('/.netlify/functions/lead-upsert', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify(leadData),
                 signal: controller.signal
             });
 
             clearTimeout(timeoutId);
 
+            // Log response status
+            console.log('[Airtable Sync] Response status:', response.status, response.statusText);
+
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('[Airtable Sync] HTTP error response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText
+                });
+                
                 const error = new Error(`HTTP error! status: ${response.status}`);
-                error.response = { status: response.status, statusText: response.statusText, data: errorText };
+                error.response = { 
+                    status: response.status, 
+                    statusText: response.statusText, 
+                    data: errorText 
+                };
                 throw error;
             }
 
             const responseData = await response.json();
-            console.log('Lead synced successfully:', { leadId: leadData.leadId, step: leadData.step });
+            console.log('[Airtable Sync] ✅ Lead synced successfully:', { 
+                leadId: leadData.leadId, 
+                step: leadData.step,
+                action: responseData.action 
+            });
+            
             return responseData;
             
         } catch (error) {
-            console.error('Error in sync request:', {
+            if (error.name === 'AbortError') {
+                console.error('[Airtable Sync] Request timeout after 15 seconds');
+                throw new Error('Request timeout - please check your connection');
+            }
+            
+            console.error('[Airtable Sync] Error in sync request:', {
                 error: error.message,
                 name: error.name,
                 status: error.response?.status,
@@ -585,7 +608,11 @@ async function syncLeadToAirtable() {
             throw error;
         }
     } catch (error) {
-        console.error('Error in syncLeadToAirtable:', error);
+        console.error('[Airtable Sync] ❌ Error in syncLeadToAirtable:', {
+            message: error.message,
+            stack: error.stack,
+            currentStep: currentStep
+        });
         // Don't show error to user as this is a background sync
         return null;
     }
