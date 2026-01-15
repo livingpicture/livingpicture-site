@@ -93,7 +93,11 @@ exports.handler = async (event, context) => {
 
     try {
         // Extract and validate required fields
-        const { leadId, step, ...otherFields } = requestBody;
+        const { leadId: rawLeadId, step: rawStep, ...otherFields } = requestBody;
+        
+        // Trim and validate required fields
+        const leadId = typeof rawLeadId === 'string' ? rawLeadId.trim() : '';
+        const step = typeof rawStep === 'string' ? rawStep.trim() : '';
         
         // Validate required fields
         const missingFields = [];
@@ -115,30 +119,65 @@ exports.handler = async (event, context) => {
                 }
             });
         }
+        
+        // Sanitize and validate other fields
+        const sanitizedFields = {};
+        const allowedFields = [
+            'sessionId', 'country', 'currency', 'customerEmail', 'customerName',
+            'memoryTitle', 'songChoice', 'photoCount', 'totalAmount', 'imageUrls',
+            'utmSource', 'utmCampaign', 'email', 'name' // Include aliases for backward compatibility
+        ];
+        
+        // Process only allowed fields
+        Object.entries(otherFields).forEach(([key, value]) => {
+            if (allowedFields.includes(key)) {
+                // Handle string fields
+                if (typeof value === 'string') {
+                    sanitizedFields[key] = value.trim();
+                } 
+                // Handle array fields (specifically imageUrls)
+                else if (key === 'imageUrls' && Array.isArray(value)) {
+                    sanitizedFields[key] = value.length > 0 ? value.join(',') : '';
+                }
+                // Handle number fields
+                else if (['photoCount', 'totalAmount'].includes(key)) {
+                    sanitizedFields[key] = Number(value) || 0;
+                }
+                // Handle other cases
+                else {
+                    sanitizedFields[key] = value || '';
+                }
+            }
+        });
 
         // Initialize Airtable
         const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
         const table = base(AIRTABLE_LEADS_TABLE);
 
-        // Prepare record data - only including fields that exist in Airtable schema
+        // Prepare record data with only allowed and properly formatted fields
         const recordData = {
-            leadId,
-            step,
-            sessionId: otherFields.sessionId || '',
-            country: otherFields.country || '',
-            currency: otherFields.currency || 'ILS',
-            customerEmail: otherFields.customerEmail || otherFields.email || '',
-            customerName: otherFields.customerName || otherFields.name || '',
-            memoryTitle: otherFields.memoryTitle || '',
-            songChoice: otherFields.songChoice || '',
-            photoCount: otherFields.photoCount || 0,
-            totalAmount: otherFields.totalAmount || 0,
-            imageUrls: otherFields.imageUrls || [],
-            utmSource: otherFields.utmSource || (otherFields.utmParams && otherFields.utmParams.utm_source) || '',
-            utmCampaign: otherFields.utmCampaign || (otherFields.utmParams && otherFields.utmParams.utm_campaign) || ''
+            fields: {
+                leadId,
+                step,
+                sessionId: sanitizedFields.sessionId || '',
+                country: sanitizedFields.country || '',
+                currency: (sanitizedFields.currency || 'ILS').toUpperCase(),
+                customerEmail: sanitizedFields.customerEmail || sanitizedFields.email || '',
+                customerName: sanitizedFields.customerName || sanitizedFields.name || '',
+                memoryTitle: sanitizedFields.memoryTitle || '',
+                songChoice: sanitizedFields.songChoice || '',
+                photoCount: Number(sanitizedFields.photoCount) || 0,
+                totalAmount: Number(sanitizedFields.totalAmount) || 0,
+                imageUrls: Array.isArray(sanitizedFields.imageUrls) 
+                    ? sanitizedFields.imageUrls.join(',') 
+                    : (sanitizedFields.imageUrls || ''),
+                utmSource: sanitizedFields.utmSource || '',
+                utmCampaign: sanitizedFields.utmCampaign || ''
+            }
         };
-
-        // Log the final data being sent to Airtable for debugging
+        
+        // Log the sanitized data being sent to Airtable
+        console.log('Sanitized record data for Airtable:', JSON.stringify(recordData, null, 2));
         console.log('Processed record data for Airtable:', JSON.stringify(recordData, null, 2));
 
         // Log the data being sent to Airtable
