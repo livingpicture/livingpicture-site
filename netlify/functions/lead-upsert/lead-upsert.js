@@ -120,12 +120,22 @@ exports.handler = async (event, context) => {
         const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
         const table = base(AIRTABLE_LEADS_TABLE);
 
-        // Prepare record data - map fields to match Airtable column names
+        // Prepare record data - using exact field names from Airtable schema
         const recordData = {
-            'Lead ID': leadId,
-            'Step': step,
+            leadId,
+            step,
             ...otherFields,
-            'Last Updated': new Date().toISOString()
+            // Include all possible fields from the form
+            sessionId: otherFields.sessionId || '',
+            country: otherFields.country || '',
+            currency: otherFields.currency || 'ILS',
+            customerEmail: otherFields.customerEmail || otherFields.email || '',
+            customerName: otherFields.customerName || otherFields.name || '',
+            memoryTitle: otherFields.memoryTitle || '',
+            songChoice: otherFields.songChoice || '',
+            photoCount: otherFields.photoCount || 0,
+            totalAmount: otherFields.totalAmount || 0,
+            imageUrls: otherFields.imageUrls || []
         };
 
         // Log the data being sent to Airtable
@@ -135,7 +145,7 @@ exports.handler = async (event, context) => {
         try {
             // Check if a record with this leadId already exists
             const existingRecords = await table.select({
-                filterByFormula: `{Lead ID} = '${escapeSingleQuotes(leadId)}'`,
+                filterByFormula: `{leadId} = '${escapeSingleQuotes(leadId)}'`,
                 maxRecords: 1
             }).firstPage();
 
