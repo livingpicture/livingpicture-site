@@ -155,33 +155,30 @@ exports.handler = async (event, context) => {
         const table = base(AIRTABLE_LEADS_TABLE);
 
         // Prepare record data with only allowed and properly formatted fields
-        const recordData = {
-            fields: {
-                leadId,
-                step,
-                sessionId: sanitizedFields.sessionId || '',
-                country: sanitizedFields.country || '',
-                currency: (sanitizedFields.currency || 'ILS').toUpperCase(),
-                customerEmail: sanitizedFields.customerEmail || sanitizedFields.email || '',
-                customerName: sanitizedFields.customerName || sanitizedFields.name || '',
-                memoryTitle: sanitizedFields.memoryTitle || '',
-                songChoice: sanitizedFields.songChoice || '',
-                photoCount: Number(sanitizedFields.photoCount) || 0,
-                totalAmount: Number(sanitizedFields.totalAmount) || 0,
-                imageUrls: Array.isArray(sanitizedFields.imageUrls) 
-                    ? sanitizedFields.imageUrls.join(',') 
-                    : (sanitizedFields.imageUrls || ''),
-                utmSource: sanitizedFields.utmSource || '',
-                utmCampaign: sanitizedFields.utmCampaign || ''
-            }
+        const recordFields = {
+            leadId,
+            step,
+            sessionId: sanitizedFields.sessionId || '',
+            country: sanitizedFields.country || '',
+            currency: (sanitizedFields.currency || 'ILS').toUpperCase(),
+            customerEmail: sanitizedFields.customerEmail || sanitizedFields.email || '',
+            customerName: sanitizedFields.customerName || sanitizedFields.name || '',
+            memoryTitle: sanitizedFields.memoryTitle || '',
+            songChoice: sanitizedFields.songChoice || '',
+            photoCount: Number(sanitizedFields.photoCount) || 0,
+            totalAmount: Number(sanitizedFields.totalAmount) || 0,
+            imageUrls: Array.isArray(sanitizedFields.imageUrls) 
+                ? sanitizedFields.imageUrls.join(',') 
+                : (sanitizedFields.imageUrls || ''),
+            utmSource: sanitizedFields.utmSource || '',
+            utmCampaign: sanitizedFields.utmCampaign || ''
         };
         
         // Log the sanitized data being sent to Airtable
-        console.log('Sanitized record data for Airtable:', JSON.stringify(recordData, null, 2));
-        console.log('Processed record data for Airtable:', JSON.stringify(recordData, null, 2));
+        console.log('Sanitized record fields for Airtable:', JSON.stringify(recordFields, null, 2));
 
         // Log the data being sent to Airtable
-        console.log('Preparing to upsert record with data:', JSON.stringify(recordData, null, 2));
+        console.log('Preparing to upsert record with data:', JSON.stringify(recordFields, null, 2));
 
         let result;
         try {
@@ -195,11 +192,14 @@ exports.handler = async (event, context) => {
                 // Update existing record
                 const recordId = existingRecords[0].id;
                 console.log(`Updating existing record ${recordId} for lead ${leadId}`);
-                result = await table.update(recordId, recordData);
+                result = await table.update([{
+                    id: recordId,
+                    fields: recordFields
+                }]);
             } else {
                 // Create new record
                 console.log(`Creating new record for lead ${leadId}`);
-                result = await table.create(recordData);
+                result = await table.create([{ fields: recordFields }]);
             }
 
             // Log the Airtable response
