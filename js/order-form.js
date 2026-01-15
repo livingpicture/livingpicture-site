@@ -238,75 +238,76 @@ function setupEventListeners() {
             button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 
-                // If we're on the photo upload step (step 2) and moving to music step (step 3)
-                if (currentStep === 2 && nextButtons[buttonId] === 3) {
+                const nextStep = nextButtons[buttonId];
+                
+                // Step 1: Memory Name → Photos
+                if (currentStep === 1) {
+                    if (!saveCurrentStep()) return;
+                    
+                    try {
+                        console.log('Syncing memory name to Airtable...');
+                        await syncLeadToAirtable();
+                        console.log('Memory name synced successfully');
+                    } catch (error) {
+                        console.error('Error syncing memory name:', error);
+                        showError('Warning: Could not save progress. Your data will be saved locally.');
+                    }
+                    await showStep(2);
+                    return;
+                }
+                
+                // Step 2: Photos → Music
+                if (currentStep === 2) {
                     // Only validate if no photos are selected at all
                     if (!formData.photos || formData.photos.length === 0) {
                         validatePhotoUpload();
-                        return; // Don't proceed if no photos at all
+                        return;
                     }
                     
                     // If we have photos, proceed even if files are still processing
                     saveCurrentStep();
                     try {
-                        console.log('Syncing lead data before moving to music step...');
+                        console.log('Syncing photos to Airtable before music step...');
                         await syncLeadToAirtable();
-                        console.log('Lead data synced successfully, proceeding to music step');
-                        await showStep(3);
+                        console.log('Photos synced successfully, proceeding to music step');
                     } catch (error) {
-                        console.error('Error syncing lead data:', error);
-                        // Still proceed to next step even if sync fails
-                        await showStep(3);
+                        console.error('Error syncing photos:', error);
+                        showError('Warning: Could not save photos. Your data will be saved locally.');
                     }
+                    await showStep(3);
                     return;
                 }
                 
-                // For other steps, perform their validations
-                if (currentStep === 1) {
-                    if (!saveCurrentStep()) {
-                        return; // Don't proceed if validation fails
+                // Step 3: Music → Checkout
+                if (currentStep === 3) {
+                    if (!validateMusicInputs() || !saveCurrentStep()) return;
+                    
+                    try {
+                        console.log('Syncing music selection to Airtable...');
+                        await syncLeadToAirtable();
+                        console.log('Music selection synced successfully');
+                    } catch (error) {
+                        console.error('Error syncing music selection:', error);
+                        showError('Warning: Could not save music selection. Your data will be saved locally.');
                     }
-                } else if (currentStep === 3) {
-                    if (!validateMusicInputs()) {
-                        return; // Don't proceed if validation fails
-                    }
+                    await showStep(4);
+                    return;
                 }
                 
-                const nextStep = nextButtons[buttonId];
-                
-                // Save current step data and validate if needed
-                if (currentStep === 1) { // Memory name step
-                    if (!saveCurrentStep()) {
-                        return; // Don't proceed if validation fails
+                // Step 4: Checkout → Complete
+                if (currentStep === 4 && nextStep === 'complete') {
+                    try {
+                        // Update status to PENDING_PAYMENT before payment
+                        console.log('Updating lead status to PENDING_PAYMENT...');
+                        formData.status = 'PENDING_PAYMENT';
+                        await syncLeadToAirtable();
+                        console.log('Lead status updated to PENDING_PAYMENT');
+                    } catch (error) {
+                        console.error('Error updating lead status:', error);
+                        // Still proceed with payment
                     }
-                } else if (currentStep === 2) { // Photo upload step
-                    if (!validatePhotoUpload()) {
-                        return; // Don't proceed if validation fails
-                    }
-                    saveCurrentStep();
-                } else if (currentStep === 3) { // Music step
-                    if (!validateMusicInputs() || !saveCurrentStep()) {
-                        return; // Don't proceed if validation fails
-                    }
-                } else {
-                    saveCurrentStep();
-                }
-                
-                // Sync lead data before proceeding to next step
-                try {
-                    console.log('Syncing lead data before step transition...');
-                    await syncLeadToAirtable();
-                    console.log('Lead data synced successfully, proceeding to next step');
-                } catch (error) {
-                    console.error('Error syncing lead data:', error);
-                    // Still proceed to next step even if sync fails
-                }
-                
-                if (nextStep === 'complete') {
                     completePurchase();
-                } else {
-                    // Make sure to await the showStep call since it's now async
-                    await showStep(nextStep);
+                    return;
                 }
             });
         }
@@ -1398,6 +1399,15 @@ async function processFiles(files) {
             newPhotos.push(photo);
             processedCount++;
             updateProgress(processedCount, totalFiles);
+            
+            // Update formData and sync to Airtable if this is the last photo
+            if (processedCount === totalFiles) {
+                formData.photos = [...formData.photos, ...newPhotos];
+                // Sync to Airtable after all photos are processed
+                syncLeadToAirtable().catch(error => {
+                    console.error('Error syncing after photo upload:', error);
+                });
+            }
             scheduleUIUpdate();
 
             // Enable next button as soon as we have at least one photo

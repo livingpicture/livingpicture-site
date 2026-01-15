@@ -60,13 +60,16 @@ async function moveLeadToOrders(leadId, paymentData) {
       
       // Payment information (fields 14-17)
       'paymentstatus': 'paid', // all lowercase as per schema
+      'amount': Number(paymentData.amount || 0),
+      'currency': paymentData.currency || 'ILS',
       'transactionId': paymentData.transaction_uid || paymentData.id || '',
+      'paymentStatus': 'paid',
       'paymentProvider': 'payplus',
       'paymentStatusRaw': JSON.stringify(paymentData) || '{}',
       
       // Order status (fields 18-20)
       'fulfillmentStatus': 'NEW',
-      'createdAt': leadData['createdAt'] || now,
+      'createdAt': new Date().toISOString(),
       'updatedAt': now
     };
     

@@ -503,7 +503,6 @@ exports.handler = async (event, context) => {
             details: process.env.NODE_ENV === 'development' 
                 ? error.details || {}
                 : undefined
-        }
-    });
+        });
     }
 };
