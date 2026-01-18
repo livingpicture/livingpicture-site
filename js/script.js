@@ -1,8 +1,6 @@
 // Import currency configuration from currency.js
 // Note: This assumes currency.js is loaded before script.js in the HTML
 
-// Get current currency from CurrencyManager or default to ILS
-const currentCurrency = window.CurrencyManager?.getCurrentCurrency() || 'ILS';
 
 // Function to update prices based on selected currency
 function updatePricing() {

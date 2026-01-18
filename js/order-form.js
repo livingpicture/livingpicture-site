@@ -191,104 +191,50 @@ function updateAllPrices() {
 
 // Set up all event listeners
 function setupEventListeners() {
-    // Track if files are currently being processed
-    let isProcessingFiles = false;
-
     // Next step buttons
     Object.keys(nextButtons).forEach(buttonId => {
         const button = document.getElementById(buttonId);
         if (button) {
-            button.addEventListener('click', async (e) => {
+            button.addEventListener('click', (e) => {
                 e.preventDefault();
                 
-                const nextStep = nextButtons[buttonId];
-                console.log(`Button ${buttonId} clicked, current step: ${currentStep}, navigating to:`, nextStep);
-                
-                // Step 1: Memory Name → Photos
-                if (currentStep === 1) {
-                    console.log('Processing step 1 → 2 transition');
-                    if (!saveCurrentStep()) {
-                        console.log('Step 1 validation failed');
-                        return;
-                    }
-                    
-                    try {
-                        console.log('Syncing memory name to Airtable...');
-                        await syncLeadToAirtable();
-                        console.log('Memory name synced successfully');
-                    } catch (error) {
-                        console.error('Error syncing memory name:', error);
-                        showError('Warning: Could not save progress. Your data will be saved locally.');
-                    }
-                    console.log('Calling showStep(2)');
-                    await showStep(2);
-                    return;
-                }
-                
-                // Step 2: Photos → Music
-                if (currentStep === 2) {
-                    console.log('Processing step 2 → 3 transition');
-                    
-                    // Allow proceeding if we have any photos, even if processing isn't complete
-                    if (!formData.photos || formData.photos.length === 0) {
-                        console.log('No photos selected, showing validation error');
+                // Check if the button is enabled using our custom data attribute
+                if (button.classList.contains('btn-disabled')) {
+                    // If the button is visually disabled, run validation to show appropriate error
+                    if (currentStep === 1) {
+                        saveCurrentStep();
+                    } else if (currentStep === 2) {
                         validatePhotoUpload();
-                        return;
+                    } else if (currentStep === 3) {
+                        validateMusicInputs();
                     }
-                    
-                    console.log(`Found ${formData.photos.length} photos, proceeding to next step`);
+                    return; // Don't proceed
+                }
+                
+                const nextStep = nextButtons[buttonId];
+                
+                // Save current step data and validate if needed
+                if (currentStep === 1) { // Memory name step
+                    if (!saveCurrentStep()) {
+                        return; // Don't proceed if validation fails
+                    }
+                } else if (currentStep === 2) { // Photo upload step
+                    if (!validatePhotoUpload()) {
+                        return; // Don't proceed if validation fails
+                    }
                     saveCurrentStep();
-                    
-                    // Sync in the background but don't wait for it to complete
-                    syncLeadToAirtable()
-                        .then(() => console.log('Background sync completed successfully'))
-                        .catch(error => {
-                            console.error('Background sync error:', error);
-                            showError('Warning: Could not save photos to server. Your data will be saved locally.');
-                        });
-                    
-                    console.log('Proceeding to music step');
-                    await showStep(3);
-                    return;
-                }
-                
-                // Step 3: Music → Checkout
-                if (currentStep === 3) {
-                    console.log('Processing step 3 → 4 transition');
+                } else if (currentStep === 3) { // Music step
                     if (!validateMusicInputs() || !saveCurrentStep()) {
-                        console.log('Step 3 validation failed');
-                        return;
+                        return; // Don't proceed if validation fails
                     }
-                    
-                    try {
-                        console.log('Syncing music selection to Airtable...');
-                        await syncLeadToAirtable();
-                        console.log('Music selection synced successfully');
-                    } catch (error) {
-                        console.error('Error syncing music selection:', error);
-                        showError('Warning: Could not save music selection. Your data will be saved locally.');
-                    }
-                    console.log('Calling showStep(4)');
-                    await showStep(4);
-                    return;
+                } else {
+                    saveCurrentStep();
                 }
                 
-                // Step 4: Checkout → Complete
-                if (currentStep === 4 && nextStep === 'complete') {
-                    console.log('Processing step 4 → complete');
-                    try {
-                        // Update status to PENDING_PAYMENT before payment
-                        console.log('Updating lead status to PENDING_PAYMENT...');
-                        formData.status = 'PENDING_PAYMENT';
-                        await syncLeadToAirtable();
-                        console.log('Lead status updated to PENDING_PAYMENT');
-                    } catch (error) {
-                        console.error('Error updating lead status:', error);
-                        // Still proceed with payment
-                    }
-                    console.log('Calling completePurchase()');
+                if (nextStep === 'complete') {
                     completePurchase();
-                    return;
+                } else {
+                    showStep(nextStep);
                 }
             });
         }
@@ -1390,14 +1336,6 @@ async function processFiles(files) {
     const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
     const maxTotalSize = 120 * 1024 * 1024; // 120MB
 
-    // Format bytes to human-readable string
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
 
     if (totalSize > maxTotalSize) {
         const currentSize = formatFileSize(totalSize);
