@@ -1,65 +1,7 @@
-// Currency configuration
-let currentCurrency = 'ILS';
-const CURRENCIES = {
-    'ILS': { symbol: '₪', name: 'Israeli Shekel' },
-    'USD': { symbol: '$', name: 'US Dollar' },
-    'EUR': { symbol: '€', name: 'Euro' },
-    'RUB': { symbol: '₽', name: 'Russian Ruble' }
-};
-
-// Pricing in different currencies (prices per photo)
-const PRICING = {
-    '1-5': {
-        ILS: 18,
-        USD: 4.80,
-        EUR: 4.50,
-        RUB: 445
-    },
-    '6-15': {
-        ILS: 16,
-        USD: 4.20,
-        EUR: 4.00,
-        RUB: 395
-    },
-    '16-25': {
-        ILS: 14,
-        USD: 3.70,
-        EUR: 3.50,
-        RUB: 345
-    },
-    '26+': {
-        ILS: 12,
-        USD: 3.10,
-        EUR: 2.90,
-        RUB: 295
-    }
-};
-
-// Store the current step and form data
-let currentStep = 1;
-const formData = {
-    memoryName: '',
-    photos: [],
-    music: {
-        songName: '',
-        artistName: '',
-        custom: true,
-        teamChoose: false
-    },
-    customer: {
-        name: '',
-        email: '',
-        country: '',
-        phone: ''
-    },
-    currency: 'ILS',
-    pricing: {
-        currentTier: '1-5',
-        pricePerPhoto: 20,
-        totalPrice: 0
-    },
-    savedAt: null
-};
+// Currency configuration - Use the global CurrencyManager
+const CURRENCIES = window.CurrencyManager?.getCurrencies() || { 'ILS': { symbol: '₪', name: 'Israeli Shekel' } };
+let currentCurrency = window.CurrencyManager?.getCurrentCurrency() || 'ILS';
+let detectedCurrency = 'ILS'; // Will be updated on init
 
 // DOM Elements
 const progressFill = document.querySelector('.progress-fill');
@@ -131,48 +73,62 @@ function initStore() {
 
 // Initialize currency
 async function initCurrency() {
-    // Check if we have a saved currency
-    const savedCurrency = localStorage.getItem('lp_currency');
-    
-    if (savedCurrency && CURRENCIES[savedCurrency]) {
-        currentCurrency = savedCurrency;
-    } else {
-        // Try to detect currency from IP
-        try {
-            const response = await fetch('https://ipapi.co/json/');
-            const data = await response.json();
-            
-            // Map country to currency
-            const countryToCurrency = {
-                'IL': 'ILS', // Israel
-                'US': 'USD', // United States
-                'RU': 'RUB', // Russia
-                // EU countries
-                'AT': 'EUR', 'BE': 'EUR', 'BG': 'EUR', 'HR': 'EUR', 'CY': 'EUR',
-                'CZ': 'EUR', 'DK': 'EUR', 'EE': 'EUR', 'FI': 'EUR', 'FR': 'EUR',
-                'DE': 'EUR', 'GR': 'EUR', 'HU': 'EUR', 'IE': 'EUR', 'IT': 'EUR',
-                'LV': 'EUR', 'LT': 'EUR', 'LU': 'EUR', 'MT': 'EUR', 'NL': 'EUR',
-                'PL': 'EUR', 'PT': 'EUR', 'RO': 'EUR', 'SK': 'EUR', 'SI': 'EUR',
-                'ES': 'EUR', 'SE': 'EUR'
-            };
-            
-            const detectedCurrency = countryToCurrency[data.country_code] || 'USD';
-            currentCurrency = detectedCurrency;
-            localStorage.setItem('lp_currency', detectedCurrency);
-        } catch (error) {
-            console.error('Error detecting currency from IP:', error);
-            currentCurrency = 'USD';
-        }
+    if (!window.CurrencyManager) {
+        console.error('CurrencyManager not available');
+        return;
     }
-    
-    // Update currency in form data
-    formData.currency = currentCurrency;
-    
-    // Create currency dropdowns
-    createCurrencyDropdowns();
-    
-    // Update prices with current currency
-    updateAllPrices();
+
+    try {
+        // Initialize the currency manager
+        currentCurrency = await window.CurrencyManager.init();
+        
+        // Get detected currency from browser or use default
+        detectedCurrency = await detectUserCurrency();
+        
+        // Update form data with both currencies
+        formData.currency = currentCurrency;
+        formData.detectedCurrency = detectedCurrency;
+        formData.selectedCurrency = currentCurrency;
+        
+        // Update lead tracking with both currencies
+        if (window.leadTracker) {
+            window.leadTracker.updateLead({
+                detectedCurrency: detectedCurrency,
+                selectedCurrency: currentCurrency,
+                currency: currentCurrency // Keep for backward compatibility
+            }, true);
+        }
+        
+        // Create currency dropdowns
+        createCurrencyDropdowns();
+        
+        // Update prices with current currency
+        updateAllPrices();
+    } catch (error) {
+        console.error('Error initializing currency:', error);
+    }
+}
+
+// Detect user's currency based on browser settings or IP
+async function detectUserCurrency() {
+    try {
+        // First try to get from browser settings
+        const browserLang = navigator.language || navigator.userLanguage || '';
+        const countryCode = browserLang.split('-')[1] || 'IL';
+        
+        // Map country codes to currencies (extend as needed)
+        const countryToCurrency = {
+            'US': 'USD', 'GB': 'GBP', 'CA': 'CAD', 'AU': 'AUD',
+            'JP': 'JPY', 'FR': 'EUR', 'DE': 'EUR', 'IT': 'EUR',
+            'ES': 'EUR', 'IL': 'ILS', 'RU': 'RUB', 'CH': 'CHF',
+            'CN': 'CNY', 'IN': 'INR', 'BR': 'BRL', 'MX': 'MXN'
+        };
+        
+        return countryToCurrency[countryCode] || 'USD';
+    } catch (e) {
+        console.error('Error detecting user currency:', e);
+        return 'USD'; // Default fallback
+    }
 }
 
 // Create currency dropdowns
@@ -203,20 +159,27 @@ function createCurrencyDropdowns() {
 }
 
 // Handle currency change
-function handleCurrencyChange(e) {
+async function handleCurrencyChange(e) {
     const newCurrency = e.target.value;
-    if (newCurrency !== currentCurrency && CURRENCIES[newCurrency]) {
-        currentCurrency = newCurrency;
-        formData.currency = newCurrency;
-        localStorage.setItem('lp_currency', newCurrency);
-        updateAllPrices();
-        
-        // Update all dropdowns
-        document.querySelectorAll('.currency-dropdown, .pricing-currency-dropdown').forEach(select => {
-            if (select.value !== newCurrency) {
-                select.value = newCurrency;
+    if (window.CurrencyManager && newCurrency !== currentCurrency) {
+        try {
+            await window.CurrencyManager.setCurrency(newCurrency);
+            currentCurrency = newCurrency;
+            formData.currency = newCurrency;
+            formData.selectedCurrency = newCurrency;
+            
+            // Update lead tracking with new currency selection
+            if (window.leadTracker) {
+                window.leadTracker.updateLead({
+                    selectedCurrency: newCurrency,
+                    currency: newCurrency // Keep for backward compatibility
+                }, true);
             }
-        });
+            
+            updateAllPrices();
+        } catch (error) {
+            console.error('Error changing currency:', error);
+        }
     }
 }
 
@@ -935,121 +898,180 @@ function setupFileUpload() {
     }, true);
 }
 
-// Calculate the current pricing tier based on number of photos
-function calculatePricingTier(photoCount) {
-    if (photoCount >= 26) return '26+';
-    if (photoCount >= 16) return '16-25';
-    if (photoCount >= 6) return '6-15';
-    return '1-5';
-}
+// Set up file upload handling with proper event delegation
+function setupFileUpload() {
+        // Get the file input and browse button
+        const fileInput = document.getElementById('photo-upload');
+        const browseBtn = document.getElementById('browse-files');
 
-// Get price per photo based on tier and currency
+        if (!fileInput || !browseBtn) return;
+
+        // Remove any existing event listeners by cloning the elements
+        const newInput = fileInput.cloneNode(true);
+        const newBrowseBtn = browseBtn.cloneNode(true);
+
+        // Replace the original elements with clones to remove existing listeners
+        if (fileInput.parentNode) {
+            fileInput.parentNode.replaceChild(newInput, fileInput);
+        }
+        if (browseBtn.parentNode) {
+            browseBtn.parentNode.replaceChild(newBrowseBtn, browseBtn);
+        }
+
+        // Handle click on browse button
+        newBrowseBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            newInput.click();
+        }, true); // Use capture phase to ensure we catch the event first
+
+        // Handle file selection
+        newInput.addEventListener('change', function (e) {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFileSelect(e);
+                // Reset the input after handling
+                this.value = '';
+                // Stop any event propagation
+                e.stopPropagation();
+            }
+        }, true); // Use capture phase
+
+        // Prevent any other click handlers from interfering
+        newInput.addEventListener('click', function (e) {
+            e.stopPropagation();
+        }, true);
+    }
+
+
+    // Get price per photo based on tier and currency
 function getPricePerPhoto(tier, currency) {
-    return PRICING[tier]?.[currency] || PRICING['1-5'][currency];
+    return window.CurrencyManager?.getPricePerPhoto(tier, currency) || 0;
 }
 
-// Calculate total price based on number of photos and current currency
-function calculateTotalPrice(photoCount) {
-    if (photoCount === 0) return 0;
-    const tier = calculatePricingTier(photoCount);
-    const pricePerPhoto = getPricePerPhoto(tier, currentCurrency);
-    return photoCount * pricePerPhoto;
+    
+// Calculate the total price using the server-side API
+async function calculateTotalPrice(photoCount, currency = currentCurrency) {
+    try {
+        const response = await fetch(`/.netlify/functions/calculate-price?photoCount=${photoCount}&currency=${currency}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to calculate price');
+        }
+        
+        return {
+            pricePerPhoto: data.data.pricePerPhoto,
+            subtotal: data.data.subtotal,
+            currency: data.data.currency,
+            nextBracket: data.data.nextBracket
+        };
+    } catch (error) {
+        console.error('Error calculating price:', error);
+        // Fallback to client-side calculation if API fails
+        const tier = calculatePricingTier(photoCount);
+        const pricePerPhoto = getPricePerPhoto(tier, currency);
+        return {
+            pricePerPhoto: pricePerPhoto,
+            subtotal: photoCount * pricePerPhoto,
+            currency: currency,
+            nextBracket: null
+        };
+    }
 }
 
 // Update the pricing display
-function updatePricingDisplay() {
-    const photoCount = formData.photos.length;
-    const tier = calculatePricingTier(photoCount);
-    const pricePerPhoto = getPricePerPhoto(tier, currentCurrency);
-    const totalPrice = calculateTotalPrice(photoCount);
+async function updatePricingDisplay() {
+    const photoCount = formData.photos ? formData.photos.length : 0;
     const currencySymbol = CURRENCIES[currentCurrency]?.symbol || '$';
-
-    // Update form data
-    formData.pricing = {
-        currentTier: tier,
-        pricePerPhoto: pricePerPhoto,
-        totalPrice: totalPrice,
-        currency: currentCurrency
-    };
-
-    // Update UI
+    
+    // Show loading state
     const totalPriceElement = document.getElementById('total-price');
-    const photoCountText = document.getElementById('photo-count-text');
     const priceDetails = document.getElementById('price-details');
     const incentiveElement = document.getElementById('pricing-incentive');
-
-    // Update total price with currency symbol
-    if (totalPriceElement) {
-        totalPriceElement.textContent = `${currencySymbol}${totalPrice.toFixed(2)}`;
-    }
-
-    // Update photo count in the total label
-    if (photoCountText) {
-        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-    }
-
-    // Update price details with currency symbol
-    if (priceDetails) {
-        if (photoCount === 0) {
-            priceDetails.textContent = 'Add photos to see your price per photo';
-        } else {
-            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
-        }
-    }
-
-    // Update incentive message with dynamic pricing encouragement
-    if (incentiveElement) {
-        const currentTier = tier;
-        let nextTier = null;
+    
+    if (totalPriceElement) totalPriceElement.textContent = 'Calculating...';
+    if (priceDetails) priceDetails.textContent = 'Updating pricing...';
+    
+    try {
+        // Get pricing from server
+        const pricing = await calculateTotalPrice(photoCount, currentCurrency);
         
-        // Find the next pricing tier (if any)
-        if (photoCount < 6) {
-            nextTier = '6-15';
-        } else if (photoCount < 16) {
-            nextTier = '16-25';
-        } else if (photoCount < 26) {
-            nextTier = '26+';
+        // Update form data
+        if (!formData.pricing) {
+            formData.pricing = {};
+        }
+        formData.pricing.pricePerPhoto = pricing.pricePerPhoto;
+        formData.pricing.totalPrice = pricing.subtotal;
+        formData.pricing.currency = currentCurrency;
+
+        // Update UI
+        const photoCountText = document.getElementById('photo-count-text');
+
+        // Update total price with currency symbol
+        if (totalPriceElement) {
+            totalPriceElement.textContent = `${currencySymbol}${pricing.subtotal.toFixed(2)}`;
         }
 
-        if (nextTier) {
-            const nextTierMin = parseInt(nextTier.split('-')[0]);
-            const photosNeeded = nextTierMin - photoCount;
-            const nextPricePerPhoto = getPricePerPhoto(nextTier, currentCurrency);
-            const priceDiff = pricePerPhoto - nextPricePerPhoto;
-            
-            // Only show if there's a price difference and we need more photos
-            if (priceDiff > 0 && photosNeeded > 0) {
-                const percentOff = Math.round((priceDiff / pricePerPhoto) * 100);
-                incentiveElement.innerHTML = `
-                    <div class="incentive-message">
-                        <i class="fas fa-tag"></i>
-                        <span>Add ${photosNeeded} more photo${photosNeeded > 1 ? 's' : ''} to save ${percentOff}% per photo</span>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: ${(photoCount / nextTierMin) * 100}%"></div>
-                            <div class="progress-text">${photoCount}/${nextTierMin}</div>
-                        </div>
-                    </div>
-                `;
-                incentiveElement.style.display = 'flex';
-                return;
+        // Update photo count in the total label
+        if (photoCountText) {
+            photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
+        }
+
+        // Update price details with currency symbol
+        if (priceDetails) {
+            if (photoCount === 0) {
+                priceDetails.textContent = 'Add photos to see your price per photo';
+            } else {
+                priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricing.pricePerPhoto.toFixed(2)} each`;
             }
         }
 
-        // If no next tier or already at the best price
-        if (photoCount > 0) {
-            incentiveElement.innerHTML = `
-                <div class="incentive-message best-price">
-                    <i class="fas fa-check-circle"></i>
-                    <span>You're getting the best price at ${currencySymbol}${pricePerPhoto.toFixed(2)} per photo!</span>
-                </div>
-            `;
-            incentiveElement.style.display = 'flex';
-        } else {
+        // Update incentive message with dynamic pricing encouragement
+        if (incentiveElement) {
+            if (pricing.nextBracket) {
+                const nextBracket = pricing.nextBracket;
+                const savings = nextBracket.potentialSavings || 0;
+                const photosNeeded = (nextBracket.minPhotos || 0) - photoCount;
+                
+                if (savings > 0 && photosNeeded > 0) {
+                    const percentOff = Math.round((savings / pricing.pricePerPhoto) * 100);
+                    incentiveElement.innerHTML = `
+                        <div class="incentive-message">
+                            <i class="fas fa-tag"></i>
+                            <span>Add ${photosNeeded} more photo${photosNeeded > 1 ? 's' : ''} to save ${percentOff}% per photo</span>
+                            <div class="progress-container">
+                                <div class="progress-bar" style="width: ${(photoCount / nextBracket.minPhotos) * 100}%"></div>
+                                <div class="progress-text">${photoCount}/${nextBracket.minPhotos}</div>
+                            </div>
+                        </div>
+                    `;
+                    incentiveElement.style.display = 'flex';
+                } else {
+                    incentiveElement.style.display = 'none';
+                }
+            } else {
+                // If no next tier or already at the best price
+                incentiveElement.innerHTML = `
+                    <div class="incentive-message best-price">
+                        <i class="fas fa-check-circle"></i>
+                        <span>You're getting the best price at ${currencySymbol}${pricing.pricePerPhoto.toFixed(2)} per photo!</span>
+                    </div>
+                `;
+                incentiveElement.style.display = 'flex';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating pricing display:', error);
+        if (priceDetails) {
+            priceDetails.textContent = 'Error loading pricing. Please refresh the page.';
+        }
+        if (incentiveElement) {
             incentiveElement.style.display = 'none';
         }
     }
+}
 
-    return totalPrice > 0;
+return totalPrice > 0;
 }
 
 // Generate a lightweight fingerprint for a file using metadata
@@ -1061,85 +1083,164 @@ function generateFileFingerprint(file) {
 
 // Track file processing and upload state
 let isProcessingFiles = false;
-let isUploadingToCloudinary = false;
+let activeUploads = 0;
+let totalUploads = 0;
+let completedUploads = 0;
 
 // Cloudinary configuration
 const CLOUDINARY_CLOUD_NAME = 'dojuekij4';
 const CLOUDINARY_UPLOAD_PRESET = 'livingpicture_orders_unsigned';
+const MAX_PARALLEL_UPLOADS = 3; // Maximum number of parallel uploads
 
 /**
- * Uploads a file to Cloudinary
+ * Uploads a file to Cloudinary with progress tracking
  * @param {File} file - The file to upload
+ * @param {string} photoId - Unique ID for the photo being uploaded
  * @returns {Promise<Object>} The Cloudinary upload response
  */
-async function uploadToCloudinary(file) {
+async function uploadToCloudinary(file, photoId) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
     
-    try {
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-            method: 'POST',
-            body: formData
+    // Create a new XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                updatePhotoProgress(photoId, percent);
+            }
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Failed to upload image to Cloudinary');
-        }
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(JSON.parse(xhr.response));
+            } else {
+                reject(new Error('Failed to upload image to Cloudinary'));
+            }
+            uploadComplete();
+        };
         
-        return await response.json();
-    } catch (error) {
-        console.error('Error uploading to Cloudinary:', error);
-        throw error;
+        xhr.onerror = () => {
+            reject(new Error('Network error during upload'));
+            uploadComplete();
+        };
+        
+        xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOAD_NAME}/image/upload`, true);
+        xhr.send(formData);
+    });
+}
+
+// Track upload completion and update UI
+function uploadComplete() {
+    activeUploads--;
+    completedUploads++;
+    updateGlobalProgress();
+    
+    // Start next upload if there are pending files
+    processUploadQueue();
+    
+    // If all uploads are complete, update UI
+    if (completedUploads === totalUploads) {
+        allUploadsComplete();
     }
 }
 
-// Re-enable file input after processing
-function reenableFileInput() {
-    const fileInput = document.getElementById('photo-upload');
-    const browseBtn = document.getElementById('browse-files');
-    
-    if (fileInput && browseBtn) {
-        // Reset the file input
-        fileInput.value = '';
-        
-        // Re-enable the browse button
-        browseBtn.disabled = false;
-        browseBtn.innerHTML = 'Add More Photos';
-        browseBtn.classList.remove('processing');
-        
-        // Reset processing flags
-        isProcessingFiles = false;
-        isUploadingToCloudinary = false;
+// Update individual photo progress
+function updatePhotoProgress(photoId, percent) {
+    const progressBar = document.querySelector(`#photo-${photoId} .progress-bar`);
+    if (progressBar) {
+        progressBar.style.width = `${percent}%`;
+        progressBar.setAttribute('aria-valuenow', percent);
     }
 }
 
-/**
- * Uploads an image file to Cloudinary
- * @param {File} file - The image file to upload
- * @returns {Promise<Object>} - The Cloudinary upload response
- */
-async function uploadImageToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+// Update global upload progress
+function updateGlobalProgress() {
+    const progressContainer = document.getElementById('global-upload-progress');
+    const progressBar = document.getElementById('global-progress-bar');
+    const progressText = document.getElementById('global-progress-text');
+    
+    if (progressContainer && progressBar && progressText) {
+        const percent = Math.round((completedUploads / totalUploads) * 100);
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `Uploaded ${completedUploads} of ${totalUploads} photos`;
+    }
+}
+
+// Process the upload queue
+function processUploadQueue() {
+    const queue = window.uploadQueue || [];
+    
+    while (activeUploads < MAX_PARALLEL_UPLOADS && queue.length > 0) {
+        const { file, photoId } = queue.shift();
+        activeUploads++;
+        
+        uploadToCloudinary(file, photoId)
+            .then(response => {
+                // Update the photo object with Cloudinary URL
+                const photoIndex = formData.photos.findIndex(p => p.id === photoId);
+                if (photoIndex !== -1) {
+                    formData.photos[photoIndex].url = response.secure_url;
+                    formData.photos[photoIndex].publicId = response.public_id;
+                    formData.photos[photoIndex].status = 'completed';
+                }
+            })
+            .catch(error => {
+                console.error('Upload failed:', error);
+                const photoIndex = formData.photos.findIndex(p => p.id === photoId);
+                if (photoIndex !== -1) {
+                    formData.photos[photoIndex].status = 'error';
+                    updatePhotoProgress(photoId, 0);
+                }
+            });
+    }
+}
+
+// Called when all uploads are complete
+function allUploadsComplete() {
+    // Re-enable the continue button
+    const nextBtn = document.getElementById('next-to-music');
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
+    }
+    
+    // Hide global progress bar with animation
+    const progressContainer = document.getElementById('global-upload-progress');
+    if (progressContainer) {
+        progressContainer.style.opacity = '0';
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressContainer.style.opacity = '1';
+        }, 500);
+    }
+    
+    // Update Airtable with all image URLs
+    updateAirtableWithImages();
+}
+
+// Update Airtable with all image URLs
+async function updateAirtableWithImages() {
+    const imageUrls = formData.photos
+        .filter(photo => photo.status === 'completed')
+        .map(photo => photo.url);
+    
+    if (imageUrls.length === 0) return;
     
     try {
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        await fetch('/.netlify/functions/update-lead-images', {
             method: 'POST',
-            body: formData
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                leadId: window.leadTracker.leadId,
+                imageUrls
+            })
         });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Failed to upload image to Cloudinary');
-        }
-        
-        return await response.json();
     } catch (error) {
-        console.error('Error uploading to Cloudinary:', error);
-        throw error;
+        console.error('Error updating Airtable with images:', error);
     }
 }
 
@@ -1173,76 +1274,117 @@ async function processFiles(files) {
     // Get DOM elements
     const fileInput = document.getElementById('photo-upload');
     const browseBtn = document.getElementById('browse-files');
-    const progressContainer = document.getElementById('upload-progress');
-    const progressBar = document.getElementById('upload-progress-bar');
-    const progressText = document.getElementById('upload-progress-text');
-
-    if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) return;
-
-    // Function to trigger file input
-    const triggerFileInput = () => {
-        fileInput.click();
-    };
-
-    // Set up event listener for browse button
-    browseBtn.addEventListener('click', triggerFileInput);
-
-    // Store original button HTML to restore later
-    const originalBtnHTML = browseBtn.innerHTML;
-
-    // Set loading state
-    const setLoading = (isLoading) => {
-        if (isLoading) {
-            browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            browseBtn.classList.add('processing');
-            progressContainer.style.display = 'block';
-        } else {
-            // Restore button
-            browseBtn.innerHTML = originalBtnHTML;
-            browseBtn.classList.remove('processing');
-
-            // Fade out progress bar
-            setTimeout(() => {
-                progressContainer.style.opacity = '0';
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                    progressContainer.style.opacity = '1';
-                    progressBar.style.width = '0%';
-                }, 300);
-            }, 500);
-        }
-    };
-
-    // Update progress
-    const updateProgress = (processed, total) => {
-        const percent = Math.round((processed / total) * 100);
-        progressBar.style.width = `${percent}%`;
-        const statusText = isUploadingToCloudinary ? 'Uploading' : 'Processing';
-        progressText.textContent = `${statusText} ${processed} of ${total} photos...`;
-        
-        // Update next button state based on upload status
-        if (isUploadingToCloudinary) {
-            updateNextButton('next-to-music', false);
-            const nextBtn = document.getElementById('next-to-music');
-            if (nextBtn) {
-                nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-            }
-        } else if (processed > 0) {
-            updateNextButton('next-to-music', true);
-            const nextBtn = document.getElementById('next-to-music');
-            if (nextBtn) {
-                nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
-            }
-        }
-    };
-
-    // Start loading
-    setLoading(true);
-    isUploadingToCloudinary = true; // Start in uploading state
-    updateProgress(0, files.length);
+    const photoGrid = document.getElementById('photo-grid');
+    const globalProgressContainer = document.getElementById('global-upload-progress');
     
-    // Disable next button during initial processing
-    updateNextButton('next-to-music', false);
+    if (!fileInput || !browseBtn || !photoGrid) return;
+    
+    // Initialize or reset upload queue
+    window.uploadQueue = [];
+    activeUploads = 0;
+    completedUploads = 0;
+    totalUploads = validFiles.length;
+    
+    // Show global progress container
+    if (globalProgressContainer) {
+        globalProgressContainer.style.display = 'flex';
+        globalProgressContainer.style.opacity = '1';
+    }
+    
+    // Disable next button during upload
+    const nextBtn = document.getElementById('next-to-music');
+    if (nextBtn) {
+        nextBtn.disabled = true;
+        nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+    }
+
+    // Add files to the upload queue and photo grid
+    validFiles.forEach((file, index) => {
+        const photoId = `photo-${Date.now()}-${index}`;
+        
+        // Add to form data
+        if (!formData.photos) {
+            formData.photos = [];
+        }
+        
+        formData.photos.push({
+            id: photoId,
+            file: file,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            status: 'queued',
+            preview: URL.createObjectURL(file)
+        });
+        
+        // Add to upload queue
+        window.uploadQueue.push({
+            file: file,
+            photoId: photoId
+        });
+        
+        // Create photo preview with progress bar
+        const photoElement = document.createElement('div');
+        photoElement.className = 'photo-item';
+        photoElement.id = `photo-container-${photoId}`;
+        photoElement.innerHTML = `
+            <div class="photo-preview">
+                <img src="${URL.createObjectURL(file)}" alt="${file.name}">
+                <div class="photo-overlay">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" 
+                             style="width: 0%" 
+                             aria-valuenow="0" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger remove-photo" data-photo-id="${photoId}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="photo-info">
+                <div class="photo-name">${file.name}</div>
+                <div class="photo-size">${formatFileSize(file.size)}</div>
+            </div>
+        `;
+        
+        // Add click handler for remove button
+        const removeBtn = photoElement.querySelector('.remove-photo');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const photoId = e.currentTarget.getAttribute('data-photo-id');
+                removePhoto(photoId);
+            });
+        }
+        
+        // Add to photo grid
+        photoGrid.appendChild(photoElement);
+    });
+    
+    // Start processing the upload queue
+    processUploadQueue();
+    
+    // Update photo counter
+    updatePhotoCounter();
+    
+    // Save to local storage
+    saveToLocalStorage();
+    
+    // Re-enable file input
+    reenableFileInput();
+    
+    // Helper function to format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 
     // Check total size
     const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);

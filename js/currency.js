@@ -1,133 +1,182 @@
-// Currency configuration
-const CURRENCIES = [
-    { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
-    { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'RUB', symbol: '₽', name: 'Russian Ruble' }
-];
+/**
+ * Currency Manager - Single source of truth for currency data and functionality
+ * 
+ * This module handles all currency-related functionality including:
+ * - Currency conversion
+ * - Price formatting
+ * - Currency detection
+ * - Price calculations
+ */
+window.CurrencyManager = (function() {
+    'use strict';
 
-// Pricing in different currencies (prices per photo)
-const PRICING = {
-    '1-5': {
-        ILS: 20,
-        USD: 5.50,
-        EUR: 5.00,
-        RUB: 500
-    },
-    '6-15': {
-        ILS: 18,
-        USD: 4.95,
-        EUR: 4.50,
-        RUB: 450
-    },
-    '16-25': {
-        ILS: 16,
-        USD: 4.40,
-        EUR: 4.00,
-        RUB: 400
-    },
-    '26+': {
-        ILS: 14,
-        USD: 3.85,
-        EUR: 3.50,
-        RUB: 350
+    // Private variables
+    const CURRENCIES = {
+        'ILS': { symbol: '₪', name: 'Israeli Shekel', decimalDigits: 0 },
+        'USD': { symbol: '$', name: 'US Dollar', decimalDigits: 2 },
+        'EUR': { symbol: '€', name: 'Euro', decimalDigits: 2 },
+        'RUB': { symbol: '₽', name: 'Russian Ruble', decimalDigits: 0 }
+    };
+
+    // Pricing in different currencies (prices per photo)
+    const PRICING = {
+        '1-5': {
+            ILS: 20,
+            USD: 5.50,
+            EUR: 5.00,
+            RUB: 500
+        },
+        '6-15': {
+            ILS: 18,
+            USD: 4.95,
+            EUR: 4.50,
+            RUB: 450
+        },
+        '16-25': {
+            ILS: 16,
+            USD: 4.40,
+            EUR: 4.00,
+            RUB: 400
+        },
+        '26+': {
+            ILS: 14,
+            USD: 3.85,
+            EUR: 3.50,
+            RUB: 350
+        }
+    };
+
+    // Current currency (default to ILS)
+    let currentCurrency = 'ILS';
+
+    /**
+     * Format a price in the current currency
+     * @param {number} amount - The amount to format
+     * @param {string} [currency=currentCurrency] - The currency code (defaults to current currency)
+     * @returns {string} Formatted price string
+     */
+    function formatPrice(amount, currency = currentCurrency) {
+        if (!CURRENCIES[currency]) {
+            console.warn(`Unknown currency: ${currency}, defaulting to ILS`);
+            currency = 'ILS';
+        }
+        
+        const currencyData = CURRENCIES[currency];
+        const formattedAmount = amount.toLocaleString(undefined, {
+            minimumFractionDigits: currencyData.decimalDigits,
+            maximumFractionDigits: currencyData.decimalDigits
+        });
+        
+        return `${currencyData.symbol}${formattedAmount}`;
     }
-};
 
-// Get currency from localStorage or detect from IP
-async function getCurrency() {
-    // Check localStorage first
-    let currency = localStorage.getItem('lp_currency');
-    
-    if (!currency) {
-        // If not set, detect from IP
-        try {
-            const response = await fetch('https://ipapi.co/json/');
-            const data = await response.json();
-            
-            // Map country to currency
-            const countryToCurrency = {
-                'IL': 'ILS', // Israel
-                'US': 'USD', // United States
-                'RU': 'RUB', // Russia
-                // EU countries
-                'AT': 'EUR', 'BE': 'EUR', 'BG': 'EUR', 'HR': 'EUR', 'CY': 'EUR',
-                'CZ': 'EUR', 'DK': 'EUR', 'EE': 'EUR', 'FI': 'EUR', 'FR': 'EUR',
-                'DE': 'EUR', 'GR': 'EUR', 'HU': 'EUR', 'IE': 'EUR', 'IT': 'EUR',
-                'LV': 'EUR', 'LT': 'EUR', 'LU': 'EUR', 'MT': 'EUR', 'NL': 'EUR',
-                'PL': 'EUR', 'PT': 'EUR', 'RO': 'EUR', 'SK': 'EUR', 'SI': 'EUR',
-                'ES': 'EUR', 'SE': 'EUR'
-            };
-            
-            currency = countryToCurrency[data.country_code] || 'USD';
+    /**
+     * Get the price for a given number of photos in the current currency
+     * @param {number} numPhotos - Number of photos
+     * @param {string} [currency=currentCurrency] - The currency code (defaults to current currency)
+     * @returns {number} Price per photo
+     */
+    function getPricePerPhoto(numPhotos, currency = currentCurrency) {
+        let priceTier = '26+';
+        
+        if (numPhotos <= 5) priceTier = '1-5';
+        else if (numPhotos <= 15) priceTier = '6-15';
+        else if (numPhotos <= 25) priceTier = '16-25';
+        
+        return PRICING[priceTier]?.[currency] || PRICING[priceTier]?.ILS || 0;
+    }
+
+    /**
+     * Calculate the total price for a given number of photos
+     * @param {number} numPhotos - Number of photos
+     * @param {string} [currency=currentCurrency] - The currency code (defaults to current currency)
+     * @returns {number} Total price
+     */
+    function calculateTotalPrice(numPhotos, currency = currentCurrency) {
+        return numPhotos * getPricePerPhoto(numPhotos, currency);
+    }
+
+    /**
+     * Get the current currency
+     * @returns {string} Current currency code
+     */
+    function getCurrentCurrency() {
+        return currentCurrency;
+    }
+
+    /**
+     * Set the current currency
+     * @param {string} currency - The currency code to set
+     */
+    function setCurrency(currency) {
+        if (CURRENCIES[currency]) {
+            currentCurrency = currency;
             localStorage.setItem('lp_currency', currency);
-        } catch (error) {
-            console.error('Error detecting currency from IP:', error);
-            currency = 'USD'; // Fallback to USD
+            
+            // Dispatch event to notify about currency change
+            document.dispatchEvent(new CustomEvent('currencyChanged', { 
+                detail: { currency } 
+            }));
+        } else {
+            console.warn(`Attempted to set unknown currency: ${currency}`);
         }
     }
-    
-    return currency;
-}
 
-// Format price based on currency
-function formatPrice(amount, currency) {
-    const currencyObj = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
-    return `${currencyObj.symbol}${amount.toFixed(currency === 'ILS' || currency === 'JPY' ? 0 : 2)}`;
-}
+    /**
+     * Initialize the currency manager
+     * @returns {Promise<string>} The detected or set currency
+     */
+    async function init() {
+        // Try to get from localStorage first
+        const savedCurrency = localStorage.getItem('lp_currency');
+        if (savedCurrency && CURRENCIES[savedCurrency]) {
+            currentCurrency = savedCurrency;
+            return currentCurrency;
+        }
 
-// Calculate total price based on photo count and currency
-function calculateTotal(photoCount, currency) {
-    const packageKey = photoCount <= 5 ? '1-5' :
-                     photoCount <= 15 ? '6-15' :
-                     photoCount <= 25 ? '16-25' : '26+';
-    
-    const pricePerPhoto = PRICING[packageKey][currency] || PRICING[packageKey]['USD'];
-    return {
-        total: pricePerPhoto * photoCount,
-        perPhoto: pricePerPhoto,
-        package: packageKey
-    };
-}
-
-// Create currency dropdown HTML
-function createCurrencyDropdown(currentCurrency, className = '') {
-    return `
-        <div class="currency-selector ${className}">
-            <select class="currency-dropdown" aria-label="Select currency">
-                ${CURRENCIES.map(currency => 
-                    `<option value="${currency.code}" ${currentCurrency === currency.code ? 'selected' : ''}>
-                        ${currency.code} (${currency.symbol})
-                    </option>`
-                ).join('')}
-            </select>
-        </div>
-    `;
-}
-
-// Initialize currency selector
-document.addEventListener('DOMContentLoaded', async () => {
-    const currency = await getCurrency();
-    
-    // Initialize all currency dropdowns
-    document.querySelectorAll('.currency-dropdown').forEach(dropdown => {
-        // Set initial value
-        dropdown.value = currency;
-        
-        // Add change event listener
-        dropdown.addEventListener('change', (e) => {
-            const newCurrency = e.target.value;
-            localStorage.setItem('lp_currency', newCurrency);
+        // If not in localStorage, try to detect from browser
+        try {
+            // Try to get currency from browser's language
+            const browserLang = navigator.language || 'en-US';
+            const region = new Intl.Locale(browserLang).region;
             
-            // Dispatch custom event for other components to listen to
-            document.dispatchEvent(new CustomEvent('currencyChanged', { 
-                detail: { currency: newCurrency } 
-            }));
-        });
+            // Map of region codes to our supported currencies
+            const regionToCurrency = {
+                'IL': 'ILS',  // Israel
+                'US': 'USD',  // United States
+                'GB': 'GBP',  // United Kingdom
+                'EU': 'EUR',  // European Union
+                'RU': 'RUB'   // Russia
+                // Add more mappings as needed
+            };
+            
+            if (region && regionToCurrency[region]) {
+                currentCurrency = regionToCurrency[region];
+                localStorage.setItem('lp_currency', currentCurrency);
+            }
+        } catch (e) {
+            console.warn('Could not detect currency from browser, using default', e);
+        }
+        
+        return currentCurrency;
+    }
+
+    // Public API
+    return {
+        init,
+        formatPrice,
+        getPricePerPhoto,
+        calculateTotalPrice,
+        getCurrentCurrency,
+        setCurrency,
+        getCurrencies: () => ({ ...CURRENCIES }),
+        getPricing: () => ({ ...PRICING })
+    };
+})();
+
+// Auto-initialize
+document.addEventListener('DOMContentLoaded', () => {
+    CurrencyManager.init().then(currency => {
+        console.log(`Currency Manager initialized with ${currency}`);
     });
-    
-    // Dispatch initial currency load event
-    document.dispatchEvent(new CustomEvent('currencyLoaded', { 
-        detail: { currency } 
-    }));
 });

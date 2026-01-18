@@ -1,0 +1,19 @@
+{
+  "name": "calculate-price-function",
+  "version": "1.0.0",
+  "description": "Server-side pricing calculation for Living Picture",
+  "main": "calculate-price.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@netlify/functions": "^1.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

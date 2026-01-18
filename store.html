@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/store.css">
+    <link rel="stylesheet" href="css/photo-upload.css">
 </head>
 <body class="store-page">
     <!-- Back Button -->
@@ -87,12 +88,22 @@
                 <button class="btn btn-primary" id="browse-files">
                     <i class="fas fa-plus"></i> Add Photos
                 </button>
+                
+                <!-- Global Upload Progress -->
+                <div id="global-upload-progress" class="global-upload-progress">
+                    <div class="global-progress-bar">
+                        <div id="global-progress-bar" class="progress-fill"></div>
+                    </div>
+                    <div id="global-progress-text" class="global-progress-text">Uploading 0 of 0 photos</div>
+                </div>
+                
                 <div id="upload-progress" class="upload-progress">
                     <div class="progress-container">
                         <div id="upload-progress-bar" class="progress-bar"></div>
                     </div>
                     <div id="upload-progress-text" class="progress-text">Processing photos...</div>
                 </div>
+                
                 <div id="photo-upload-error" class="photo-upload-error">
                     <i class="fas fa-exclamation-circle"></i>
                     <span>Please upload at least one photo to continue</span>

@@ -137,6 +137,10 @@ exports.handler = async (event, context) => {
                 } 
                 // Handle array fields (specifically imageUrls)
                 else if (key === 'imageUrls' && Array.isArray(value)) {
+                    console.log(`Processing ${value.length} image URLs:`);
+                    value.forEach((url, index) => {
+                        console.log(`  [${index + 1}] ${typeof url === 'string' ? url : 'Invalid URL (not a string)'}`);
+                    });
                     sanitizedFields[key] = value.length > 0 ? value.join(',') : '';
                 }
                 // Handle number fields
@@ -149,6 +153,27 @@ exports.handler = async (event, context) => {
                 }
             }
         });
+
+        // Validate photoCount matches the number of image URLs if both are provided
+        if (sanitizedFields.photoCount > 0 && sanitizedFields.imageUrls) {
+            const urlCount = sanitizedFields.imageUrls.split(',').filter(Boolean).length;
+            console.log(`Validating photo count: ${sanitizedFields.photoCount} (expected) vs ${urlCount} (actual URLs)`);
+            
+            if (sanitizedFields.photoCount !== urlCount) {
+                const errorMessage = `Photo count (${sanitizedFields.photoCount}) does not match the number of image URLs (${urlCount})`;
+                console.error('Validation error:', errorMessage);
+                return createResponse(400, {
+                    ok: false,
+                    error: 'Validation Error',
+                    message: errorMessage,
+                    details: {
+                        photoCount: sanitizedFields.photoCount,
+                        urlCount,
+                        imageUrls: sanitizedFields.imageUrls.split(',').map(url => url.trim()).filter(Boolean)
+                    }
+                });
+            }
+        }
 
         // Initialize Airtable
         const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
@@ -175,10 +200,24 @@ exports.handler = async (event, context) => {
         };
         
         // Log the sanitized data being sent to Airtable
-        console.log('Sanitized record fields for Airtable:', JSON.stringify(recordFields, null, 2));
+        console.log('Sanitized record fields for Airtable:', JSON.stringify({
+            ...recordFields,
+            // Truncate long fields in logs for better readability
+            imageUrls: recordFields.imageUrls ? 
+                (recordFields.imageUrls.length > 100 ? 
+                    recordFields.imageUrls.substring(0, 100) + '...' : 
+                    recordFields.imageUrls) : 
+                null
+        }, null, 2));
 
-        // Log the data being sent to Airtable
-        console.log('Preparing to upsert record with data:', JSON.stringify(recordFields, null, 2));
+        // Log detailed image URL information
+        if (recordFields.imageUrls) {
+            const urls = recordFields.imageUrls.split(',').filter(Boolean);
+            console.log(`Saving ${urls.length} image URLs to Airtable:`);
+            urls.forEach((url, index) => {
+                console.log(`  [${index + 1}] ${url}`);
+            });
+        }
 
         let result;
         try {
