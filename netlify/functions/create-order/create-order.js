@@ -412,14 +412,42 @@ exports.handler = async (event, context) => {
             });
             
             if (!findLeadResult.records || findLeadResult.records.length === 0) {
-                return {
-                    statusCode: 404,
-                    body: JSON.stringify({ 
-                        ok: false, 
-                        error: 'Lead not found',
-                        details: `No lead found with leadId: ${orderData.leadId}`
-                    })
+                // Lead not found, so create it
+                console.log(`Lead not found with leadId: ${orderData.leadId}. Creating new lead.`);
+
+                // Whitelist of allowed lead fields for creation
+                const allowedLeadFields = [
+                    'customerEmail', 'customerName', 'country', 'memoryName', 'memoryTitle', 
+                    'songName', 'artistName', 'imageUrls', 'photoCount', 'packageKey', 
+                    'totalAmount', 'currency', 'paymentstatus', 'paymentProvider', 
+                    'paymentStatusRaw', 'transactionId', 'payplusPaymentLink', 
+                    'fulfillmentStatus', 'step', 'notes', 'createdAt', 'updatedAt', 'paidAt'
+                ];
+                
+                const createFields = {
+                    leadId: orderData.leadId,
+                    step: orderData.step || 'INITIALIZED',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
                 };
+
+                allowedLeadFields.forEach(field => {
+                    if (orderData[field] !== undefined && orderData[field] !== null) {
+                        createFields[field] = orderData[field];
+                    }
+                });
+
+                const createResult = await airtableRequest({
+                    method: 'POST',
+                    table: AIRTABLE_LEADS_TABLE,
+                    data: { fields: filterObject(createFields) } // Use filterObject to remove null/undefined
+                });
+
+                return createResponse(201, { // 201 Created
+                    ok: true,
+                    lead: createResult,
+                    action: 'lead_created'
+                });
             }
 
             const leadRecordId = findLeadResult.records[0].id;

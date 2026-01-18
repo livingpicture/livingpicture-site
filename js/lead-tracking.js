@@ -145,7 +145,7 @@ class LeadTracker {
                     _lastActivity: this.lastActivity
                 });
                 
-                navigator.sendBeacon('/.netlify/functions/lead-upsert', data);
+                navigator.sendBeacon('/.netlify/functions/create-order', data);
             } catch (error) {
                 console.error('Failed to send beacon:', error);
             }
@@ -457,7 +457,7 @@ class LeadTracker {
                 }
             });
             
-            const response = await fetch('/.netlify/functions/lead-upsert', {
+            const response = await fetch('/.netlify/functions/create-order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -653,7 +653,7 @@ class LeadTracker {
                 }
                 
                 try {
-                    const response = await fetch('/.netlify/functions/lead-upsert', {
+                    const response = await fetch('/.netlify/functions/create-order', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(item.data)
@@ -730,11 +730,11 @@ window.addEventListener('beforeunload', () => {
         const data = JSON.stringify(window.leadTracker.leadData);
         if (navigator.sendBeacon) {
             const blob = new Blob([data], { type: 'application/json' });
-            navigator.sendBeacon('/.netlify/functions/lead-upsert', blob);
+            navigator.sendBeacon('/.netlify/functions/create-order', blob);
         } else {
             // Fallback to sync XHR if sendBeacon is not available
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/.netlify/functions/lead-upsert', false); // Synchronous
+            xhr.open('POST', '/.netlify/functions/create-order', false); // Synchronous
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.send(data);
         }

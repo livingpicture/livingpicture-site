@@ -1191,7 +1191,7 @@ async function updateAirtableWithImages() {
 }
 
 // Process selected files
-async function processFiles(files) {
+async async function processFiles(files) {
     // Set processing flag
     isProcessingFiles = true;
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];

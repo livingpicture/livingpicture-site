@@ -1,13 +1,15 @@
-// Import currency configuration from currency.js
-// Note: This assumes currency.js is loaded before script.js in the HTML
+// Get currency data from the global CurrencyManager
+const CURRENCIES = window.CurrencyManager?.getCurrencies() || {};
+const PRICING = window.CurrencyManager?.getPricing() || {};
+let currentCurrency = window.CurrencyManager?.getCurrentCurrency() || 'ILS';
+
+// Listen for currency changes to keep the UI in sync
+document.addEventListener('currencyChanged', (e) => {
+    currentCurrency = e.detail.currency;
+    updatePricing();
+});
 
 
-// Function to update prices based on selected currency
-function updatePricing() {
-    if (typeof window.updatePricing === 'function') {
-        window.updatePricing();
-    }
-}
 
 // Function to update prices based on selected currency
 function updatePricing() {
