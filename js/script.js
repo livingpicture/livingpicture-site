@@ -1,8 +1,8 @@
 // Import currency configuration from currency.js
 // Note: This assumes currency.js is loaded before script.js in the HTML
 
-// Current currency (default to ILS)
-let currentCurrency = window.currentCurrency || 'ILS';
+// Get current currency from CurrencyManager or default to ILS
+const currentCurrency = window.CurrencyManager?.getCurrentCurrency() || 'ILS';
 
 // Function to update prices based on selected currency
 function updatePricing() {
@@ -107,21 +107,23 @@ document.addEventListener('DOMContentLoaded', function() {
         select.value = currentCurrency;
         
         // Add event listener
-        select.addEventListener('change', (e) => {
-            currentCurrency = e.target.value;
-            updatePricing();
-            // Save to localStorage for consistency
-            localStorage.setItem('preferredCurrency', currentCurrency);
+        select.addEventListener('change', async (e) => {
+            const newCurrency = e.target.value;
+            if (window.CurrencyManager) {
+                try {
+                    await window.CurrencyManager.setCurrency(newCurrency);
+                    updatePricing();
+                } catch (error) {
+                    console.error('Error changing currency:', error);
+                }
+            }
         });
         
         currencySelectorContainer.appendChild(select);
     }
     
-    // Load saved currency preference
-    const savedCurrency = localStorage.getItem('preferredCurrency');
-    if (savedCurrency && CURRENCIES[savedCurrency]) {
-        currentCurrency = savedCurrency;
-    }
+    // Currency is now managed by CurrencyManager
+    // No need to load from localStorage here as CurrencyManager handles it
     
     // Initial price update
     updatePricing();

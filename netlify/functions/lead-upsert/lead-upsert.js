@@ -1,3 +1,5 @@
+// DEPRECATED: This function is no longer in use. Please use the create-order function instead.
+
 // Helper function to escape single quotes in strings for Airtable formulas
 function escapeSingleQuotes(str) {
     if (typeof str !== 'string') return str;

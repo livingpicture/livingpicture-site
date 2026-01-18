@@ -254,23 +254,40 @@
     </div>
 
     <script>
-        // Set current date
-        const now = new Date();
-        const options = { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        };
-        document.getElementById('order-date').textContent = now.toLocaleDateString('en-US', options);
-        
-        // Generate a random order number
-        const orderNumber = 'LP-' + Math.floor(100000 + Math.random() * 900000);
-        document.getElementById('order-number').textContent = orderNumber;
-        
-        // You can add more dynamic content here based on the order details
-        // For example, from URL parameters or localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const orderData = JSON.parse(localStorage.getItem('livingPictureOrder'));
+
+            if (orderData) {
+                document.getElementById('order-number').textContent = orderData.orderId;
+                document.getElementById('order-date').textContent = new Date(orderData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                document.getElementById('order-total').textContent = `${orderData.currencySymbol}${orderData.total.toFixed(2)}`;
+
+                // Prepare data for Airtable
+                const airtableData = {
+                    ...orderData,
+                    paymentstatus: 'PAID',
+                    transactionId: new URLSearchParams(window.location.search).get('transactionId') || 'N/A',
+                };
+
+                // Call the create-order function
+                fetch('/.netlify/functions/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(airtableData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        console.log('Order created and lead updated successfully');
+                    } else {
+                        console.error('Failed to create order or update lead');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        });
     </script>
     <script>
         // Add a small delay before showing the content to prevent flash of unstyled content

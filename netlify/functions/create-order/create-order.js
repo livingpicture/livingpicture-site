@@ -1,3 +1,14 @@
+// Helper function to filter out null and undefined values from an object
+function filterObject(obj) {
+    const filtered = {};
+    for (const key in obj) {
+        if (obj[key] !== null && obj[key] !== undefined) {
+            filtered[key] = obj[key];
+        }
+    }
+    return filtered;
+}
+
 // Helper function to make Airtable API requests
 async function airtableRequest(config) {
     const { method, table, data, recordId, params } = config;
@@ -183,7 +194,7 @@ exports.handler = async (event, context) => {
 
             // 2. Update the lead to mark as PAID
             const leadUpdate = {
-                fields: {
+                fields: filterObject({
                     step: 'PAID',
                     paymentstatus: 'PAID',
                     transactionId: orderData.transactionId,
@@ -192,7 +203,7 @@ exports.handler = async (event, context) => {
                         : String(orderData.paymentStatusRaw || ''),
                     paidAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
-                }
+                })
             };
 
             // Whitelisted fields for order creation with standardized field names
@@ -266,7 +277,7 @@ exports.handler = async (event, context) => {
             console.log('Prepared order data for Airtable:', JSON.stringify(orderFields, null, 2));
 
             // Create order record with whitelisted fields
-            const orderRecord = { fields: orderFields };
+            const orderRecord = { fields: filterObject(orderFields) };
 
             // Log field keys and sample values before making API calls
             const logSafeLeadFields = {};

@@ -461,7 +461,7 @@ async function syncLeadToAirtable() {
         // ... (existing code to prepare leadData)
 
         // Use relative URL for Netlify functions
-        const functionUrl = '/.netlify/functions/lead-upsert';
+        const functionUrl = '/.netlify/functions/create-order';
         console.log(`Calling Netlify function at: ${functionUrl}`);
 
         const response = await fetch(functionUrl, {

@@ -1,3 +1,5 @@
+import { formatFileSize } from './utils.js';
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize variables
     const memoryForm = document.querySelector('form');
@@ -469,14 +471,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Format file size
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
     
     // Retry upload for a failed or cancelled upload
     async function retryUpload(photoData) {
@@ -540,24 +534,23 @@ document.addEventListener('DOMContentLoaded', function() {
             cancelUploadBtn.style.display = 'none';
         }
     }
-    }
-    
+
     // Handle retry and cancel button clicks
     document.addEventListener('click', function(e) {
         // Stop propagation for retry buttons
         if (e.target.classList.contains('retry-upload')) {
             e.stopPropagation();
         }
-        
+
         // Handle cancel upload button clicks
         const cancelBtn = e.target.closest('.cancel-upload');
         if (cancelBtn) {
             e.preventDefault();
             e.stopPropagation();
-            
+
             const fileId = cancelBtn.getAttribute('data-file-id');
             if (!fileId) return;
-            
+
             // Find and cancel the upload
             const photo = uploadedPhotos.find(p => p.id === fileId);
             if (photo && photo.controller) {

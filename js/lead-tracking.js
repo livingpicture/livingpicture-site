@@ -22,10 +22,59 @@ class LeadTracker {
         this.lastActivity = Date.now();
         this.sessionTimeout = null;
         this.retryCounts = new Map(); // Track retry counts per request type
+        this.lastSuccessfulSync = 0;
         
         // Initialize
         this.initialize();
-        this.setupActivityListeners();
+    }
+    
+    loadLeadData() {
+        try {
+            const savedData = localStorage.getItem('lp_leadData');
+            if (savedData) {
+                this.leadData = JSON.parse(savedData);
+            }
+        } catch (error) {
+            console.error('Error loading lead data:', error);
+            this.leadData = {};
+        }
+    }
+    
+    updateLastActivity() {
+        this.lastActivity = Date.now();
+        // Reset session timeout
+        if (this.sessionTimeout) {
+            clearTimeout(this.sessionTimeout);
+        }
+        this.sessionTimeout = setTimeout(() => {
+            this.handleSessionTimeout();
+        }, this.SESSION_TIMEOUT);
+    }
+    
+    setupActivityListeners() {
+        // Track user activity
+        const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
+        events.forEach(event => {
+            window.addEventListener(event, () => this.updateLastActivity());
+        });
+    }
+    
+    handleSessionTimeout() {
+        // Handle session timeout
+        console.log('Session timed out due to inactivity');
+        // You can add additional cleanup or notification here
+    }
+    
+    setupPeriodicSync() {
+        // Set up periodic sync every 5 minutes
+        setInterval(() => {
+            this.syncPendingUpdates();
+        }, 5 * 60 * 1000);
+    }
+    
+    syncPendingUpdates() {
+        // Implement sync logic here
+        this.lastSuccessfulSync = Date.now();
     }
 
     initialize() {
