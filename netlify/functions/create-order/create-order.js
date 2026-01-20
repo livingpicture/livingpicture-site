@@ -1,14 +1,3 @@
-// Helper function to filter out null and undefined values from an object
-function filterObject(obj) {
-    const filtered = {};
-    for (const key in obj) {
-        if (obj[key] !== null && obj[key] !== undefined) {
-            filtered[key] = obj[key];
-        }
-    }
-    return filtered;
-}
-
 // Helper function to make Airtable API requests
 async function airtableRequest(config) {
     const { method, table, data, recordId, params } = config;
@@ -194,7 +183,7 @@ exports.handler = async (event, context) => {
 
             // 2. Update the lead to mark as PAID
             const leadUpdate = {
-                fields: filterObject({
+                fields: {
                     step: 'PAID',
                     paymentstatus: 'PAID',
                     transactionId: orderData.transactionId,
@@ -203,7 +192,7 @@ exports.handler = async (event, context) => {
                         : String(orderData.paymentStatusRaw || ''),
                     paidAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
-                })
+                }
             };
 
             // Whitelisted fields for order creation with standardized field names
@@ -277,7 +266,7 @@ exports.handler = async (event, context) => {
             console.log('Prepared order data for Airtable:', JSON.stringify(orderFields, null, 2));
 
             // Create order record with whitelisted fields
-            const orderRecord = { fields: filterObject(orderFields) };
+            const orderRecord = { fields: orderFields };
 
             // Log field keys and sample values before making API calls
             const logSafeLeadFields = {};
@@ -412,42 +401,14 @@ exports.handler = async (event, context) => {
             });
             
             if (!findLeadResult.records || findLeadResult.records.length === 0) {
-                // Lead not found, so create it
-                console.log(`Lead not found with leadId: ${orderData.leadId}. Creating new lead.`);
-
-                // Whitelist of allowed lead fields for creation
-                const allowedLeadFields = [
-                    'customerEmail', 'customerName', 'country', 'memoryName', 'memoryTitle', 
-                    'songName', 'artistName', 'imageUrls', 'photoCount', 'packageKey', 
-                    'totalAmount', 'currency', 'paymentstatus', 'paymentProvider', 
-                    'paymentStatusRaw', 'transactionId', 'payplusPaymentLink', 
-                    'fulfillmentStatus', 'step', 'notes', 'createdAt', 'updatedAt', 'paidAt'
-                ];
-                
-                const createFields = {
-                    leadId: orderData.leadId,
-                    step: orderData.step || 'INITIALIZED',
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ 
+                        ok: false, 
+                        error: 'Lead not found',
+                        details: `No lead found with leadId: ${orderData.leadId}`
+                    })
                 };
-
-                allowedLeadFields.forEach(field => {
-                    if (orderData[field] !== undefined && orderData[field] !== null) {
-                        createFields[field] = orderData[field];
-                    }
-                });
-
-                const createResult = await airtableRequest({
-                    method: 'POST',
-                    table: AIRTABLE_LEADS_TABLE,
-                    data: { fields: filterObject(createFields) } // Use filterObject to remove null/undefined
-                });
-
-                return createResponse(201, { // 201 Created
-                    ok: true,
-                    lead: createResult,
-                    action: 'lead_created'
-                });
             }
 
             const leadRecordId = findLeadResult.records[0].id;

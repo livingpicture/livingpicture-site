@@ -35,9 +35,6 @@ const PRICING = {
     }
 };
 
-// Define pricing tiers
-const PRICING_TIERS = ['1-5', '6-15', '16-25', '26+'];
-
 // Store the current step and form data
 let currentStep = 1;
 const formData = {

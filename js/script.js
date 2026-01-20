@@ -1,15 +1,41 @@
-// Get currency data from the global CurrencyManager
-const CURRENCIES = window.CurrencyManager?.getCurrencies() || {};
-const PRICING = window.CurrencyManager?.getPricing() || {};
-let currentCurrency = window.CurrencyManager?.getCurrentCurrency() || 'ILS';
+// Currency configuration
+const CURRENCIES = {
+    'ILS': { symbol: '₪', name: 'Israeli Shekel' },
+    'USD': { symbol: '$', name: 'US Dollar' },
+    'EUR': { symbol: '€', name: 'Euro' },
+    'RUB': { symbol: '₽', name: 'Russian Ruble' }
+};
 
-// Listen for currency changes to keep the UI in sync
-document.addEventListener('currencyChanged', (e) => {
-    currentCurrency = e.detail.currency;
-    updatePricing();
-});
+// Pricing in different currencies (prices per photo)
+const PRICING = {
+    '1-5': {
+        ILS: 18,
+        USD: 4.80,
+        EUR: 4.50,
+        RUB: 445
+    },
+    '6-15': {
+        ILS: 16,
+        USD: 4.20,
+        EUR: 4.00,
+        RUB: 395
+    },
+    '16-25': {
+        ILS: 14,
+        USD: 3.70,
+        EUR: 3.50,
+        RUB: 345
+    },
+    '26+': {
+        ILS: 12,
+        USD: 3.10,
+        EUR: 2.90,
+        RUB: 295
+    }
+};
 
-
+// Current currency (default to ILS)
+let currentCurrency = 'ILS';
 
 // Function to update prices based on selected currency
 function updatePricing() {
@@ -30,64 +56,8 @@ function updatePricing() {
     }
 }
 
-// Function to force videos to play on mobile
-function forceVideoPlay(video) {
-    if (video.paused) {
-        const playPromise = video.play();
-        
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                // Autoplay was prevented, try muting and playing
-                video.muted = true;
-                video.play();
-            });
-        }
-    }
-}
-
-// Function to handle video autoplay on mobile
-function setupVideoAutoplay() {
-    const videos = document.querySelectorAll('video[autoplay]');
-    
-    // Try to play all autoplay videos
-    videos.forEach(video => {
-        // Ensure videos are muted for autoplay
-        video.muted = true;
-        video.setAttribute('playsinline', '');
-        video.setAttribute('webkit-playsinline', '');
-        
-        // Try to play the video
-        forceVideoPlay(video);
-        
-        // Handle iOS webkit-paused state
-        video.addEventListener('loadedmetadata', function() {
-            forceVideoPlay(video);
-        });
-        
-        // Handle visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                forceVideoPlay(video);
-            }
-        });
-    });
-    
-    // For iOS, handle the play/pause on touch events
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        document.body.addEventListener('touchend', function touchHandler() {
-            videos.forEach(video => {
-                forceVideoPlay(video);
-            });
-            document.body.removeEventListener('touchend', touchHandler);
-        }, { once: true });
-    }
-}
-
 // Function to create currency selector
 document.addEventListener('DOMContentLoaded', function() {
-    // Setup video autoplay
-    setupVideoAutoplay();
-    
     // Create currency selector if it doesn't exist
     const currencySelectorContainer = document.getElementById('pricing-currency-selector');
     if (currencySelectorContainer && !document.getElementById('pricing-currency')) {
@@ -107,23 +77,21 @@ document.addEventListener('DOMContentLoaded', function() {
         select.value = currentCurrency;
         
         // Add event listener
-        select.addEventListener('change', async (e) => {
-            const newCurrency = e.target.value;
-            if (window.CurrencyManager) {
-                try {
-                    await window.CurrencyManager.setCurrency(newCurrency);
-                    updatePricing();
-                } catch (error) {
-                    console.error('Error changing currency:', error);
-                }
-            }
+        select.addEventListener('change', (e) => {
+            currentCurrency = e.target.value;
+            updatePricing();
+            // Save to localStorage for consistency
+            localStorage.setItem('preferredCurrency', currentCurrency);
         });
         
         currencySelectorContainer.appendChild(select);
     }
     
-    // Currency is now managed by CurrencyManager
-    // No need to load from localStorage here as CurrencyManager handles it
+    // Load saved currency preference
+    const savedCurrency = localStorage.getItem('preferredCurrency');
+    if (savedCurrency && CURRENCIES[savedCurrency]) {
+        currentCurrency = savedCurrency;
+    }
     
     // Initial price update
     updatePricing();

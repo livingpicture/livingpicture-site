@@ -10,11 +10,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/store.css">
-    <link rel="stylesheet" href="css/photo-upload.css">
 </head>
 <body class="store-page">
     <!-- Back Button -->
-    <a href="./index.html" class="back-button" aria-label="Back to home">
+    <a href="index.html" class="back-button">
         <i class="fas fa-arrow-left"></i>
     </a>
 
@@ -59,7 +58,7 @@
             <p class="step-description">Give your memory a special name that speaks to you.</p>
             
             <div class="form-group">
-                <input type="text" id="memoryName" name="memoryName" placeholder="e.g., 'Our Story', 'Galina's Gift Book'" autocomplete="off">
+                <input type="text" id="memory-name" name="memory-name" placeholder="e.g., 'Our Story', 'Galina's Gift Book'" autocomplete="off">
                 <div class="input-underline"></div>
             </div>
             
@@ -83,27 +82,16 @@
             </div>
             
             <div class="photo-upload-container">
-                <input type="file" id="photoUpload" name="photoUpload" multiple accept="image/*" style="display: none;">
-                <div id="photoPreview" class="photo-preview-container"></div>
+                <input type="file" id="photo-upload" name="photo-upload" multiple accept="image/*" style="display: none;">
                 <button class="btn btn-primary" id="browse-files">
                     <i class="fas fa-plus"></i> Add Photos
                 </button>
-                
-                <!-- Global Upload Progress -->
-                <div id="global-upload-progress" class="global-upload-progress">
-                    <div class="global-progress-bar">
-                        <div id="global-progress-bar" class="progress-fill"></div>
-                    </div>
-                    <div id="global-progress-text" class="global-progress-text">Uploading 0 of 0 photos</div>
-                </div>
-                
                 <div id="upload-progress" class="upload-progress">
                     <div class="progress-container">
                         <div id="upload-progress-bar" class="progress-bar"></div>
                     </div>
                     <div id="upload-progress-text" class="progress-text">Processing photos...</div>
                 </div>
-                
                 <div id="photo-upload-error" class="photo-upload-error">
                     <i class="fas fa-exclamation-circle"></i>
                     <span>Please upload at least one photo to continue</span>
@@ -494,10 +482,6 @@
         </div>
     </div>
 
-    <script src="js/currency.js"></script>
-    <script src="js/order-form.js"></script>
-    <script src="js/script.js"></script>
-    <script src="js/lead-tracking.js"></script>
-    <script src="js/memory-form.js" type="module"></script>
+    <script src="js/store.js"></script>
 </body>
 </html>
