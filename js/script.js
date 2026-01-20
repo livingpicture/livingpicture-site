@@ -1,38 +1,3 @@
-// Currency configuration
-const CURRENCIES = {
-    'ILS': { symbol: '₪', name: 'Israeli Shekel' },
-    'USD': { symbol: '$', name: 'US Dollar' },
-    'EUR': { symbol: '€', name: 'Euro' },
-    'RUB': { symbol: '₽', name: 'Russian Ruble' }
-};
-
-// Pricing in different currencies (prices per photo)
-const PRICING = {
-    '1-5': {
-        ILS: 18,
-        USD: 4.80,
-        EUR: 4.50,
-        RUB: 445
-    },
-    '6-15': {
-        ILS: 16,
-        USD: 4.20,
-        EUR: 4.00,
-        RUB: 395
-    },
-    '16-25': {
-        ILS: 14,
-        USD: 3.70,
-        EUR: 3.50,
-        RUB: 345
-    },
-    '26+': {
-        ILS: 12,
-        USD: 3.10,
-        EUR: 2.90,
-        RUB: 295
-    }
-};
 
 // Current currency (default to ILS)
 let currentCurrency = 'ILS';

@@ -6,7 +6,6 @@ const CURRENCIES = [
     { code: 'RUB', symbol: '₽', name: 'Russian Ruble' }
 ];
 
-// Pricing in different currencies (prices per photo)
 const PRICING = {
     '1-5': {
         ILS: 20,
@@ -33,6 +32,7 @@ const PRICING = {
         RUB: 350
     }
 };
+
 
 // Get currency from localStorage or detect from IP
 async function getCurrency() {
@@ -76,19 +76,6 @@ function formatPrice(amount, currency) {
     return `${currencyObj.symbol}${amount.toFixed(currency === 'ILS' || currency === 'JPY' ? 0 : 2)}`;
 }
 
-// Calculate total price based on photo count and currency
-function calculateTotal(photoCount, currency) {
-    const packageKey = photoCount <= 5 ? '1-5' :
-                     photoCount <= 15 ? '6-15' :
-                     photoCount <= 25 ? '16-25' : '26+';
-    
-    const pricePerPhoto = PRICING[packageKey][currency] || PRICING[packageKey]['USD'];
-    return {
-        total: pricePerPhoto * photoCount,
-        perPhoto: pricePerPhoto,
-        package: packageKey
-    };
-}
 
 // Create currency dropdown HTML
 function createCurrencyDropdown(currentCurrency, className = '') {

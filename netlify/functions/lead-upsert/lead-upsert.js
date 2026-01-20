@@ -1,8 +1,4 @@
-// Helper function to escape single quotes in strings for Airtable formulas
-function escapeSingleQuotes(str) {
-    if (typeof str !== 'string') return str;
-    return str.replace(/'/g, "''");
-}
+const Airtable = require('airtable');
 
 // CORS headers
 const CORS_HEADERS = {
@@ -10,6 +6,48 @@ const CORS_HEADERS = {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
+
+const PRICING = {
+    '1-5': {
+        ILS: 20,
+        USD: 5.50,
+        EUR: 5.00,
+        RUB: 500
+    },
+    '6-15': {
+        ILS: 18,
+        USD: 4.95,
+        EUR: 4.50,
+        RUB: 450
+    },
+    '16-25': {
+        ILS: 16,
+        USD: 4.40,
+        EUR: 4.00,
+        RUB: 400
+    },
+    '26+': {
+        ILS: 14,
+        USD: 3.85,
+        EUR: 3.50,
+        RUB: 350
+    }
+};
+
+function calculatePrice(photoCount, currency) {
+    const tier = photoCount <= 5 ? '1-5' :
+                 photoCount <= 15 ? '6-15' :
+                 photoCount <= 25 ? '16-25' : '26+';
+    
+    const pricePerPhoto = PRICING[tier]?.[currency] || PRICING[tier]?.['USD'];
+    const total = pricePerPhoto * photoCount;
+
+    return { 
+        total,
+        pricePerPhoto,
+        tier
+    };
+}
 
 // Helper function to create response
 function createResponse(statusCode, body) {
@@ -88,9 +126,25 @@ exports.handler = async (event, context) => {
         });
     }
 
+    const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
+
     try {
         // Extract and validate required fields
-        const { leadId, step, ...otherFields } = requestBody;
+        const {
+            leadId,
+            step,
+            memoryTitle,
+            photoCount,
+            imageUrls,
+            customerName,
+            customerEmail,
+            country,
+            currency,
+            totalAmount,
+            detectedCurrency,
+            selectedCurrency,
+            sessionId
+        } = requestBody;
         
         // Validate required fields
         const missingFields = [];
@@ -108,13 +162,68 @@ exports.handler = async (event, context) => {
                 receivedData: {
                     hasLeadId: !!leadId,
                     hasStep: !!step,
-                    otherFields: Object.keys(otherFields)
+                    otherFields: Object.keys(requestBody)
                 }
             });
         }
 
-        // Rest of your function logic here...
-        // [Previous code continues...]
+        let pricingData = {};
+        if (photoCount && currency) {
+            pricingData = calculatePrice(photoCount, currency);
+        }
+
+        const airtableData = {
+            leadId,
+            memoryTitle,
+            photoCount,
+            imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : undefined,
+            customerName,
+            customerEmail,
+            country,
+            currency,
+            totalAmount: totalAmount || (pricingData ? pricingData.total : undefined),
+            detectedCurrency,
+            selectedCurrency,
+            sessionId,
+            step,
+            'Last Updated': new Date().toISOString(),
+        };
+
+        // Remove undefined fields to avoid overwriting existing data with nulls
+        Object.keys(airtableData).forEach(key => airtableData[key] === undefined && delete airtableData[key]);
+
+        // Find existing record by leadId
+        const records = await base(AIRTABLE_LEADS_TABLE).select({
+            filterByFormula: `{leadId} = '${leadId}'`,
+            maxRecords: 1
+        }).firstPage();
+
+        let airtableRecord;
+        if (records.length > 0) {
+            // Update existing record
+            const recordToUpdate = records[0];
+            const updatedRecords = await base(AIRTABLE_LEADS_TABLE).update([{
+                id: recordToUpdate.id,
+                fields: airtableData
+            }]);
+            airtableRecord = updatedRecords[0];
+            console.log('Airtable record updated:', airtableRecord.id);
+        } else {
+            // Create new record
+            const createdRecords = await base(AIRTABLE_LEADS_TABLE).create([{
+                fields: airtableData
+            }]);
+            airtableRecord = createdRecords[0];
+            console.log('Airtable record created:', airtableRecord.id);
+        }
+
+        return createResponse(200, {
+            ok: true,
+            leadId: airtableRecord.fields.leadId,
+            airtableId: airtableRecord.id,
+            pricing: pricingData,
+            message: 'Lead upserted successfully'
+        });
 
     } catch (error) {
         console.error('=== Error processing lead ===');

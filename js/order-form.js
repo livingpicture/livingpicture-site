@@ -1,39 +1,4 @@
-// Currency configuration
 let currentCurrency = 'ILS';
-const CURRENCIES = {
-    'ILS': { symbol: '₪', name: 'Israeli Shekel' },
-    'USD': { symbol: '$', name: 'US Dollar' },
-    'EUR': { symbol: '€', name: 'Euro' },
-    'RUB': { symbol: '₽', name: 'Russian Ruble' }
-};
-
-// Pricing in different currencies (prices per photo)
-const PRICING = {
-    '1-5': {
-        ILS: 18,
-        USD: 4.80,
-        EUR: 4.50,
-        RUB: 445
-    },
-    '6-15': {
-        ILS: 16,
-        USD: 4.20,
-        EUR: 4.00,
-        RUB: 395
-    },
-    '16-25': {
-        ILS: 14,
-        USD: 3.70,
-        EUR: 3.50,
-        RUB: 345
-    },
-    '26+': {
-        ILS: 12,
-        USD: 3.10,
-        EUR: 2.90,
-        RUB: 295
-    }
-};
 
 // Store the current step and form data
 let currentStep = 1;
@@ -249,14 +214,7 @@ function setupEventListeners() {
                         return;
                     }
                     
-                    try {
-                        console.log('Syncing memory name to Airtable...');
-                        await syncLeadToAirtable();
-                        console.log('Memory name synced successfully');
-                    } catch (error) {
-                        console.error('Error syncing memory name:', error);
-                        showError('Warning: Could not save progress. Your data will be saved locally.');
-                    }
+                    await syncLeadData();
                     console.log('Calling showStep(2)');
                     await showStep(2);
                     return;
@@ -275,15 +233,7 @@ function setupEventListeners() {
                     
                     console.log(`Found ${formData.photos.length} photos, proceeding to next step`);
                     saveCurrentStep();
-                    
-                    // Sync in the background but don't wait for it to complete
-                    syncLeadToAirtable()
-                        .then(() => console.log('Background sync completed successfully'))
-                        .catch(error => {
-                            console.error('Background sync error:', error);
-                            showError('Warning: Could not save photos to server. Your data will be saved locally.');
-                        });
-                    
+                    await syncLeadData();
                     console.log('Proceeding to music step');
                     await showStep(3);
                     return;
@@ -297,14 +247,7 @@ function setupEventListeners() {
                         return;
                     }
                     
-                    try {
-                        console.log('Syncing music selection to Airtable...');
-                        await syncLeadToAirtable();
-                        console.log('Music selection synced successfully');
-                    } catch (error) {
-                        console.error('Error syncing music selection:', error);
-                        showError('Warning: Could not save music selection. Your data will be saved locally.');
-                    }
+                    await syncLeadData();
                     console.log('Calling showStep(4)');
                     await showStep(4);
                     return;
@@ -313,16 +256,7 @@ function setupEventListeners() {
                 // Step 4: Checkout → Complete
                 if (currentStep === 4 && nextStep === 'complete') {
                     console.log('Processing step 4 → complete');
-                    try {
-                        // Update status to PENDING_PAYMENT before payment
-                        console.log('Updating lead status to PENDING_PAYMENT...');
-                        formData.status = 'PENDING_PAYMENT';
-                        await syncLeadToAirtable();
-                        console.log('Lead status updated to PENDING_PAYMENT');
-                    } catch (error) {
-                        console.error('Error updating lead status:', error);
-                        // Still proceed with payment
-                    }
+                    await syncLeadData();
                     console.log('Calling completePurchase()');
                     completePurchase();
                     return;
@@ -490,90 +424,58 @@ function validatePhotoUpload() {
     return true;
 }
 
-// Update the syncLeadToAirtable function
-async function syncLeadToAirtable() {
-    console.log('[Airtable Sync] Starting sync...');
-    
+
+
+// Show a specific step
+async function syncLeadData() {
+    console.log('Syncing lead data...');
+
+    const payload = {
+        leadId: formData.leadId || localStorage.getItem('leadId'),
+        step: `STEP_${currentStep}`,
+        memoryTitle: formData.memoryName,
+        photoCount: formData.photos ? Number(formData.photos.length) : undefined,
+        imageUrls: formData.photos ? formData.photos.map(p => p.permanentUrl) : undefined,
+        customerName: formData.customer?.name,
+        customerEmail: formData.customer?.email,
+        country: formData.customer?.country,
+        currency: formData.currency,
+        totalAmount: formData.pricing ? Number(formData.pricing.totalPrice) : undefined,
+        detectedCurrency: formData.detectedCurrency,
+        selectedCurrency: formData.currency,
+        sessionId: formData.sessionId
+    };
+
+    // Omit missing fields
+    Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined || payload[key] === null || payload[key] === '') {
+            delete payload[key];
+        }
+    });
+
     try {
-        // ... (existing code to prepare leadData)
-
-        // Use relative URL for Netlify functions
-        const functionUrl = '/.netlify/functions/lead-upsert';
-        console.log(`Calling Netlify function at: ${functionUrl}`);
-
-        const response = await fetch(functionUrl, {
+        const response = await fetch('/.netlify/functions/lead-upsert', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(leadData)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', {
-                status: response.status,
-                statusText: response.statusText,
-                body: errorText
-            });
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        console.log('Sync successful:', data);
-        return data;
-
-    } catch (error) {
-        console.error('Error in syncLeadToAirtable:', {
-            error: error.message,
-            stack: error.stack
-        });
-        throw error;
-    }
-}
-
-// Update the showStep function to handle the sync properly
-async function showStep(stepNumber) {
-    try {
-        console.log(`Transitioning to step ${stepNumber}`);
-        await syncLeadToAirtable();
-        console.log('Sync completed, showing step:', stepNumber);
-        
-        // Your existing step transition logic here
-        document.querySelectorAll('.form-step').forEach(step => {
-            step.classList.remove('active');
-        });
-        document.getElementById(`step-${stepNumber}`).classList.add('active');
-        
-    } catch (error) {
-        console.error('Error during step transition:', error);
-        // Show user-friendly error message
-        alert('There was an error saving your progress. Please try again.');
-    }
-}
-
-// Show a specific step
-async function showStep(stepNumber) {
-    // 1. First, sync with Airtable at the beginning of step transition
-    try {
-        console.log(`[Airtable Sync] Starting sync before step transition from ${currentStep} to ${stepNumber}...`);
-        const syncResult = await syncLeadToAirtable();
-        if (syncResult && syncResult.leadId) {
-            console.log(`[Airtable Sync] Successfully synced lead ${syncResult.leadId} at step ${currentStep}`);
-        } else {
-            console.warn('[Airtable Sync] Sync completed but no lead ID was returned');
+        const result = await response.json();
+        console.log('Sync successful:', result);
+        if (result.airtableId) {
+            formData.airtableId = result.airtableId;
         }
     } catch (error) {
-        console.error('[Airtable Sync] Error during sync before step change:', {
-            error: error.message,
-            step: currentStep,
-            nextStep: stepNumber,
-            timestamp: new Date().toISOString()
-        });
-        // Continue with step change even if sync fails, but show a warning
-        showError('Warning: Could not save progress to our servers. Your data will be saved locally.');
+        console.error('Failed to sync lead data:', error);
+        // Optionally show a non-blocking error to the user
     }
+}
+
+async function showStep(stepNumber) {
     
     // 2. Validate current step before proceeding
     let canProceed = true;
@@ -935,26 +837,6 @@ function setupFileUpload() {
     }, true);
 }
 
-// Calculate the current pricing tier based on number of photos
-function calculatePricingTier(photoCount) {
-    if (photoCount >= 26) return '26+';
-    if (photoCount >= 16) return '16-25';
-    if (photoCount >= 6) return '6-15';
-    return '1-5';
-}
-
-// Get price per photo based on tier and currency
-function getPricePerPhoto(tier, currency) {
-    return PRICING[tier]?.[currency] || PRICING['1-5'][currency];
-}
-
-// Calculate total price based on number of photos and current currency
-function calculateTotalPrice(photoCount) {
-    if (photoCount === 0) return 0;
-    const tier = calculatePricingTier(photoCount);
-    const pricePerPhoto = getPricePerPhoto(tier, currentCurrency);
-    return photoCount * pricePerPhoto;
-}
 
 // Update the pricing display
 function updatePricingDisplay() {
@@ -1213,25 +1095,23 @@ async function processFiles(files) {
         }
     };
 
+    let successfulUploads = 0;
+
     // Update progress
     const updateProgress = (processed, total) => {
         const percent = Math.round((processed / total) * 100);
         progressBar.style.width = `${percent}%`;
         const statusText = isUploadingToCloudinary ? 'Uploading' : 'Processing';
         progressText.textContent = `${statusText} ${processed} of ${total} photos...`;
-        
-        // Update next button state based on upload status
-        if (isUploadingToCloudinary) {
-            updateNextButton('next-to-music', false);
-            const nextBtn = document.getElementById('next-to-music');
-            if (nextBtn) {
-                nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-            }
-        } else if (processed > 0) {
-            updateNextButton('next-to-music', true);
-            const nextBtn = document.getElementById('next-to-music');
-            if (nextBtn) {
-                nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
+
+        if (processed === total) {
+            isUploadingToCloudinary = false;
+            if (successfulUploads === total) {
+                updateNextButton('next-to-music', true);
+                const nextBtn = document.getElementById('next-to-music');
+                if (nextBtn) {
+                    nextBtn.innerHTML = 'Continue <i class="fas fa-arrow-right"></i>';
+                }
             }
         }
     };
@@ -1344,11 +1224,7 @@ async function processFiles(files) {
             }
             scheduleUIUpdate();
 
-            // Enable next button as soon as we have at least one photo
-            if (newPhotos.length === 1) {
-                updateNextButton('next-to-music', true);
-            }
-
+            successfulUploads++;
             return { success: true, file, photo };
         } catch (error) {
             console.error('Error processing file:', file.name, error);

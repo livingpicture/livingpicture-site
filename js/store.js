@@ -1,39 +1,4 @@
-// Currency configuration
 let currentCurrency = 'ILS';
-const CURRENCIES = {
-    'ILS': { symbol: '₪', name: 'Israeli Shekel' },
-    'USD': { symbol: '$', name: 'US Dollar' },
-    'EUR': { symbol: '€', name: 'Euro' },
-    'RUB': { symbol: '₽', name: 'Russian Ruble' }
-};
-
-// Pricing in different currencies (prices per photo)
-const PRICING = {
-    '1-5': {
-        ILS: 18,
-        USD: 4.80,
-        EUR: 4.50,
-        RUB: 445
-    },
-    '6-15': {
-        ILS: 16,
-        USD: 4.20,
-        EUR: 4.00,
-        RUB: 395
-    },
-    '16-25': {
-        ILS: 14,
-        USD: 3.70,
-        EUR: 3.50,
-        RUB: 345
-    },
-    '26+': {
-        ILS: 12,
-        USD: 3.10,
-        EUR: 2.90,
-        RUB: 295
-    }
-};
 
 // Store the current step and form data
 let currentStep = 1;
@@ -285,6 +250,9 @@ function setupEventListeners() {
                 // Update form data on input
                 formData.music.songName = songNameInput.value.trim();
                 formData.music.artistName = artistNameInput.value.trim();
+                if (window.leadTracker) {
+                    window.leadTracker.updateLead({ songChoice: `${formData.music.songName} by ${formData.music.artistName}`, step: 'SONG_SELECTED' });
+                }
                 
                 // Enable/disable next button based on input
                 const hasValidInput = formData.music.songName && formData.music.artistName;
@@ -320,6 +288,9 @@ function setupEventListeners() {
             formData.memoryName = e.target.value;
             saveToLocalStorage();
             updateNextButton('next-to-photos', e.target.value.trim() !== '');
+            if (window.leadTracker) {
+                window.leadTracker.updateLead({ memoryTitle: e.target.value, step: 'STEP_1' });
+            }
         });
     }
     
@@ -367,8 +338,18 @@ function setupEventListeners() {
     });
     
     // Radio button changes
-    selectSongRadio.addEventListener('change', updateMusicSelectionUI);
-    teamChooseRadio.addEventListener('change', updateMusicSelectionUI);
+    selectSongRadio.addEventListener('change', () => {
+        updateMusicSelectionUI();
+        if (window.leadTracker) {
+            window.leadTracker.updateLead({ songChoice: 'choose-song', step: 'SONG_SELECTED' });
+        }
+    });
+    teamChooseRadio.addEventListener('change', () => {
+        updateMusicSelectionUI();
+        if (window.leadTracker) {
+            window.leadTracker.updateLead({ songChoice: 'team-choose', step: 'SONG_SELECTED' });
+        }
+    });
     
     // Music input validation
     songNameInput.addEventListener('input', validateMusicInputs);
@@ -809,121 +790,64 @@ function setupFileUpload() {
     }, true);
 }
 
-// Calculate the current pricing tier based on number of photos
-function calculatePricingTier(photoCount) {
-    if (photoCount >= 26) return '26+';
-    if (photoCount >= 16) return '16-25';
-    if (photoCount >= 6) return '6-15';
-    return '1-5';
-}
-
-// Get price per photo based on tier and currency
-function getPricePerPhoto(tier, currency) {
-    return PRICING[tier]?.[currency] || PRICING['1-5'][currency];
-}
-
-// Calculate total price based on number of photos and current currency
-function calculateTotalPrice(photoCount) {
-    if (photoCount === 0) return 0;
-    const tier = calculatePricingTier(photoCount);
-    const pricePerPhoto = getPricePerPhoto(tier, currentCurrency);
-    return photoCount * pricePerPhoto;
-}
-
-// Update the pricing display
-function updatePricingDisplay() {
+async function updatePricingDisplay() {
     const photoCount = formData.photos.length;
-    const tier = calculatePricingTier(photoCount);
-    const pricePerPhoto = getPricePerPhoto(tier, currentCurrency);
-    const totalPrice = calculateTotalPrice(photoCount);
-    const currencySymbol = CURRENCIES[currentCurrency]?.symbol || '$';
+    const currency = currentCurrency;
 
-    // Update form data
-    formData.pricing = {
-        currentTier: tier,
-        pricePerPhoto: pricePerPhoto,
-        totalPrice: totalPrice,
-        currency: currentCurrency
-    };
+    try {
+        const response = await fetch('/.netlify/functions/lead-upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                leadId: 'temp-price-check', // Use a temporary ID for price checking
+                step: 2,
+                photoCount,
+                currency
+            })
+        });
 
-    // Update UI
-    const totalPriceElement = document.getElementById('total-price');
-    const photoCountText = document.getElementById('photo-count-text');
-    const priceDetails = document.getElementById('price-details');
-    const incentiveElement = document.getElementById('pricing-incentive');
-
-    // Update total price with currency symbol
-    if (totalPriceElement) {
-        totalPriceElement.textContent = `${currencySymbol}${totalPrice.toFixed(2)}`;
-    }
-
-    // Update photo count in the total label
-    if (photoCountText) {
-        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-    }
-
-    // Update price details with currency symbol
-    if (priceDetails) {
-        if (photoCount === 0) {
-            priceDetails.textContent = 'Add photos to see your price per photo';
-        } else {
-            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
-        }
-    }
-
-    // Update incentive message with dynamic pricing encouragement
-    if (incentiveElement) {
-        const currentTier = tier;
-        let nextTier = null;
-        
-        // Find the next pricing tier (if any)
-        if (photoCount < 6) {
-            nextTier = '6-15';
-        } else if (photoCount < 16) {
-            nextTier = '16-25';
-        } else if (photoCount < 26) {
-            nextTier = '26+';
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        if (nextTier) {
-            const nextTierMin = parseInt(nextTier.split('-')[0]);
-            const photosNeeded = nextTierMin - photoCount;
-            const nextPricePerPhoto = getPricePerPhoto(nextTier, currentCurrency);
-            const priceDiff = pricePerPhoto - nextPricePerPhoto;
-            
-            // Only show if there's a price difference and we need more photos
-            if (priceDiff > 0 && photosNeeded > 0) {
-                const percentOff = Math.round((priceDiff / pricePerPhoto) * 100);
-                incentiveElement.innerHTML = `
-                    <div class="incentive-message">
-                        <i class="fas fa-tag"></i>
-                        <span>Add ${photosNeeded} more photo${photosNeeded > 1 ? 's' : ''} to save ${percentOff}% per photo</span>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: ${(photoCount / nextTierMin) * 100}%"></div>
-                            <div class="progress-text">${photoCount}/${nextTierMin}</div>
-                        </div>
-                    </div>
-                `;
-                incentiveElement.style.display = 'flex';
-                return;
+        const data = await response.json();
+        const { pricing } = data;
+        const { total, pricePerPhoto, tier } = pricing;
+        const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || '$';
+
+        // Update form data
+        formData.pricing = {
+            currentTier: tier,
+            pricePerPhoto: pricePerPhoto,
+            totalPrice: total,
+            currency: currency
+        };
+
+        // Update UI
+        const totalPriceElement = document.getElementById('total-price');
+        const photoCountText = document.getElementById('photo-count-text');
+        const priceDetails = document.getElementById('price-details');
+
+        if (totalPriceElement) {
+            totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
+        }
+
+        if (photoCountText) {
+            photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
+        }
+
+        if (priceDetails) {
+            if (photoCount === 0) {
+                priceDetails.textContent = 'Add photos to see your price per photo';
+            } else {
+                priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
             }
         }
 
-        // If no next tier or already at the best price
-        if (photoCount > 0) {
-            incentiveElement.innerHTML = `
-                <div class="incentive-message best-price">
-                    <i class="fas fa-check-circle"></i>
-                    <span>You're getting the best price at ${currencySymbol}${pricePerPhoto.toFixed(2)} per photo!</span>
-                </div>
-            `;
-            incentiveElement.style.display = 'flex';
-        } else {
-            incentiveElement.style.display = 'none';
-        }
+    } catch (error) {
+        console.error('Error fetching price:', error);
+        // Optionally, display an error to the user in the UI
     }
-
-    return totalPrice > 0;
 }
 
 // Generate a lightweight fingerprint for a file using metadata
@@ -1150,6 +1074,15 @@ async function processFiles(files) {
     // Start processing files
     try {
         const newPhotos = await processFilesOptimized(validFiles);
+
+        // After all files are uploaded and processed
+        if (window.leadTracker) {
+            window.leadTracker.updateLead({
+                imageUrls: formData.photos.map(p => p.permanentUrl).join(','),
+                photoCount: formData.photos.length,
+                step: 'PHOTOS_UPLOADED'
+            });
+        }
 
         // Final UI update
         if (newPhotos.length > 0) {
@@ -1459,6 +1392,9 @@ function updateOrderSummary() {
 
 // Complete purchase
 async function completePurchase() {
+    if (window.leadTracker) {
+        await window.leadTracker.updateLead({ step: 'PENDING_PAYMENT' }, true);
+    }
     // Show loading state
     const completeBtn = document.getElementById('complete-purchase');
     const originalBtnText = completeBtn ? completeBtn.innerHTML : '';
