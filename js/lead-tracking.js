@@ -26,21 +26,33 @@ class LeadTracker {
             this.sessionId = `sess_${this.generateId()}`;
             localStorage.setItem('lp_sessionId', this.sessionId);
         }
+
+        const now = new Date().toISOString();
+        const createdAt = localStorage.getItem('lp_createdAt') || now;
+        if (!localStorage.getItem('lp_createdAt')) {
+            localStorage.setItem('lp_createdAt', createdAt);
+        }
         
         // Initialize with default data
         this.leadData = {
             leadId: this.leadId,
+            createdAt: createdAt,
+            updatedAt: now,
             sessionId: this.sessionId,
-            step: 'STEP_1',
+            step: 'STORE_VIEW',
             country: this.getUserCountry(),
             currency: localStorage.getItem('preferredCurrency') || 'ILS',
             userAgent: navigator.userAgent,
             screenResolution: `${window.screen.width}x${window.screen.height}`,
             referrer: document.referrer || 'direct',
+            utmSource: new URLSearchParams(window.location.search).get('utm_source') || undefined,
+            utmCampaign: new URLSearchParams(window.location.search).get('utm_campaign') || undefined,
             utmParams: this.getUtmParams(),
             pageUrl: window.location.href,
-            timestamp: new Date().toISOString()
+            timestamp: now
         };
+
+        Object.keys(this.leadData).forEach(key => this.leadData[key] === undefined && delete this.leadData[key]);
     }
 
     generateId() {
@@ -74,6 +86,7 @@ class LeadTracker {
         this.leadData = {
             ...this.leadData,
             ...data,
+            updatedAt: new Date().toISOString(),
             timestamp: new Date().toISOString()
         };
 
@@ -154,15 +167,15 @@ window.leadTracker = new LeadTracker();
 // Track page view on load
 document.addEventListener('DOMContentLoaded', () => {
     // Determine the current step based on the page
-    let step = 'STEP_1';
+    let step = 'STORE_VIEW';
     
-    if (window.location.pathname.includes('store.html')) {
+    if (window.location.pathname.includes('store.html') || window.location.pathname === '/store' || window.location.pathname === '/store/') {
         // You can add more granular step tracking here based on the current view
         step = 'STORE_VIEW';
-    } else if (window.location.pathname.includes('thanks.html')) {
+    } else if (window.location.pathname.includes('thanks.html') || window.location.pathname.includes('thank-you.html')) {
         step = 'PAID';
     } else if (window.location.pathname.includes('payment-failed.html')) {
-        step = 'FAILED';
+        step = 'PENDING_PAYMENT';
     }
     
     // Track the page view

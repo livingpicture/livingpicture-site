@@ -161,9 +161,14 @@ exports.handler = async (event, context) => {
             country,
             currency,
             totalAmount,
+            orderId,
+            utmSource,
+            utmCampaign,
             detectedCurrency,
             selectedCurrency,
-            sessionId
+            sessionId,
+            createdAt,
+            updatedAt
         } = requestBody;
         
         // Validate required fields
@@ -194,6 +199,7 @@ exports.handler = async (event, context) => {
 
         const airtableData = {
             leadId,
+            updatedAt: updatedAt || new Date().toISOString(),
             memoryTitle,
             photoCount,
             imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : (typeof imageUrls === 'string' ? imageUrls : undefined),
@@ -202,10 +208,13 @@ exports.handler = async (event, context) => {
             country,
             currency,
             totalAmount: totalAmount || (pricingData ? pricingData.total : undefined),
+            utmSource,
+            utmCampaign,
             detectedCurrency,
             selectedCurrency,
             sessionId,
             step,
+            orderId,
         };
 
         // Remove undefined fields to avoid overwriting existing data with nulls
@@ -229,9 +238,11 @@ exports.handler = async (event, context) => {
             console.log('Airtable record updated:', airtableRecord.id);
         } else {
             // Create new record
+            airtableData.createdAt = createdAt || new Date().toISOString();
             const createdRecords = await base(AIRTABLE_LEADS_TABLE).create([{
                 fields: airtableData
             }]);
+
             airtableRecord = createdRecords[0];
             console.log('Airtable record created:', airtableRecord.id);
         }

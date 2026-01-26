@@ -196,7 +196,7 @@ function setupEventListeners() {
             saveToLocalStorage();
             updateNextButton('next-to-photos', e.target.value.trim() !== '');
             if (window.leadTracker) {
-                window.leadTracker.updateLead({ memoryTitle: e.target.value, step: 'STEP_1' });
+                window.leadTracker.updateLead({ memoryTitle: e.target.value, step: 'STORE_VIEW' });
             } else {
                 console.warn('leadTracker not available yet.');
             }
@@ -1427,6 +1427,9 @@ async function completePurchase() {
         const result = await response.json();
 
         if (result.ok && result.paymentUrl) {
+            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+                await window.leadTracker.trackStep('PENDING_PAYMENT', { orderId });
+            }
             // Redirect to PayPlus payment page
             window.location.href = result.paymentUrl;
         } else {
@@ -1902,6 +1905,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
                 return;
+            }
+
+            if (window.leadTracker) {
+                await window.leadTracker.updateLead({
+                    customerName: formData.customer?.name,
+                    customerEmail: formData.customer?.email,
+                    country: formData.customer?.country,
+                    currency: formData.currency,
+                    totalAmount: formData.pricing?.totalPrice,
+                    photoCount: formData.photos?.length || 0,
+                    step: 'DETAILS_ENTERED'
+                }, true);
             }
             
             // Save current step data

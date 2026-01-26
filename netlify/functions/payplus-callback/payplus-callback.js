@@ -45,6 +45,7 @@ exports.handler = async (event, context) => {
     }
 
     let leadRecord = {};
+    let leadAirtableId = null;
     try {
         const records = await base('Leads').select({
             filterByFormula: `{leadId} = '${leadId}'`,
@@ -52,6 +53,7 @@ exports.handler = async (event, context) => {
         }).firstPage();
 
         if (records.length > 0) {
+            leadAirtableId = records[0].id;
             leadRecord = records[0].fields;
             console.log('Found lead record:', records[0].id);
         } else {
@@ -60,6 +62,26 @@ exports.handler = async (event, context) => {
     } catch (error) {
         console.error('Error fetching lead from Airtable:', error);
         // Proceeding with metadata even if lead fetch fails
+    }
+
+    // Update lead step to PAID
+    if (leadAirtableId) {
+        try {
+            await base('Leads').update([
+                {
+                    id: leadAirtableId,
+                    fields: {
+                        step: 'PAID',
+                        orderId: metadata.orderId,
+                        updatedAt: now
+                    }
+                }
+            ]);
+            console.log('Updated lead step to PAID for lead:', leadAirtableId);
+        } catch (error) {
+            console.error('Error updating lead step to PAID:', error);
+            return createResponse(500, { ok: false, error: 'Airtable Error', message: error.message });
+        }
     }
 
     const orderFields = {
@@ -77,11 +99,12 @@ exports.handler = async (event, context) => {
         transactionId: transaction.uuid,
         paymentProvider: 'PayPlus',
         paymentStatusRaw: JSON.stringify(data),
+        'Customer (link)': [],
         currency: transaction.currency,
         totalAmount: Number(transaction.amount_in_cents) / 100,
         payplusPaymentLink: data.payment_page_link,
         paidAt: now,
-        fulfillmentStatus: 'NEW',
+        fulfillmentStatus: 'PAID',
         leadId: leadId,
         detectedCurrency: leadRecord.detectedCurrency || metadata.detectedCurrency,
         selectedCurrency: leadRecord.selectedCurrency || metadata.selectedCurrency,
