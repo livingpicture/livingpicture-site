@@ -154,6 +154,7 @@ exports.handler = async (event, context) => {
             leadId,
             step,
             memoryTitle,
+            songChoice,
             photoCount,
             imageUrls,
             customerName,
@@ -201,6 +202,7 @@ exports.handler = async (event, context) => {
             leadId,
             updatedAt: updatedAt || new Date().toISOString(),
             memoryTitle,
+            songChoice,
             photoCount,
             imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : (typeof imageUrls === 'string' ? imageUrls : undefined),
             customerName,
@@ -230,6 +232,12 @@ exports.handler = async (event, context) => {
         if (records.length > 0) {
             // Update existing record
             const recordToUpdate = records[0];
+
+            // Backfill createdAt only if it is missing on the existing record
+            if (!recordToUpdate.fields || !recordToUpdate.fields.createdAt) {
+                airtableData.createdAt = createdAt || new Date().toISOString();
+            }
+
             const updatedRecords = await base(AIRTABLE_LEADS_TABLE).update([{
                 id: recordToUpdate.id,
                 fields: airtableData

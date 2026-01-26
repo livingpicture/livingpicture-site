@@ -201,6 +201,20 @@ function setupEventListeners() {
                 console.warn('leadTracker not available yet.');
             }
         });
+
+        const commitMemoryTitle = async (e) => {
+            if (!window.leadTracker) return;
+            const value = (e?.target?.value || '').trim();
+            if (!value) return;
+            try {
+                await window.leadTracker.updateLead({ memoryTitle: value, step: 'STORE_VIEW' }, true);
+            } catch (err) {
+                console.warn('Failed to commit memoryTitle to lead tracker:', err);
+            }
+        };
+
+        memoryNameInput.addEventListener('blur', commitMemoryTitle);
+        memoryNameInput.addEventListener('change', commitMemoryTitle);
     }
     
     // Initialize file upload handling after DOM is fully loaded
@@ -511,7 +525,6 @@ function showSuccess(message) {
     }, 3000);
 }
 
-// Clear photo upload error message
 function clearPhotoUploadError() {
     const errorElement = document.getElementById('photo-upload-error');
     const dropZone = document.getElementById('drop-zone');
@@ -565,11 +578,25 @@ function updateUIForStep(step) {
                 const hasValidInput = formData.music.songName && formData.music.artistName;
                 updateNextButton('next-to-checkout', hasValidInput);
             }
+
+            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+                const songChoice = (formData.music && formData.music.teamChoose)
+                    ? 'team-choose'
+                    : (formData.music && formData.music.songName && formData.music.artistName)
+                        ? `${formData.music.songName} by ${formData.music.artistName}`
+                        : undefined;
+
+                window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
+            }
             break;
             
         case 4:
             // Update order summary
             updateOrderSummary();
+
+            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+                window.leadTracker.trackStep('DETAILS_ENTERED');
+            }
             break;
     }
 }
@@ -1023,7 +1050,7 @@ async function processFiles(files) {
                 if (window.leadTracker) {
                     if (formData.photos.length > 0) {
                         window.leadTracker.updateLead({
-                            imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean).join(','),
+                            imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
                             photoCount: formData.photos.length,
                             step: 'PHOTOS_UPLOADED'
                         });
@@ -1582,7 +1609,10 @@ function saveToLocalStorage() {
             id: photo.id,
             name: photo.name,
             size: photo.size,
-            type: photo.file?.type || ''
+            type: photo.file?.type || '',
+            permanentUrl: photo.permanentUrl,
+            publicId: photo.publicId,
+            uploadStatus: photo.uploadStatus
         })),
         music: formData.music,
         customer: formData.customer,
@@ -1945,26 +1975,54 @@ document.addEventListener('DOMContentLoaded', async () => {
         'customer-name': 'name-error',
         'customer-email': 'email-error',
         'customer-country': 'country-error',
-        'customer-phone': '' // No error for optional field
+        'customer-phone': ''
+    };
+
+    const commitDetailsToLead = async () => {
+        if (!window.leadTracker) return;
+
+        const nameInput = document.getElementById('customer-name');
+        const emailInput = document.getElementById('customer-email');
+        const countrySelect = document.getElementById('customer-country');
+        const phoneInput = document.getElementById('customer-phone');
+
+        formData.customer.name = nameInput ? nameInput.value.trim() : formData.customer.name;
+        formData.customer.email = emailInput ? emailInput.value.trim() : formData.customer.email;
+        formData.customer.country = countrySelect ? countrySelect.value : formData.customer.country;
+        formData.customer.phone = phoneInput ? phoneInput.value.trim() : formData.customer.phone;
+
+        try {
+            await window.leadTracker.updateLead({
+                customerName: formData.customer?.name,
+                customerEmail: formData.customer?.email,
+                country: formData.customer?.country,
+                step: 'DETAILS_ENTERED'
+            }, true);
+        } catch (err) {
+            console.warn('Failed to commit customer details to lead tracker:', err);
+        }
     };
     
     Object.keys(customerFields).forEach(fieldId => {
         const field = document.getElementById(fieldId);
-        if (field) {
-            field.addEventListener('input', () => {
-                const errorId = customerFields[fieldId];
-                if (errorId) {
-                    const errorElement = document.getElementById(errorId);
-                    if (errorElement) {
-                        errorElement.textContent = '';
-                    }
+        if (!field) return;
+
+        field.addEventListener('input', () => {
+            const errorId = customerFields[fieldId];
+            if (errorId) {
+                const errorElement = document.getElementById(errorId);
+                if (errorElement) {
+                    errorElement.textContent = '';
                 }
-                const formGroup = field.closest('.form-group');
-                if (formGroup) {
-                    formGroup.classList.remove('error');
-                }
-            });
-        }
+            }
+            const formGroup = field.closest('.form-group');
+            if (formGroup) {
+                formGroup.classList.remove('error');
+            }
+        });
+
+        field.addEventListener('blur', commitDetailsToLead);
+        field.addEventListener('change', commitDetailsToLead);
     });
     
     // Remove any existing event listeners to prevent duplicates

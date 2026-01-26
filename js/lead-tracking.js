@@ -114,7 +114,11 @@ class LeadTracker {
         this.isUpdating = true;
         
         try {
-            const response = await fetch('/.netlify/functions/lead-upsert', {
+            const functionUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+                ? 'https://livingpicture.netlify.app/.netlify/functions/lead-upsert'
+                : '/.netlify/functions/lead-upsert';
+
+            const response = await fetch(functionUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
