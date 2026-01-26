@@ -92,29 +92,31 @@ function createCurrencyDropdown(currentCurrency, className = '') {
     `;
 }
 
-// Initialize currency selector
+// Initialize currency selectors
 document.addEventListener('DOMContentLoaded', async () => {
     const currency = await getCurrency();
-    
-    // Initialize all currency dropdowns
+
+    // Find all containers and inject the dropdown
+    document.querySelectorAll('.currency-selector-container').forEach(container => {
+        container.innerHTML = createCurrencyDropdown(currency);
+    });
+
+    // Add event listeners to all newly created dropdowns
     document.querySelectorAll('.currency-dropdown').forEach(dropdown => {
-        // Set initial value
-        dropdown.value = currency;
-        
-        // Add change event listener
         dropdown.addEventListener('change', (e) => {
             const newCurrency = e.target.value;
             localStorage.setItem('lp_currency', newCurrency);
-            
-            // Dispatch custom event for other components to listen to
-            document.dispatchEvent(new CustomEvent('currencyChanged', { 
-                detail: { currency: newCurrency } 
+
+            // Dispatch the event from the dropdown itself
+            e.target.dispatchEvent(new CustomEvent('currencyChanged', {
+                detail: { currency: newCurrency },
+                bubbles: true // Allow the event to bubble up to the document
             }));
         });
     });
-    
-    // Dispatch initial currency load event
-    document.dispatchEvent(new CustomEvent('currencyLoaded', { 
-        detail: { currency } 
+
+    // Dispatch initial event to set prices on page load
+    document.dispatchEvent(new CustomEvent('currencyLoaded', {
+        detail: { currency }
     }));
 });

@@ -126,7 +126,27 @@ exports.handler = async (event, context) => {
         });
     }
 
+    const { leadId, photoCount, currency, ...leadData } = requestBody;
+
+    // Calculate pricing
+    const pricing = calculatePrice(photoCount, currency);
+
+    // If this is just a price check, return the pricing and exit
+    if (leadId === 'temp-price-check') {
+        return {
+            statusCode: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ pricing })
+        };
+    }
+
+    // Airtable Base
     const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
+    const table = base(AIRTABLE_LEADS_TABLE);
 
     try {
         // Extract and validate required fields
@@ -176,7 +196,7 @@ exports.handler = async (event, context) => {
             leadId,
             memoryTitle,
             photoCount,
-            imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : undefined,
+            imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : (typeof imageUrls === 'string' ? imageUrls : undefined),
             customerName,
             customerEmail,
             country,

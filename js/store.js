@@ -1,3 +1,9 @@
+const PRICING_TIERS = [
+    { photos: '1-5', price: 20 },
+    { photos: '6-10', price: 18 },
+    { photos: '11-20', price: 15 },
+    { photos: '21+', price: 12 },
+];
 let currentCurrency = 'ILS';
 
 // Store the current step and form data
@@ -84,9 +90,6 @@ function initStore() {
     // Set up event listeners
     setupEventListeners();
     
-    // Initialize currency
-    initCurrency();
-    
     // Initialize the first step
     showStep(1);
     
@@ -94,96 +97,24 @@ function initStore() {
     renderMusicOptions();
 }
 
-// Initialize currency
-async function initCurrency() {
-    // Check if we have a saved currency
-    const savedCurrency = localStorage.getItem('lp_currency');
-    
-    if (savedCurrency && CURRENCIES[savedCurrency]) {
-        currentCurrency = savedCurrency;
-    } else {
-        // Try to detect currency from IP
-        try {
-            const response = await fetch('https://ipapi.co/json/');
-            const data = await response.json();
-            
-            // Map country to currency
-            const countryToCurrency = {
-                'IL': 'ILS', // Israel
-                'US': 'USD', // United States
-                'RU': 'RUB', // Russia
-                // EU countries
-                'AT': 'EUR', 'BE': 'EUR', 'BG': 'EUR', 'HR': 'EUR', 'CY': 'EUR',
-                'CZ': 'EUR', 'DK': 'EUR', 'EE': 'EUR', 'FI': 'EUR', 'FR': 'EUR',
-                'DE': 'EUR', 'GR': 'EUR', 'HU': 'EUR', 'IE': 'EUR', 'IT': 'EUR',
-                'LV': 'EUR', 'LT': 'EUR', 'LU': 'EUR', 'MT': 'EUR', 'NL': 'EUR',
-                'PL': 'EUR', 'PT': 'EUR', 'RO': 'EUR', 'SK': 'EUR', 'SI': 'EUR',
-                'ES': 'EUR', 'SE': 'EUR'
-            };
-            
-            const detectedCurrency = countryToCurrency[data.country_code] || 'USD';
-            currentCurrency = detectedCurrency;
-            localStorage.setItem('lp_currency', detectedCurrency);
-        } catch (error) {
-            console.error('Error detecting currency from IP:', error);
-            currentCurrency = 'USD';
-        }
-    }
-    
-    // Update currency in form data
-    formData.currency = currentCurrency;
-    
-    // Create currency dropdowns
-    createCurrencyDropdowns();
-    
-    // Update prices with current currency
+function handleCurrencyUpdate(newCurrency) {
+    currentCurrency = newCurrency;
+    formData.currency = newCurrency;
     updateAllPrices();
-}
-
-// Create currency dropdowns
-function createCurrencyDropdowns() {
-    const containers = [
-        { id: 'currency-selector-container', className: 'currency-dropdown' },
-        { id: 'pricing-currency-selector', className: 'pricing-currency-dropdown' }
-    ];
-    
-    containers.forEach(container => {
-        const element = document.getElementById(container.id);
-        if (element) {
-            let html = `<select class="${container.className}" aria-label="Select currency">`;
-            
-            for (const [code, currency] of Object.entries(CURRENCIES)) {
-                const selected = currentCurrency === code ? ' selected' : '';
-                html += `<option value="${code}"${selected}>${code} (${currency.symbol})</option>`;
-            }
-            
-            html += '</select>';
-            element.innerHTML = html;
-            
-            // Add event listener
-            const select = element.querySelector('select');
-            select.addEventListener('change', handleCurrencyChange);
-        }
+    document.querySelectorAll('.currency-dropdown').forEach(select => {
+        select.value = newCurrency;
     });
 }
 
-// Handle currency change
-function handleCurrencyChange(e) {
-    const newCurrency = e.target.value;
-    if (newCurrency !== currentCurrency && CURRENCIES[newCurrency]) {
-        currentCurrency = newCurrency;
-        formData.currency = newCurrency;
-        localStorage.setItem('lp_currency', newCurrency);
-        updateAllPrices();
-        
-        // Update all dropdowns
-        document.querySelectorAll('.currency-dropdown, .pricing-currency-dropdown').forEach(select => {
-            if (select.value !== newCurrency) {
-                select.value = newCurrency;
-            }
-        });
+document.addEventListener('currencyLoaded', (e) => {
+    handleCurrencyUpdate(e.detail.currency);
+});
+
+document.addEventListener('currencyChanged', (e) => {
+    if (e.target.classList.contains('currency-dropdown')) {
+        handleCurrencyUpdate(e.detail.currency);
     }
-}
+});
 
 // Update all prices on the page
 function updateAllPrices() {
@@ -199,38 +130,14 @@ function setupEventListeners() {
         if (button) {
             button.addEventListener('click', (e) => {
                 e.preventDefault();
-                
-                // Check if the button is enabled using our custom data attribute
-                if (button.classList.contains('btn-disabled')) {
-                    // If the button is visually disabled, run validation to show appropriate error
-                    if (currentStep === 1) {
-                        saveCurrentStep();
-                    } else if (currentStep === 2) {
-                        validatePhotoUpload();
-                    } else if (currentStep === 3) {
-                        validateMusicInputs();
-                    }
-                    return; // Don't proceed
+                if (buttonId === 'next-to-photos') {
+                    console.log('Button clicked');
                 }
-                
                 const nextStep = nextButtons[buttonId];
                 
-                // Save current step data and validate if needed
-                if (currentStep === 1) { // Memory name step
-                    if (!saveCurrentStep()) {
-                        return; // Don't proceed if validation fails
-                    }
-                } else if (currentStep === 2) { // Photo upload step
-                    if (!validatePhotoUpload()) {
-                        return; // Don't proceed if validation fails
-                    }
-                    saveCurrentStep();
-                } else if (currentStep === 3) { // Music step
-                    if (!validateMusicInputs() || !saveCurrentStep()) {
-                        return; // Don't proceed if validation fails
-                    }
-                } else {
-                    saveCurrentStep();
+                // Save current step data and validate
+                if (!saveCurrentStep()) {
+                    return; // Don't proceed if validation fails
                 }
                 
                 if (nextStep === 'complete') {
@@ -290,6 +197,8 @@ function setupEventListeners() {
             updateNextButton('next-to-photos', e.target.value.trim() !== '');
             if (window.leadTracker) {
                 window.leadTracker.updateLead({ memoryTitle: e.target.value, step: 'STEP_1' });
+            } else {
+                console.warn('leadTracker not available yet.');
             }
         });
     }
@@ -356,6 +265,15 @@ function setupEventListeners() {
     artistNameInput.addEventListener('input', validateMusicInputs);
 }
 
+// Save data to local storage
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem('formData', JSON.stringify(formData));
+    } catch (e) {
+        console.error('Could not save to local storage:', e);
+    }
+}
+
 // Validate photo upload
 function validatePhotoUpload() {
     const dropZone = document.getElementById('drop-zone');
@@ -413,92 +331,67 @@ function validatePhotoUpload() {
     
     // Enable the next button
     updateNextButton('next-to-music', true);
-    
     return true;
 }
 
-// Show a specific step
 function showStep(stepNumber) {
-    let canProceed = true;
-    
-    // If trying to move to step 2, validate step 1 first
-    if (stepNumber === 2 && currentStep === 1) {
-        if (!saveCurrentStep()) {
-            // If validation fails, don't proceed to next step
-            canProceed = false;
-        }
+    // Hide all steps
+    document.querySelectorAll('.store-step').forEach(step => {
+        step.classList.remove('active');
+    });
+
+    // Show the selected step
+    const stepElement = document.getElementById(`step-${stepNumber}`);
+    if (stepElement) {
+        stepElement.classList.add('active');
     }
-    
-    // If trying to move to step 3, validate step 2 (photo upload)
-    if (stepNumber === 3 && currentStep === 2) {
-        if (!validatePhotoUpload()) {
-            // If validation fails, don't proceed to next step
-            canProceed = false;
-        }
-    }
-    
-    // Only proceed with step change if validation passed
-    if (canProceed) {
-        // Hide all steps
-        document.querySelectorAll('.store-step').forEach(step => {
+
+    // Update active state in progress steps
+    document.querySelectorAll('.step').forEach(step => {
+        if (parseInt(step.getAttribute('data-step')) === stepNumber) {
+            step.classList.add('active');
+        } else {
             step.classList.remove('active');
-        });
-        
-        // Show the selected step
-        const stepElement = document.getElementById(`step-${stepNumber}`);
-        if (stepElement) {
-            stepElement.classList.add('active');
         }
-        
-        // Update active state in progress steps
-        document.querySelectorAll('.step').forEach(step => {
-            if (parseInt(step.getAttribute('data-step')) === stepNumber) {
-                step.classList.add('active');
-            } else {
-                step.classList.remove('active');
-            }
-        });
-        
-        // Update progress bars
-        const progress = (stepNumber / 4) * 100;
-        
-        // Update desktop progress bar
-        const desktopProgress = document.querySelector('.progress');
-        if (desktopProgress) {
-            desktopProgress.style.width = `${progress}%`;
-        }
-        
-        // Update mobile progress bar
-        const mobileProgressBar = document.getElementById('mobile-progress-bar');
-        if (mobileProgressBar) {
-            mobileProgressBar.style.width = `${progress}%`;
-        }
-        
-        // Update mobile step indicator
-        const currentStepElement = document.getElementById('current-step');
-        if (currentStepElement) {
-            currentStepElement.textContent = stepNumber;
-        }
-        
-        // Scroll to top of the step
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-        
-        // Validate the current step
-        validateCurrentStep(stepNumber);
-        
-        // Update current step
-        currentStep = stepNumber;
-        
-        // Update UI based on the current step
-        updateUIForStep(stepNumber);
-        
-        return true;
+    });
+
+    // Update progress bars
+    const progress = (stepNumber / 4) * 100;
+
+    // Update desktop progress bar
+    const desktopProgress = document.querySelector('.progress');
+    if (desktopProgress) {
+        desktopProgress.style.width = `${progress}%`;
     }
-    
-    return false;
+
+    // Update mobile progress bar
+    const mobileProgressBar = document.getElementById('mobile-progress-bar');
+    if (mobileProgressBar) {
+        mobileProgressBar.style.width = `${progress}%`;
+    }
+
+    // Update mobile step indicator
+    const currentStepElement = document.getElementById('current-step');
+    if (currentStepElement) {
+        currentStepElement.textContent = stepNumber;
+    }
+
+    // Scroll to top of the step
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+
+    // Validate the current step
+    validateCurrentStep(stepNumber);
+
+    // Update current step
+    currentStep = stepNumber;
+
+    // Update UI based on the current step
+    updateUIForStep(stepNumber);
+
+    return true;
 }
 
 // Validate music inputs and show inline errors
@@ -704,19 +597,57 @@ function validateCurrentStep(stepNumber) {
 function updateNextButton(buttonId, isEnabled) {
     const button = document.getElementById(buttonId);
     if (button) {
-        // Always enable the button to allow click events
-        button.disabled = false;
-
-        // Store the enabled state as a data attribute for validation
-        button.dataset.enabled = isEnabled;
-
-        // Add/remove a class for visual feedback
-        if (!isEnabled) {
-            button.classList.add('btn-disabled');
-        } else {
+        button.disabled = !isEnabled;
+        if (isEnabled) {
             button.classList.remove('btn-disabled');
+        } else {
+            button.classList.add('btn-disabled');
         }
     }
+}
+
+// Validate customer details
+function validateCustomerDetails() {
+    const name = document.getElementById('customer-name').value.trim();
+    const email = document.getElementById('customer-email').value.trim();
+    const country = document.getElementById('customer-country').value;
+    let isValid = true;
+
+    if (!name) {
+        showInputError(document.getElementById('customer-name'), 'Name is required');
+        isValid = false;
+    }
+
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+        showInputError(document.getElementById('customer-email'), 'A valid email is required');
+        isValid = false;
+    }
+
+    if (!country) {
+        showInputError(document.getElementById('customer-country'), 'Country is required');
+        isValid = false;
+    }
+
+    return isValid;
+}
+
+// Complete the purchase
+async function completePurchase() {
+    if (!validateCustomerDetails()) {
+        return;
+    }
+
+    // Update form data with customer details
+    formData.customer.name = document.getElementById('customer-name').value.trim();
+    formData.customer.email = document.getElementById('customer-email').value.trim();
+    formData.customer.country = document.getElementById('customer-country').value;
+    formData.customer.phone = document.getElementById('customer-phone').value.trim();
+
+    // Here you would typically integrate with a payment gateway
+    // For now, we'll just show a success message
+    showSuccess('Your order has been received!');
+
+    // Optionally, reset the form or redirect
 }
 
 // Handle file selection
@@ -793,67 +724,52 @@ function setupFileUpload() {
 async function updatePricingDisplay() {
     const photoCount = formData.photos.length;
     const currency = currentCurrency;
+    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || '$';
 
-    try {
-        const response = await fetch('/.netlify/functions/lead-upsert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                leadId: 'temp-price-check', // Use a temporary ID for price checking
-                step: 2,
-                photoCount,
-                currency
-            })
-        });
+    const getTier = (count) => {
+        if (count >= 26) return '26+';
+        if (count >= 16) return '16-25';
+        if (count >= 6) return '6-15';
+        return '1-5';
+    };
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    const tier = getTier(photoCount);
+    const pricePerPhoto = PRICING[tier][currency];
+    const total = photoCount * pricePerPhoto;
+
+    // Update form data
+    formData.pricing = {
+        currentTier: tier,
+        pricePerPhoto: pricePerPhoto,
+        totalPrice: total,
+        currency: currency
+    };
+
+    // Update UI
+    const totalPriceElement = document.getElementById('total-price');
+    const photoCountText = document.getElementById('photo-count-text');
+    const priceDetails = document.getElementById('price-details');
+
+    if (totalPriceElement) {
+        totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
+    }
+
+    if (photoCountText) {
+        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
+    }
+
+    if (priceDetails) {
+        if (photoCount === 0) {
+            priceDetails.textContent = 'Add photos to see your price per photo';
+        } else {
+            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
         }
-
-        const data = await response.json();
-        const { pricing } = data;
-        const { total, pricePerPhoto, tier } = pricing;
-        const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || '$';
-
-        // Update form data
-        formData.pricing = {
-            currentTier: tier,
-            pricePerPhoto: pricePerPhoto,
-            totalPrice: total,
-            currency: currency
-        };
-
-        // Update UI
-        const totalPriceElement = document.getElementById('total-price');
-        const photoCountText = document.getElementById('photo-count-text');
-        const priceDetails = document.getElementById('price-details');
-
-        if (totalPriceElement) {
-            totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
-        }
-
-        if (photoCountText) {
-            photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-        }
-
-        if (priceDetails) {
-            if (photoCount === 0) {
-                priceDetails.textContent = 'Add photos to see your price per photo';
-            } else {
-                priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
-            }
-        }
-
-    } catch (error) {
-        console.error('Error fetching price:', error);
-        // Optionally, display an error to the user in the UI
     }
 }
 
 // Generate a lightweight fingerprint for a file using metadata
 function generateFileFingerprint(file) {
     // Use file name, size, and last modified time as a fingerprint
-    // This is much faster than hashing the entire file
     return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
@@ -974,20 +890,6 @@ async function processFiles(files) {
         Math.min(3, Math.max(2, navigator.hardwareConcurrency || 2)) : // Mobile: 2-3
         Math.min(6, Math.max(4, navigator.hardwareConcurrency || 4)); // Desktop: 4-6
 
-    // Batch UI updates using requestAnimationFrame
-    const scheduleUIUpdate = () => {
-        if (!pendingUIUpdate) {
-            pendingUIUpdate = true;
-            requestAnimationFrame(() => {
-                renderPhotoGrid();
-                updatePricingDisplay();
-                updatePhotoCounter();
-                pendingUIUpdate = false;
-                lastUpdateTime = performance.now();
-            });
-        }
-    };
-
     // Process files with optimized concurrency control
     const processFilesOptimized = async (filesToProcess) => {
         const results = [];
@@ -1047,11 +949,6 @@ async function processFiles(files) {
                     // Update progress more efficiently (throttled)
                     if (processed % 2 === 0 || processed === filesToProcess.length) {
                         updateProgress(processed, filesToProcess.length);
-
-                        // Update UI in batches
-                        if (processed % 5 === 0 || processed === filesToProcess.length) {
-                            scheduleUIUpdate();
-                        }
                     }
 
                     return result;
@@ -1073,25 +970,45 @@ async function processFiles(files) {
 
     // Start processing files
     try {
-        const newPhotos = await processFilesOptimized(validFiles);
+        // Process files in the background
+        (async () => {
+            try {
+                const newPhotos = await processFilesOptimized(validFiles);
 
-        // After all files are uploaded and processed
-        if (window.leadTracker) {
-            window.leadTracker.updateLead({
-                imageUrls: formData.photos.map(p => p.permanentUrl).join(','),
-                photoCount: formData.photos.length,
-                step: 'PHOTOS_UPLOADED'
-            });
-        }
+                // After all files are uploaded and processed
+                if (window.leadTracker) {
+                    if (formData.photos.length > 0) {
+                        window.leadTracker.updateLead({
+                            imageUrls: formData.photos.map(p => p.permanentUrl).join(','),
+                            photoCount: formData.photos.length,
+                            step: 'PHOTOS_UPLOADED'
+                        });
+                    }
+                }
 
-        // Final UI update
-        if (newPhotos.length > 0) {
-            updatePhotoGrid();
-            updatePhotoCounter();
-            updatePricingDisplay();
-            showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
-        }
+                if (newPhotos.length > 0) {
+                    showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
+                }
 
+                // Final UI updates after processing
+                renderPhotoGrid();
+                updatePhotoCounter();
+                updatePricingDisplay();
+                updateNextButton('next-to-music', formData.photos.length > 0);
+                saveToLocalStorage();
+            } catch (error) {
+                console.error('Error processing files:', error);
+                showError('An error occurred while processing your photos. Please try again.');
+            } finally {
+                // Clean up
+                setLoading(false);
+                // Re-enable file input by resetting it
+                const fileInput = document.getElementById('photo-upload');
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+            }
+        })();
     } catch (error) {
         console.error('Error processing files:', error);
         showError('An error occurred while processing your photos. Please try again.');
@@ -1901,12 +1818,17 @@ function showFieldError(fieldId, message) {
 // Complete purchase is implemented above with PayPlus integration
 
 // Initialize the store when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Ensure leadTracker is initialized before anything else
+    if (window.leadTracker && typeof window.leadTracker.init === 'function') {
+        await window.leadTracker.init();
+    }
+
     // Make sure all required elements exist
     const fileInput = document.getElementById('photo-upload');
     const browseBtn = document.getElementById('browse-files');
     const completePurchaseBtn = document.getElementById('complete-purchase');
-    
+
     // Initialize the store
     initStore();
     

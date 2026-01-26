@@ -1,65 +1,32 @@
 
-// Current currency (default to ILS)
 let currentCurrency = 'ILS';
 
-// Function to update prices based on selected currency
-function updatePricing() {
-    const currencySymbol = CURRENCIES[currentCurrency]?.symbol || '₪';
-    
-    // Update all price elements
+function updatePricing(currency) {
+    currentCurrency = currency;
+    const currencyObj = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
+    const currencySymbol = currencyObj.symbol;
+
     document.querySelectorAll('.tier-price .amount').forEach(priceElement => {
         const tier = priceElement.closest('.price-tier').getAttribute('data-tier');
-        const price = PRICING[tier]?.[currentCurrency] || 0;
-        priceElement.textContent = `${currencySymbol}${price}`;
-        priceElement.setAttribute('data-currency', currentCurrency);
+        const price = PRICING[tier]?.[currency] || 0;
+        priceElement.textContent = `${currencySymbol}${price.toFixed(2)}`;
     });
-    
-    // Update currency selector if it exists
-    const currencySelect = document.getElementById('pricing-currency');
-    if (currencySelect) {
-        currencySelect.value = currentCurrency;
-    }
+
+    document.querySelectorAll('.currency-dropdown').forEach(dropdown => {
+        dropdown.value = currency;
+    });
 }
 
-// Function to create currency selector
 document.addEventListener('DOMContentLoaded', function() {
-    // Create currency selector if it doesn't exist
-    const currencySelectorContainer = document.getElementById('pricing-currency-selector');
-    if (currencySelectorContainer && !document.getElementById('pricing-currency')) {
-        const select = document.createElement('select');
-        select.id = 'pricing-currency';
-        select.className = 'currency-select';
-        
-        // Add currency options
-        Object.entries(CURRENCIES).forEach(([code, currency]) => {
-            const option = document.createElement('option');
-            option.value = code;
-            option.textContent = `${code} (${currency.symbol})`;
-            select.appendChild(option);
-        });
-        
-        // Set default value
-        select.value = currentCurrency;
-        
-        // Add event listener
-        select.addEventListener('change', (e) => {
-            currentCurrency = e.target.value;
-            updatePricing();
-            // Save to localStorage for consistency
-            localStorage.setItem('preferredCurrency', currentCurrency);
-        });
-        
-        currencySelectorContainer.appendChild(select);
-    }
-    
-    // Load saved currency preference
-    const savedCurrency = localStorage.getItem('preferredCurrency');
-    if (savedCurrency && CURRENCIES[savedCurrency]) {
-        currentCurrency = savedCurrency;
-    }
-    
-    // Initial price update
-    updatePricing();
+    document.dispatchEvent(new CustomEvent('pageLoaded', { detail: { page: 'index' } }));
+
+    document.addEventListener('currencyLoaded', (e) => {
+        updatePricing(e.detail.currency);
+    });
+
+    document.addEventListener('currencyChanged', (e) => {
+        updatePricing(e.detail.currency);
+    });
     
     // DOM Elements
     const body = document.body;
