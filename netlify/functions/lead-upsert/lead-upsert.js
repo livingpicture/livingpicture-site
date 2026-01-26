@@ -206,7 +206,6 @@ exports.handler = async (event, context) => {
             selectedCurrency,
             sessionId,
             step,
-            'Last Updated': new Date().toISOString(),
         };
 
         // Remove undefined fields to avoid overwriting existing data with nulls
@@ -253,8 +252,9 @@ exports.handler = async (event, context) => {
         return createResponse(500, {
             ok: false,
             error: 'Internal Server Error',
-            message: 'An unexpected error occurred while processing your request',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: error.message || 'An unexpected error occurred while processing your request',
+            type: error.name,
+            statusCode: error.statusCode
         });
     }
 };

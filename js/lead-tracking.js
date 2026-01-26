@@ -110,7 +110,13 @@ class LeadTracker {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                let errorDetails = '';
+                try {
+                    errorDetails = await response.text();
+                } catch (e) {
+                    errorDetails = '';
+                }
+                throw new Error(`HTTP error! status: ${response.status}${errorDetails ? ` | ${errorDetails}` : ''}`);
             }
 
             const result = await response.json();
@@ -119,6 +125,7 @@ class LeadTracker {
             
         } catch (error) {
             console.error('Error updating lead:', error);
+            console.error('Lead payload (keys):', Object.keys(this.leadData || {}));
             
             // Retry once if we haven't exceeded max retries
             if (this.retryCount < this.MAX_RETRIES) {

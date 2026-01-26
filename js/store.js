@@ -773,6 +773,36 @@ function generateFileFingerprint(file) {
     return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
+async function uploadToCloudinary(file) {
+    const cloudName = window.CLOUDINARY_CLOUD_NAME || localStorage.getItem('CLOUDINARY_CLOUD_NAME');
+    const uploadPreset = window.CLOUDINARY_UPLOAD_PRESET || localStorage.getItem('CLOUDINARY_UPLOAD_PRESET');
+
+    if (!cloudName || !uploadPreset) {
+        throw new Error('Cloudinary is not configured');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        let details = '';
+        try {
+            details = await response.text();
+        } catch (e) {
+            details = '';
+        }
+        throw new Error(`Cloudinary upload failed: ${response.status}${details ? ` | ${details}` : ''}`);
+    }
+
+    return response.json();
+}
+
 // Process selected files
 async function processFiles(files) {
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -852,6 +882,9 @@ async function processFiles(files) {
     setLoading(true);
     updateProgress(0, files.length);
 
+    // Lock the Continue button until Cloudinary uploads are done
+    updateNextButton('next-to-music', false);
+
     // Check total size
     const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
     const maxTotalSize = 120 * 1024 * 1024; // 120MB
@@ -927,8 +960,19 @@ async function processFiles(files) {
                 file: file,
                 name: file.name,
                 size: file.size,
-                fileFingerprint: fileFingerprint
+                fileFingerprint: fileFingerprint,
+                uploadStatus: 'uploading'
             };
+
+            try {
+                const uploadResult = await uploadToCloudinary(file);
+                photo.permanentUrl = uploadResult.secure_url;
+                photo.publicId = uploadResult.public_id;
+                photo.uploadStatus = 'uploaded';
+            } catch (e) {
+                console.error('Cloudinary upload failed for', file.name, e);
+                photo.uploadStatus = 'failed';
+            }
 
             // Add to results
             return { success: true, file, photo };
@@ -979,7 +1023,7 @@ async function processFiles(files) {
                 if (window.leadTracker) {
                     if (formData.photos.length > 0) {
                         window.leadTracker.updateLead({
-                            imageUrls: formData.photos.map(p => p.permanentUrl).join(','),
+                            imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean).join(','),
                             photoCount: formData.photos.length,
                             step: 'PHOTOS_UPLOADED'
                         });
@@ -994,7 +1038,15 @@ async function processFiles(files) {
                 renderPhotoGrid();
                 updatePhotoCounter();
                 updatePricingDisplay();
-                updateNextButton('next-to-music', formData.photos.length > 0);
+
+                // Enable Continue only when all photos have permanent URLs
+                const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
+                if (!allPhotosUploaded && formData.photos.length > 0) {
+                    console.error('Some photos are missing permanentUrl; keeping Continue disabled. Upload statuses:', formData.photos.map(p => ({ name: p.name, uploadStatus: p.uploadStatus })));
+                    showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
+                }
+                updateNextButton('next-to-music', allPhotosUploaded);
+
                 saveToLocalStorage();
             } catch (error) {
                 console.error('Error processing files:', error);
@@ -1002,6 +1054,7 @@ async function processFiles(files) {
             } finally {
                 // Clean up
                 setLoading(false);
+
                 // Re-enable file input by resetting it
                 const fileInput = document.getElementById('photo-upload');
                 if (fileInput) {
@@ -1167,7 +1220,8 @@ function removePhoto(photoId) {
     // Save and update UI
     saveToLocalStorage();
     renderPhotoGrid();
-    updateNextButton('next-to-music', formData.photos.length > 0);
+    const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
+    updateNextButton('next-to-music', allPhotosUploaded);
     updateOrderSummary(); // Update the order summary after removing a photo
 }
 
