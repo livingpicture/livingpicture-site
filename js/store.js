@@ -876,7 +876,6 @@ async function processFiles(files) {
                 });
             }
         }
-
         if (newPhotos.length > 0) {
             showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
         }
@@ -886,85 +885,130 @@ async function processFiles(files) {
         updatePricingDisplay();
         updatePhotoContinueButtonState();
 
-        // Get DOM elements
+        saveToLocalStorage();
+    } catch (error) {
+        console.error('Error processing files:', error);
+        showError('An error occurred while processing your photos. Please try again.');
+    } finally {
+        setLoading(false);
+        isUploading = false;
+        updatePhotoContinueButtonState();
+
         const fileInput = document.getElementById('photo-upload');
-        const browseBtn = document.getElementById('browse-files');
-        const progressContainer = document.getElementById('upload-progress');
-        const progressBar = document.getElementById('upload-progress-bar');
-        const progressText = document.getElementById('upload-progress-text');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    }
+}
 
-        if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) return;
+// Load saved data
+async function loadSavedData() {
+    const savedData = localStorage.getItem('memoryCreatorData');
+    if (savedData) {
+        try {
+            const parsedData = JSON.parse(savedData);
 
-        // Function to trigger file input
-        const triggerFileInput = () => {
-            fileInput.click();
-        };
+            const savedAt = new Date(parsedData.savedAt);
+            const now = new Date();
+            const hoursDiff = Math.abs(now - savedAt) / 36e5;
 
-        // Set up event listener for browse button
-        browseBtn.addEventListener('click', triggerFileInput);
-        const savedAt = new Date(parsedData.savedAt);
-        const now = new Date();
-        const hoursDiff = Math.abs(now - savedAt) / 36e5;
+            if (hoursDiff < 24) {
+                // Only restore non-photo data directly
+                formData.memoryName = parsedData.memoryName || '';
+                formData.music = parsedData.music || null;
+                formData.customer = parsedData.customer || null;
+                formData.pricing = parsedData.pricing || null;
+                formData.savedAt = parsedData.savedAt;
 
-        if (hoursDiff < 24) {
-            // Only restore non-photo data directly
-            formData.memoryName = parsedData.memoryName || '';
-            formData.music = parsedData.music || null;
-            formData.customer = parsedData.customer || null;
-            formData.pricing = parsedData.pricing || null;
-            formData.savedAt = parsedData.savedAt;
+                // Update the current currency variable
+                if (parsedData.currency && CURRENCIES[parsedData.currency]) {
+                    currentCurrency = parsedData.currency;
+                }
 
-            // Update the current currency variable
-            if (parsedData.currency && CURRENCIES[parsedData.currency]) {
-                currentCurrency = parsedData.currency;
-            }
+                // Restore pricing data or initialize with default
+                if (parsedData.pricing) {
+                    formData.pricing = parsedData.pricing;
+                } else {
+                    formData.pricing = {
+                        currentTier: PRICING_TIERS[0],
+                        totalPrice: 0
+                    };
+                }
 
-            // Restore pricing data or initialize with default
-            if (parsedData.pricing) {
-                formData.pricing = parsedData.pricing;
+                // Update form fields
+                if (memoryNameInput && formData.memoryName) {
+                    memoryNameInput.value = formData.memoryName;
+                    updateNextButton('next-to-photos', true);
+                }
+
+                // If we have photo metadata but no actual photo data (from a previous session)
+                if (parsedData.photos && parsedData.photos.length > 0) {
+                    // Update pricing display with the loaded photo count
+                    updatePricingDisplay();
+                    // Do not update the next button state here
+                }
+
+                if (formData.music) {
+                    updateNextButton('next-to-checkout', true);
+                }
+
+                if (formData.customer) {
+                    const { name, email, country, phone } = formData.customer;
+                    const nameInput = document.getElementById('customer-name');
+                    const emailInput = document.getElementById('customer-email');
+                    const countrySelect = document.getElementById('customer-country');
+                    const phoneInput = document.getElementById('customer-phone');
+
+                    if (nameInput && name) nameInput.value = name;
+                    if (emailInput && email) emailInput.value = email;
+                    if (countrySelect && country) countrySelect.value = country;
+                    if (phoneInput && phone) phoneInput.value = phone;
+                }
+
+                updatePhotoContinueButtonState();
+                updateOrderSummary();
             } else {
-                formData.pricing = {
-                    currentTier: PRICING_TIERS[0],
-                    totalPrice: 0
-                };
+                // Clear old data
+                clearFormData();
             }
-
-            // Update form fields
-            if (memoryNameInput && formData.memoryName) {
-                memoryNameInput.value = formData.memoryName;
-                updateNextButton('next-to-photos', true);
-            }
-
-            // If we have photo metadata but no actual photo data (from a previous session)
-            if (parsedData.photos && parsedData.photos.length > 0) {
-                // Update pricing display with the loaded photo count
-                updatePricingDisplay();
-                // Do not update the next button state here
-            }
-
-            if (formData.music) {
-                updateNextButton('next-to-checkout', true);
-            }
-
-            if (formData.customer) {
-                const { name, email, country, phone } = formData.customer;
-                const nameInput = document.getElementById('customer-name');
-                const emailInput = document.getElementById('customer-email');
-                const countrySelect = document.getElementById('customer-country');
-                const phoneInput = document.getElementById('customer-phone');
-
-                if (nameInput && name) nameInput.value = name;
-                if (emailInput && email) emailInput.value = email;
-                if (countrySelect && country) countrySelect.value = country;
-                if (phoneInput && phone) phoneInput.value = phone;
-            }
-        } else {
-            // Clear old data
+        } catch (e) {
+            console.error('Error loading saved data:', e);
             clearFormData();
         }
-    } catch (e) {
-        console.error('Error loading saved data:', e);
-        clearFormData();
+    }
+}
+
+// Update order summary
+function updateOrderSummary() {
+    const currencyEl = document.getElementById('summary-currency');
+    const totalEl = document.getElementById('order-total-price');
+
+    if (currencyEl) {
+        currencyEl.textContent = currentCurrency || '-';
+    }
+
+    if (summaryName) {
+        summaryName.textContent = formData.memoryName || '-';
+    }
+
+    if (summaryPhotoCount) {
+        summaryPhotoCount.textContent = String((formData.photos || []).length);
+    }
+
+    if (summaryMusic) {
+        if (formData.music && formData.music.teamChoose) {
+            summaryMusic.textContent = 'Team choice';
+        } else if (formData.music && formData.music.songName && formData.music.artistName) {
+            summaryMusic.textContent = `${formData.music.songName} by ${formData.music.artistName}`;
+        } else {
+            summaryMusic.textContent = '-';
+        }
+    }
+
+    if (totalEl) {
+        const currencySymbol = CURRENCIES.find(c => c.code === currentCurrency)?.symbol || '$';
+        const total = Number(formData?.pricing?.totalPrice || 0);
+        totalEl.textContent = `${currencySymbol}${total.toFixed(2)}`;
     }
 }
 
