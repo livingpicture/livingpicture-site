@@ -105,9 +105,7 @@ class LeadTracker {
         this.isUpdating = true;
         
         try {
-            const functionUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
-                ? 'https://livingpicture.netlify.app/.netlify/functions/lead-upsert'
-                : '/.netlify/functions/lead-upsert';
+            const functionUrl = '/.netlify/functions/lead-upsert';
 
             const response = await fetch(functionUrl, {
                 method: 'POST',

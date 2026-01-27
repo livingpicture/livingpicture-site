@@ -296,6 +296,147 @@ function saveToLocalStorage() {
     }
 }
 
+function showError(message) {
+    const errorElement = document.getElementById('photo-upload-error');
+    if (errorElement) {
+        const errorText = errorElement.querySelector('.error-text') || errorElement.querySelector('span');
+        if (errorText) {
+            errorText.textContent = message;
+        }
+        errorElement.style.display = 'flex';
+        errorElement.classList.remove('shake');
+        void errorElement.offsetWidth;
+        errorElement.classList.add('shake');
+    }
+    console.error(message);
+}
+
+function showSuccess(message) {
+    console.log(message);
+}
+
+function clearPhotoUploadError() {
+    const errorElement = document.getElementById('photo-upload-error');
+    if (errorElement) {
+        errorElement.style.display = 'none';
+        errorElement.classList.remove('shake');
+    }
+}
+
+function showInputError(inputEl, message) {
+    if (!inputEl) return;
+    const group = inputEl.closest('.form-group');
+    if (group) {
+        group.classList.add('error');
+        const errorEl = group.querySelector('.error-message');
+        if (errorEl) {
+            errorEl.textContent = message;
+        }
+    }
+}
+
+function renderMusicOptions() {
+    updateMusicSelectionUI();
+}
+
+function updateMusicSelectionUI() {
+    const songForm = document.getElementById('song-selection-form');
+    const teamNote = document.getElementById('team-choose-note');
+
+    const isTeamChoose = !!(teamChooseRadio && teamChooseRadio.checked);
+    if (formData.music) {
+        formData.music.teamChoose = isTeamChoose;
+        formData.music.custom = !isTeamChoose;
+    }
+
+    if (songForm) {
+        songForm.style.display = isTeamChoose ? 'none' : 'block';
+    }
+    if (teamNote) {
+        teamNote.style.display = isTeamChoose ? 'block' : 'none';
+    }
+
+    validateMusicInputs();
+}
+
+function validateMusicInputs() {
+    if (!formData.music) {
+        formData.music = { songName: '', artistName: '', custom: true, teamChoose: false };
+    }
+
+    const isTeamChoose = !!(teamChooseRadio && teamChooseRadio.checked);
+    if (isTeamChoose) {
+        updateNextButton('next-to-checkout', true);
+        return true;
+    }
+
+    const song = (songNameInput?.value || '').trim();
+    const artist = (artistNameInput?.value || '').trim();
+    formData.music.songName = song;
+    formData.music.artistName = artist;
+
+    const hasValidInput = !!(song && artist);
+    updateNextButton('next-to-checkout', hasValidInput);
+    return hasValidInput;
+}
+
+function showStep(step) {
+    currentStep = step;
+    stepSections.forEach(section => section.classList.remove('active'));
+    const activeSection = document.getElementById(`step-${step}`);
+    if (activeSection) {
+        activeSection.classList.add('active');
+    }
+
+    steps.forEach(s => s.classList.remove('active'));
+    const activeStepIndicator = document.querySelector(`.step[data-step="${step}"]`);
+    if (activeStepIndicator) {
+        activeStepIndicator.classList.add('active');
+    }
+
+    const progress = document.querySelector('.progress');
+    if (progress) {
+        progress.style.width = `${(step / 4) * 100}%`;
+    }
+
+    const currentStepEl = document.getElementById('current-step');
+    if (currentStepEl) {
+        currentStepEl.textContent = String(step);
+    }
+
+    updateUIForStep(step);
+}
+
+function saveCurrentStep() {
+    if (currentStep === 1) {
+        formData.memoryName = (memoryNameInput?.value || '').trim();
+        const ok = !!formData.memoryName;
+        updateNextButton('next-to-photos', ok);
+        saveToLocalStorage();
+        return ok;
+    }
+
+    if (currentStep === 2) {
+        const ok = validatePhotoUpload();
+        saveToLocalStorage();
+        return ok;
+    }
+
+    if (currentStep === 3) {
+        const ok = validateMusicInputs();
+        saveToLocalStorage();
+        return ok;
+    }
+
+    if (currentStep === 4) {
+        const ok = validateCustomerDetails();
+        saveToLocalStorage();
+        return ok;
+    }
+
+    return true;
+}
+
 // Validate photo upload
 function validatePhotoUpload() {
     const dropZone = document.getElementById('drop-zone');
