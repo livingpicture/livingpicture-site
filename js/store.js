@@ -640,576 +640,99 @@ function updatePhotoContinueButtonState() {
     btn.textContent = 'Continue';
 }
 
-// Validate customer details
-function validateCustomerDetails() {
-    const name = document.getElementById('customer-name').value.trim();
-    const email = document.getElementById('customer-email').value.trim();
-    const country = document.getElementById('customer-country').value;
-    let isValid = true;
+function renderPhotoGrid() {
+    if (!photoGrid) return;
 
-    if (!name) {
-        showInputError(document.getElementById('customer-name'), 'Name is required');
-        isValid = false;
-    }
+    photoGrid.innerHTML = '';
 
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-        showInputError(document.getElementById('customer-email'), 'A valid email is required');
-        isValid = false;
-    }
+    (formData.photos || []).forEach(photo => {
+        const item = document.createElement('div');
+        item.className = 'photo-item';
+        item.dataset.photoId = photo.id;
 
-    if (!country) {
-        showInputError(document.getElementById('customer-country'), 'Country is required');
-        isValid = false;
-    }
+        const img = document.createElement('img');
+        img.className = 'photo-thumbnail';
+        img.alt = photo.name || 'Uploaded photo';
+        img.src = photo.previewUrl || photo.permanentUrl || '';
 
-    return isValid;
-}
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-photo';
+        removeBtn.type = 'button';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.addEventListener('click', () => removePhotoById(photo.id));
 
-// Complete the purchase
-async function completePurchase() {
-    if (!validateCustomerDetails()) {
-        return;
-    }
+        item.appendChild(img);
 
-    // Update form data with customer details
-    formData.customer.name = document.getElementById('customer-name').value.trim();
-    formData.customer.email = document.getElementById('customer-email').value.trim();
-    formData.customer.country = document.getElementById('customer-country').value;
-    formData.customer.phone = document.getElementById('customer-phone').value.trim();
-
-    // Here you would typically integrate with a payment gateway
-    // For now, we'll just show a success message
-    showSuccess('Your order has been received!');
-
-    // Optionally, reset the form or redirect
-}
-
-// Handle file selection
-async function handleFileSelect(e) {
-    // Prevent default to handle everything ourselves
-    e.preventDefault();
-
-    // Get files from the event
-    const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-
-    // Process files if we have any
-    if (files && files.length > 0) {
-        console.log('Files selected:', files.length);
-        // Clear any existing error when new files are selected
-        clearPhotoUploadError();
-
-        isUploading = true;
-        updatePhotoContinueButtonState();
-
-        try {
-            // Process the files and wait for completion
-            await processFiles(files);
-        } catch (error) {
-            console.error('Error in handleFileSelect:', error);
-            showError('Failed to process files. Please try again.');
+        if (photo.uploadStatus === 'uploading') {
+            const overlay = document.createElement('div');
+            overlay.className = 'thumbnail-overlay';
+            overlay.innerHTML = '<div class="overlay-content"><i class="fas fa-spinner fa-spin"></i><span>Uploading...</span></div>';
+            item.appendChild(overlay);
         }
-    } else {
-        // If no files were selected, validate to show error
-        validatePhotoUpload();
-    }
-}
 
-// Set up file upload handling with proper event delegation
-function setupFileUpload() {
-    // Get the file input and browse button
-    const fileInput = document.getElementById('photo-upload');
-    const browseBtn = document.getElementById('browse-files');
+        if (photo.uploadStatus === 'failed') {
+            const overlay = document.createElement('div');
+            overlay.className = 'thumbnail-overlay failed';
+            overlay.innerHTML = `
+                <div class="overlay-content">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Upload failed</span>
+                    <div class="overlay-actions">
+                        <button type="button" class="retry-upload">Retry</button>
+                        <button type="button" class="remove-failed">Remove</button>
+                    </div>
+                </div>
+            `;
 
-    if (!fileInput || !browseBtn) return;
-
-    // Remove any existing event listeners by cloning the elements
-    const newInput = fileInput.cloneNode(true);
-    const newBrowseBtn = browseBtn.cloneNode(true);
-
-    // Replace the original elements with clones to remove existing listeners
-    if (fileInput.parentNode) {
-        fileInput.parentNode.replaceChild(newInput, fileInput);
-    }
-    if (browseBtn.parentNode) {
-        browseBtn.parentNode.replaceChild(newBrowseBtn, browseBtn);
-    }
-
-    // Handle click on browse button
-    newBrowseBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        newInput.click();
-    }, true); // Use capture phase to ensure we catch the event first
-
-    // Handle file selection
-    newInput.addEventListener('change', function (e) {
-        if (e.target.files && e.target.files.length > 0) {
-            handleFileSelect(e);
-            // Reset the input after handling
-            this.value = '';
-            // Stop any event propagation
-            e.stopPropagation();
+            overlay.querySelector('.retry-upload')?.addEventListener('click', () => retryUploadById(photo.id));
+            overlay.querySelector('.remove-failed')?.addEventListener('click', () => removePhotoById(photo.id));
+            item.appendChild(overlay);
         }
-    }, true); // Use capture phase
 
-    // Prevent any other click handlers from interfering
-    newInput.addEventListener('click', function (e) {
-        e.stopPropagation();
-    }, true);
-}
-
-async function updatePricingDisplay() {
-    const photoCount = formData.photos.length;
-    const currency = currentCurrency;
-    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || '$';
-
-    const getTier = (count) => {
-        if (count >= 26) return '26+';
-        if (count >= 16) return '16-25';
-        if (count >= 6) return '6-15';
-        return '1-5';
-    };
-
-    const tier = getTier(photoCount);
-    const pricePerPhoto = PRICING[tier][currency];
-    const total = photoCount * pricePerPhoto;
-
-    // Update form data
-    formData.pricing = {
-        currentTier: tier,
-        pricePerPhoto: pricePerPhoto,
-        totalPrice: total,
-        currency: currency
-    };
-
-    // Update UI
-    const totalPriceElement = document.getElementById('total-price');
-    const photoCountText = document.getElementById('photo-count-text');
-    const priceDetails = document.getElementById('price-details');
-
-    if (totalPriceElement) {
-        totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
-    }
-
-    if (photoCountText) {
-        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-    }
-
-    if (priceDetails) {
-        if (photoCount === 0) {
-            priceDetails.textContent = 'Add photos to see your price per photo';
-        } else {
-            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
-        }
-    }
-}
-
-// Generate a lightweight fingerprint for a file using metadata
-function generateFileFingerprint(file) {
-    // Use file name, size, and last modified time as a fingerprint
-    return `${file.name}-${file.size}-${file.lastModified}`;
-}
-
-async function uploadToCloudinary(file) {
-    const cloudName = window.CLOUDINARY_CLOUD_NAME || localStorage.getItem('CLOUDINARY_CLOUD_NAME');
-    const uploadPreset = window.CLOUDINARY_UPLOAD_PRESET || localStorage.getItem('CLOUDINARY_UPLOAD_PRESET');
-
-    if (!cloudName || !uploadPreset) {
-        throw new Error('Cloudinary is not configured');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: formData
+        item.appendChild(removeBtn);
+        photoGrid.appendChild(item);
     });
-
-    if (!response.ok) {
-        let details = '';
-        try {
-            details = await response.text();
-        } catch (e) {
-            details = '';
-        }
-        throw new Error(`Cloudinary upload failed: ${response.status}${details ? ` | ${details}` : ''}`);
-    }
-
-    return response.json();
 }
 
-// Process selected files
-async function processFiles(files) {
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const heicTypes = ['image/heic', 'image/heif', 'image/heif-sequence'];
+async function retryUploadById(photoId) {
+    const photo = (formData.photos || []).find(p => p.id === photoId);
+    if (!photo || !photo.file) return;
 
-    // Check for HEIC files first to show specific error
-    const heicFiles = Array.from(files).filter(file => heicTypes.some(type =>
-        file.type.toLowerCase().includes(type.split('/')[1])
-    ));
-
-    if (heicFiles.length > 0) {
-        showError('HEIC/HEIF files are not supported. Please convert to JPG or PNG before uploading.');
-        return;
-    }
-
-    // Check for other valid image types
-    const validFiles = Array.from(files).filter(file =>
-        validImageTypes.includes(file.type.toLowerCase())
-    );
-
-    if (validFiles.length === 0) {
-        showError('Please select valid image files (JPEG, PNG, or WebP)');
-        return;
-    }
-
-    // Get DOM elements
-    const fileInput = document.getElementById('photo-upload');
-    const browseBtn = document.getElementById('browse-files');
-    const progressContainer = document.getElementById('upload-progress');
-    const progressBar = document.getElementById('upload-progress-bar');
-    const progressText = document.getElementById('upload-progress-text');
-
-    if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) return;
-
-    // Function to trigger file input
-    const triggerFileInput = () => {
-        fileInput.click();
-    };
-
-    // Set up event listener for browse button
-    browseBtn.addEventListener('click', triggerFileInput);
-
-    // Store original button HTML to restore later
-    const originalBtnHTML = browseBtn.innerHTML;
-
-    // Set loading state
-    const setLoading = (isLoading) => {
-        if (isLoading) {
-            browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            browseBtn.classList.add('processing');
-            progressContainer.style.display = 'block';
-        } else {
-            // Restore button
-            browseBtn.innerHTML = originalBtnHTML;
-            browseBtn.classList.remove('processing');
-
-            // Fade out progress bar
-            setTimeout(() => {
-                progressContainer.style.opacity = '0';
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                    progressContainer.style.opacity = '1';
-                    progressBar.style.width = '0%';
-                }, 300);
-            }, 500);
-        }
-    };
-
-    // Update progress
-    const updateProgress = (processed, total) => {
-        const percent = Math.round((processed / total) * 100);
-        progressBar.style.width = `${percent}%`;
-        progressText.textContent = `Processing ${processed} of ${total} photos...`;
-    };
-
-    // Start loading
-    setLoading(true);
-    updateProgress(0, files.length);
-
-    // Process files with optimized concurrency control
-    const processFilesOptimized = async (filesToProcess) => {
-        const newPhotos = [];
-        let processed = 0;
-
-        const processFile = async (file) => {
-            // Check file type first
-            if (!file.type.startsWith('image/')) {
-                console.log('Skipping non-image file:', file.name);
-                return { success: false, file, error: 'Not an image' };
-            }
-
-            // Generate file fingerprint
-            const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
-
-            // Check for duplicates
-            if (existingHashes.has(fileFingerprint)) {
-                duplicateCount++;
-                return { success: false, file, error: 'Duplicate file' };
-            }
-
-            // Mark as processed
-            existingHashes.add(fileFingerprint);
-
-            // Create object URL
-            const objectUrl = URL.createObjectURL(file);
-
-            // Create photo object and add immediately so the UI shows "Uploading..."
-            const photo = {
-                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                previewUrl: objectUrl,
-                file: file,
-                name: file.name,
-                size: file.size,
-                fileFingerprint: fileFingerprint,
-                uploadStatus: 'uploading'
-            };
-
-            formData.photos.push(photo);
-            newPhotos.push(photo);
-            renderPhotoGrid();
-            updatePhotoContinueButtonState();
-
-            try {
-                const uploadResult = await uploadToCloudinary(file);
-                photo.permanentUrl = uploadResult.secure_url;
-                photo.publicId = uploadResult.public_id;
-                photo.uploadStatus = 'uploaded';
-            } catch (e) {
-                console.error('Cloudinary upload failed for', file.name, e);
-                photo.uploadStatus = 'failed';
-            }
-
-            renderPhotoGrid();
-            updatePhotoContinueButtonState();
-
-            return { success: true, file, photo };
-        };
-
-        const processBatch = async (batch) => {
-            const batchPromises = batch.map(file =>
-                processFile(file).then(result => {
-                    processed++;
-                    if (processed % 2 === 0 || processed === filesToProcess.length) {
-                        updateProgress(processed, filesToProcess.length);
-                    }
-                    return result;
-                })
-            );
-
-            return Promise.all(batchPromises);
-        };
-
-        const batchSize = maxConcurrent;
-        for (let i = 0; i < filesToProcess.length; i += batchSize) {
-            const batch = filesToProcess.slice(i, i + batchSize);
-            await processBatch(batch);
-        }
-
-        return newPhotos;
-    };
+    isUploading = true;
+    photo.uploadStatus = 'uploading';
+    renderPhotoGrid();
+    updatePhotoContinueButtonState();
 
     try {
-        const newPhotos = await processFilesOptimized(validFiles);
-
-        if (duplicateCount > 0) {
-            showError(`You tried to upload ${duplicateCount} duplicate photos which were skipped.`);
-        }
-
-        if (window.leadTracker) {
-            if (formData.photos.length > 0) {
-                window.leadTracker.updateLead({
-                    imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
-                    photoCount: formData.photos.length,
-                    step: 'PHOTOS_UPLOADED'
-                });
-            }
-        }
-        if (newPhotos.length > 0) {
-            showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
-        }
-
-        renderPhotoGrid();
-        updatePhotoCounter();
-        updatePricingDisplay();
-        updatePhotoContinueButtonState();
-
-        saveToLocalStorage();
-    } catch (error) {
-        console.error('Error processing files:', error);
-        showError('An error occurred while processing your photos. Please try again.');
+        const uploadResult = await uploadToCloudinary(photo.file);
+        photo.permanentUrl = uploadResult.secure_url;
+        photo.publicId = uploadResult.public_id;
+        photo.uploadStatus = 'uploaded';
+    } catch (e) {
+        console.error('Retry upload failed for', photo.name, e);
+        photo.uploadStatus = 'failed';
+        showError('Upload failed again. Please remove and re-add the photo (or check your connection).');
     } finally {
-        setLoading(false);
-        isUploading = false;
+        isUploading = (formData.photos || []).some(p => p.uploadStatus === 'uploading');
+        renderPhotoGrid();
         updatePhotoContinueButtonState();
-
-        const fileInput = document.getElementById('photo-upload');
-        if (fileInput) {
-            fileInput.value = '';
-        }
+        saveToLocalStorage();
     }
 }
 
-// Load saved data
-async function loadSavedData() {
-    const savedData = localStorage.getItem('memoryCreatorData');
-    if (savedData) {
-        try {
-            const parsedData = JSON.parse(savedData);
-
-            const savedAt = new Date(parsedData.savedAt);
-            const now = new Date();
-            const hoursDiff = Math.abs(now - savedAt) / 36e5;
-
-            if (hoursDiff < 24) {
-                // Only restore non-photo data directly
-                formData.memoryName = parsedData.memoryName || '';
-                formData.music = parsedData.music || null;
-                formData.customer = parsedData.customer || null;
-                formData.pricing = parsedData.pricing || null;
-                formData.savedAt = parsedData.savedAt;
-
-                // Update the current currency variable
-                if (parsedData.currency && CURRENCIES[parsedData.currency]) {
-                    currentCurrency = parsedData.currency;
-                }
-
-                // Restore pricing data or initialize with default
-                if (parsedData.pricing) {
-                    formData.pricing = parsedData.pricing;
-                } else {
-                    formData.pricing = {
-                        currentTier: PRICING_TIERS[0],
-                        totalPrice: 0
-                    };
-                }
-
-                // Update form fields
-                if (memoryNameInput && formData.memoryName) {
-                    memoryNameInput.value = formData.memoryName;
-                    updateNextButton('next-to-photos', true);
-                }
-
-                // If we have photo metadata but no actual photo data (from a previous session)
-                if (parsedData.photos && parsedData.photos.length > 0) {
-                    // Update pricing display with the loaded photo count
-                    updatePricingDisplay();
-                    // Do not update the next button state here
-                }
-
-                if (formData.music) {
-                    updateNextButton('next-to-checkout', true);
-                }
-
-                if (formData.customer) {
-                    const { name, email, country, phone } = formData.customer;
-                    const nameInput = document.getElementById('customer-name');
-                    const emailInput = document.getElementById('customer-email');
-                    const countrySelect = document.getElementById('customer-country');
-                    const phoneInput = document.getElementById('customer-phone');
-
-                    if (nameInput && name) nameInput.value = name;
-                    if (emailInput && email) emailInput.value = email;
-                    if (countrySelect && country) countrySelect.value = country;
-                    if (phoneInput && phone) phoneInput.value = phone;
-                }
-
-                updatePhotoContinueButtonState();
-                updateOrderSummary();
-            } else {
-                // Clear old data
-                clearFormData();
-            }
-        } catch (e) {
-            console.error('Error loading saved data:', e);
-            clearFormData();
-        }
+function removePhotoById(photoId) {
+    const idx = (formData.photos || []).findIndex(p => p.id === photoId);
+    if (idx === -1) return;
+    const [removed] = formData.photos.splice(idx, 1);
+    if (removed?.previewUrl) {
+        try { URL.revokeObjectURL(removed.previewUrl); } catch (e) {}
     }
-}
-
-// Update order summary
-function updateOrderSummary() {
-    const currencyEl = document.getElementById('summary-currency');
-    const totalEl = document.getElementById('order-total-price');
-
-    if (currencyEl) {
-        currencyEl.textContent = currentCurrency || '-';
-    }
-
-    if (summaryName) {
-        summaryName.textContent = formData.memoryName || '-';
-    }
-
-    if (summaryPhotoCount) {
-        summaryPhotoCount.textContent = String((formData.photos || []).length);
-    }
-
-    if (summaryMusic) {
-        if (formData.music && formData.music.teamChoose) {
-            summaryMusic.textContent = 'Team choice';
-        } else if (formData.music && formData.music.songName && formData.music.artistName) {
-            summaryMusic.textContent = `${formData.music.songName} by ${formData.music.artistName}`;
-        } else {
-            summaryMusic.textContent = '-';
-        }
-    }
-
-    if (totalEl) {
-        const currencySymbol = CURRENCIES.find(c => c.code === currentCurrency)?.symbol || '$';
-        const total = Number(formData?.pricing?.totalPrice || 0);
-        totalEl.textContent = `${currencySymbol}${total.toFixed(2)}`;
-    }
-}
-
-// Clear form data
-function clearFormData() {
-    // Revoke all object URLs before clearing the photos array
-    if (formData.photos && Array.isArray(formData.photos)) {
-        formData.photos.forEach(photo => {
-            if (photo.previewUrl) {
-                URL.revokeObjectURL(photo.previewUrl);
-            }
-        });
-    }
-
-    // Clear the form data object
-    formData.memoryName = '';
-    formData.photos = [];
-    formData.music = {
-        songName: '',
-        artistName: '',
-        custom: true,
-        teamChoose: false
-    };
-    formData.customer = {
-        name: '',
-        email: '',
-        country: '',
-        phone: ''
-    };
-    formData.pricing = {
-        currentTier: PRICING_TIERS[0],
-        totalPrice: 0
-    };
-    formData.savedAt = null;
-
-    // Update pricing display
+    isUploading = (formData.photos || []).some(p => p.uploadStatus === 'uploading');
+    renderPhotoGrid();
+    updatePhotoCounter();
     updatePricingDisplay();
-
-    // Clear local storage
-    localStorage.removeItem('memoryCreatorData');
-
-    // Reset form fields
-    if (memoryNameInput) {
-        memoryNameInput.value = '';
-    }
-
-    if (songNameInput && artistNameInput) {
-        songNameInput.value = '';
-        artistNameInput.value = '';
-    }
-
-    // Reset UI
-    if (photoGrid) {
-        photoGrid.innerHTML = '';
-    }
-
-    // Reset buttons
-    updateNextButton('next-to-photos', false);
-    updateNextButton('next-to-music', false);
-    updateNextButton('next-to-checkout', false);
+    updatePhotoContinueButtonState();
+    saveToLocalStorage();
 }
 
 // Drag and drop helpers
