@@ -6,9 +6,12 @@ const PRICING_TIERS = [
 ];
 let currentCurrency = 'ILS';
 
+let isUploading = false;
+
 // Store the current step and form data
 let currentStep = 1;
 const formData = {
+    leadId: null,
     memoryName: '',
     photos: [],
     music: {
@@ -86,6 +89,11 @@ if (memoryNameInput) {
 function initStore() {
     // Load saved data if exists
     loadSavedData();
+
+    // Always bind this visit to the current (fresh) leadId
+    if (window.leadTracker && window.leadTracker.leadId) {
+        formData.leadId = window.leadTracker.leadId;
+    }
     
     // Set up event listeners
     setupEventListeners();
@@ -292,10 +300,13 @@ function saveToLocalStorage() {
 function validatePhotoUpload() {
     const dropZone = document.getElementById('drop-zone');
     const errorElement = document.getElementById('photo-upload-error');
-    
+
     // Check if there are any photos
     const hasPhotos = formData.photos && formData.photos.length > 0;
-    
+    const anyUploading = hasPhotos && formData.photos.some(p => p.uploadStatus === 'uploading');
+    const anyFailed = hasPhotos && formData.photos.some(p => p.uploadStatus === 'failed');
+    const allPhotosUploaded = hasPhotos && formData.photos.every(p => p.uploadStatus === 'uploaded');
+
     if (!hasPhotos) {
         // Show error state
         if (dropZone) {
@@ -305,239 +316,75 @@ function validatePhotoUpload() {
         }
         if (errorElement) {
             // Update error message text
-            const errorText = errorElement.querySelector('span');
+            const errorText = errorElement.querySelector('.error-text') || errorElement.querySelector('span');
             if (errorText) {
                 errorText.textContent = 'Please upload at least one photo to continue';
             }
-            
+
             // Make sure error is visible
             errorElement.style.display = 'flex';
             errorElement.style.visibility = 'visible';
             errorElement.style.opacity = '1';
             errorElement.style.position = 'static';
             errorElement.style.marginTop = '1rem';
-            
+
             // Log for debugging
             console.log('Showing error message: Please upload at least one photo to continue');
         }
-        
+
         // Scroll to the upload area
         const uploadArea = document.querySelector('.photo-upload-container');
         if (uploadArea) {
             uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-        
-        // Ensure the next button is disabled
-        updateNextButton('next-to-music', false);
-        
+
+        updatePhotoContinueButtonState();
+
         return false;
     }
-    
+
+    if (anyUploading) {
+        if (errorElement) {
+            const errorText = errorElement.querySelector('.error-text') || errorElement.querySelector('span');
+            if (errorText) {
+                errorText.textContent = 'Please wait for all photos to finish uploading.';
+            }
+            errorElement.style.display = 'flex';
+        }
+        updatePhotoContinueButtonState();
+        return false;
+    }
+
+    if (anyFailed || !allPhotosUploaded) {
+        if (dropZone) {
+            dropZone.classList.add('error');
+            void dropZone.offsetWidth;
+        }
+
+        if (errorElement) {
+            const errorText = errorElement.querySelector('.error-text') || errorElement.querySelector('span');
+            if (errorText) {
+                errorText.textContent = 'Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.';
+            }
+            errorElement.style.display = 'flex';
+        }
+        updatePhotoContinueButtonState();
+        return false;
+    }
+
     // Clear error state if we have photos
     if (dropZone) {
         dropZone.classList.remove('error');
     }
+
     if (errorElement) {
         errorElement.style.display = 'none';
         errorElement.style.visibility = 'hidden';
         errorElement.style.opacity = '0';
     }
-    
-    // Enable the next button
-    updateNextButton('next-to-music', true);
+
+    updatePhotoContinueButtonState();
     return true;
-}
-
-function showStep(stepNumber) {
-    // Hide all steps
-    document.querySelectorAll('.store-step').forEach(step => {
-        step.classList.remove('active');
-    });
-
-    // Show the selected step
-    const stepElement = document.getElementById(`step-${stepNumber}`);
-    if (stepElement) {
-        stepElement.classList.add('active');
-    }
-
-    // Update active state in progress steps
-    document.querySelectorAll('.step').forEach(step => {
-        if (parseInt(step.getAttribute('data-step')) === stepNumber) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    });
-
-    // Update progress bars
-    const progress = (stepNumber / 4) * 100;
-
-    // Update desktop progress bar
-    const desktopProgress = document.querySelector('.progress');
-    if (desktopProgress) {
-        desktopProgress.style.width = `${progress}%`;
-    }
-
-    // Update mobile progress bar
-    const mobileProgressBar = document.getElementById('mobile-progress-bar');
-    if (mobileProgressBar) {
-        mobileProgressBar.style.width = `${progress}%`;
-    }
-
-    // Update mobile step indicator
-    const currentStepElement = document.getElementById('current-step');
-    if (currentStepElement) {
-        currentStepElement.textContent = stepNumber;
-    }
-
-    // Scroll to top of the step
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
-
-    // Validate the current step
-    validateCurrentStep(stepNumber);
-
-    // Update current step
-    currentStep = stepNumber;
-
-    // Update UI based on the current step
-    updateUIForStep(stepNumber);
-
-    return true;
-}
-
-// Validate music inputs and show inline errors
-function validateMusicInputs() {
-    // If team choose is selected, always return true
-    if (teamChooseRadio && teamChooseRadio.checked) {
-        // Clear any existing errors
-        clearMusicInputErrors();
-        return true;
-    }
-    
-    // For manual song selection, validate both fields
-    const songName = songNameInput ? songNameInput.value.trim() : '';
-    const artistName = artistNameInput ? artistNameInput.value.trim() : '';
-    let isValid = true;
-    
-    // Clear previous errors
-    clearMusicInputErrors();
-    
-    // Validate song name
-    if (!songName) {
-        showInputError(songNameInput, 'Please enter a song name');
-        isValid = false;
-    }
-    
-    // Validate artist name
-    if (!artistName) {
-        showInputError(artistNameInput, 'Please enter an artist name');
-        isValid = false;
-    }
-    
-    // Update next button state
-    updateNextButton('next-to-checkout', isValid);
-    
-    return isValid;
-}
-
-// Show error for a specific input field
-function showInputError(inputElement, message) {
-    if (!inputElement) return;
-    
-    // Add error class to input
-    inputElement.classList.add('error');
-    
-    // Create or update error message
-    let errorElement = inputElement.nextElementSibling;
-    if (!errorElement || !errorElement.classList.contains('error-message')) {
-        errorElement = document.createElement('div');
-        errorElement.className = 'error-message';
-        inputElement.parentNode.insertBefore(errorElement, inputElement.nextSibling);
-    }
-    
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-    
-    // Scroll to the first error
-    inputElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-// Clear all music input errors
-function clearMusicInputErrors() {
-    const inputs = [songNameInput, artistNameInput];
-    inputs.forEach(input => {
-        if (input) {
-            input.classList.remove('error');
-            const errorElement = input.nextElementSibling;
-            if (errorElement && errorElement.classList.contains('error-message')) {
-                errorElement.style.display = 'none';
-            }
-        }
-    });
-}
-
-// Show error message
-function showError(message) {
-    console.error(message);
-    const errorElement = document.getElementById('photo-upload-error');
-    if (errorElement) {
-        errorElement.style.display = 'flex';
-        const errorText = errorElement.querySelector('span');
-        if (errorText) {
-            errorText.textContent = message;
-        }
-    }
-}
-
-// Show success message
-function showSuccess(message) {
-    console.log('Success:', message);
-    // Create or find success message element
-    let successElement = document.getElementById('success-message');
-    
-    if (!successElement) {
-        successElement = document.createElement('div');
-        successElement.id = 'success-message';
-        successElement.style.position = 'fixed';
-        successElement.style.top = '20px';
-        successElement.style.left = '50%';
-        successElement.style.transform = 'translateX(-50%)';
-        successElement.style.backgroundColor = '#4CAF50';
-        successElement.style.color = 'white';
-        successElement.style.padding = '15px 25px';
-        successElement.style.borderRadius = '4px';
-        successElement.style.zIndex = '1000';
-        successElement.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-        successElement.style.display = 'none';
-        document.body.appendChild(successElement);
-    }
-    
-    // Set message and show
-    successElement.textContent = message;
-    successElement.style.display = 'block';
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-        successElement.style.display = 'none';
-    }, 3000);
-}
-
-function clearPhotoUploadError() {
-    const errorElement = document.getElementById('photo-upload-error');
-    const dropZone = document.getElementById('drop-zone');
-    
-    if (errorElement) {
-        errorElement.style.display = 'none';
-        errorElement.style.visibility = 'hidden';
-        errorElement.style.opacity = '0';
-    }
-    
-    if (dropZone) {
-        dropZone.classList.remove('error');
-    }
 }
 
 // Update UI based on current step
@@ -552,17 +399,15 @@ function updateUIForStep(step) {
                 memoryNameInput.setSelectionRange(len, len);
             }
             break;
-            
+
         case 2:
             // Update photo grid if we have photos
             if (formData.photos && formData.photos.length > 0) {
                 renderPhotoGrid();
-                updateNextButton('next-to-music', true);
-            } else {
-                updateNextButton('next-to-music', false);
             }
+            updatePhotoContinueButtonState();
             break;
-            
+
         case 3:
             // Set focus on song name input
             if (songNameInput) {
@@ -589,7 +434,7 @@ function updateUIForStep(step) {
                 window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
             }
             break;
-            
+        
         case 4:
             // Update order summary
             updateOrderSummary();
@@ -631,6 +476,27 @@ function updateNextButton(buttonId, isEnabled) {
             button.classList.add('btn-disabled');
         }
     }
+}
+
+function updatePhotoContinueButtonState() {
+    const btn = document.getElementById('next-to-music');
+    if (!btn) return;
+
+    if (isUploading) {
+        btn.disabled = true;
+        btn.classList.add('btn-disabled');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading Photos...';
+        return;
+    }
+
+    const allUploaded = formData.photos.length > 0 && formData.photos.every(p => p.uploadStatus === 'uploaded');
+    btn.disabled = !allUploaded;
+    if (allUploaded) {
+        btn.classList.remove('btn-disabled');
+    } else {
+        btn.classList.add('btn-disabled');
+    }
+    btn.textContent = 'Continue';
 }
 
 // Validate customer details
@@ -690,6 +556,9 @@ async function handleFileSelect(e) {
         console.log('Files selected:', files.length);
         // Clear any existing error when new files are selected
         clearPhotoUploadError();
+
+        isUploading = true;
+        updatePhotoContinueButtonState();
 
         try {
             // Process the files and wait for completion
@@ -909,63 +778,19 @@ async function processFiles(files) {
     setLoading(true);
     updateProgress(0, files.length);
 
-    // Lock the Continue button until Cloudinary uploads are done
-    updateNextButton('next-to-music', false);
-
-    // Check total size
-    const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
-    const maxTotalSize = 120 * 1024 * 1024; // 120MB
-
-    // Format bytes to human-readable string
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    if (totalSize > maxTotalSize) {
-        const currentSize = formatFileSize(totalSize);
-        const maxSize = formatFileSize(maxTotalSize);
-        showError(`Total file size (${currentSize}) exceeds the maximum allowed (${maxSize}). Please upload fewer or smaller photos.`);
-        reenableFileInput();
-        return;
-    }
-
-    // Check for duplicate files
-    const existingHashes = new Set(formData.photos.map(photo => photo.fileFingerprint));
-    let duplicateCount = 0;
-    let processedCount = 0;
-    const fileArray = Array.from(files);
-    const totalFiles = fileArray.length;
-    let pendingUIUpdate = false;
-    let lastUpdateTime = 0;
-    let lastProgressUpdate = 0;
-
-    // Determine concurrency based on device type (mobile or desktop)
-    const isMobile = window.innerWidth <= 768; // Common breakpoint for mobile devices
-    // Mobile: 2-3 concurrent, Desktop: 4-6 concurrent based on device capabilities
-    const maxConcurrent = isMobile ?
-        Math.min(3, Math.max(2, navigator.hardwareConcurrency || 2)) : // Mobile: 2-3
-        Math.min(6, Math.max(4, navigator.hardwareConcurrency || 4)); // Desktop: 4-6
-
     // Process files with optimized concurrency control
     const processFilesOptimized = async (filesToProcess) => {
-        const results = [];
-        const processing = new Set();
         const newPhotos = [];
         let processed = 0;
 
-        // Process files with controlled concurrency
         const processFile = async (file) => {
-            // Check file type first (fast check before hashing)
+            // Check file type first
             if (!file.type.startsWith('image/')) {
                 console.log('Skipping non-image file:', file.name);
                 return { success: false, file, error: 'Not an image' };
             }
 
-            // Generate file fingerprint (quick hash based on name, size, and last modified)
+            // Generate file fingerprint
             const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
 
             // Check for duplicates
@@ -977,10 +802,10 @@ async function processFiles(files) {
             // Mark as processed
             existingHashes.add(fileFingerprint);
 
-            // Create object URL (this is the most expensive part)
+            // Create object URL
             const objectUrl = URL.createObjectURL(file);
 
-            // Create photo object
+            // Create photo object and add immediately so the UI shows "Uploading..."
             const photo = {
                 id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
                 previewUrl: objectUrl,
@@ -990,6 +815,11 @@ async function processFiles(files) {
                 fileFingerprint: fileFingerprint,
                 uploadStatus: 'uploading'
             };
+
+            formData.photos.push(photo);
+            newPhotos.push(photo);
+            renderPhotoGrid();
+            updatePhotoContinueButtonState();
 
             try {
                 const uploadResult = await uploadToCloudinary(file);
@@ -1001,27 +831,19 @@ async function processFiles(files) {
                 photo.uploadStatus = 'failed';
             }
 
-            // Add to results
+            renderPhotoGrid();
+            updatePhotoContinueButtonState();
+
             return { success: true, file, photo };
         };
 
-        // Process a batch of files
         const processBatch = async (batch) => {
             const batchPromises = batch.map(file =>
                 processFile(file).then(result => {
-                    if (result.success) {
-                        formData.photos.push(result.photo);
-                        newPhotos.push(result.photo);
-                    }
-
-                    // Update progress
                     processed++;
-
-                    // Update progress more efficiently (throttled)
                     if (processed % 2 === 0 || processed === filesToProcess.length) {
                         updateProgress(processed, filesToProcess.length);
                     }
-
                     return result;
                 })
             );
@@ -1029,7 +851,6 @@ async function processFiles(files) {
             return Promise.all(batchPromises);
         };
 
-        // Process files in batches with controlled concurrency
         const batchSize = maxConcurrent;
         for (let i = 0; i < filesToProcess.length; i += batchSize) {
             const batch = filesToProcess.slice(i, i + batchSize);
@@ -1039,622 +860,48 @@ async function processFiles(files) {
         return newPhotos;
     };
 
-    // Start processing files
     try {
-        // Process files in the background
-        (async () => {
-            try {
-                const newPhotos = await processFilesOptimized(validFiles);
+        const newPhotos = await processFilesOptimized(validFiles);
 
-                // After all files are uploaded and processed
-                if (window.leadTracker) {
-                    if (formData.photos.length > 0) {
-                        window.leadTracker.updateLead({
-                            imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
-                            photoCount: formData.photos.length,
-                            step: 'PHOTOS_UPLOADED'
-                        });
-                    }
-                }
-
-                if (newPhotos.length > 0) {
-                    showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
-                }
-
-                // Final UI updates after processing
-                renderPhotoGrid();
-                updatePhotoCounter();
-                updatePricingDisplay();
-
-                // Enable Continue only when all photos have permanent URLs
-                const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
-                if (!allPhotosUploaded && formData.photos.length > 0) {
-                    console.error('Some photos are missing permanentUrl; keeping Continue disabled. Upload statuses:', formData.photos.map(p => ({ name: p.name, uploadStatus: p.uploadStatus })));
-                    showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
-                }
-                updateNextButton('next-to-music', allPhotosUploaded);
-
-                saveToLocalStorage();
-            } catch (error) {
-                console.error('Error processing files:', error);
-                showError('An error occurred while processing your photos. Please try again.');
-            } finally {
-                // Clean up
-                setLoading(false);
-
-                // Re-enable file input by resetting it
-                const fileInput = document.getElementById('photo-upload');
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-            }
-        })();
-    } catch (error) {
-        console.error('Error processing files:', error);
-        showError('An error occurred while processing your photos. Please try again.');
-    } finally {
-        // Clean up
-        setLoading(false);
-        // Re-enable file input by resetting it
-        const fileInput = document.getElementById('photo-upload');
-        if (fileInput) {
-            fileInput.value = '';
+        if (duplicateCount > 0) {
+            showError(`You tried to upload ${duplicateCount} duplicate photos which were skipped.`);
         }
-    }
-}
 
-// Re-render the photo grid
-function updatePhotoGrid() {
-    const photoGrid = document.querySelector('.photo-grid');
-    if (!photoGrid) return;
-
-    // Clear existing content
-    photoGrid.innerHTML = '';
-
-    // Add photos to grid
-    formData.photos.forEach(photo => {
-        const photoItem = document.createElement('div');
-        photoItem.className = 'photo-item';
-        photoItem.innerHTML = `
-            <img src="${photo.previewUrl}" alt="${photo.name}">
-            <button class="remove-photo" onclick="removePhoto('${photo.id}')">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        photoGrid.appendChild(photoItem);
-    });
-}
-
-// Update photo counter with dynamic message
-function updatePhotoCounter() {
-    const photoCounter = document.getElementById('photo-counter');
-    if (!photoCounter) return;
-
-    const count = formData.photos.length;
-
-    let message = '';
-    if (count === 0) {
-        photoCounter.style.display = 'none';
-        return;
-    } else if (count === 1) {
-        message = '1 memory selected ✨ You\'re off to a beautiful start.';
-    } else if (count < 5) {
-        message = `${count} memories selected ✨ Keep them coming!`;
-    } else if (count < 10) {
-        message = `${count} memories selected ✨ What a wonderful collection!`;
-    } else {
-        message = `${count} memories selected ✨ This is truly special!`;
-    }
-
-    photoCounter.innerHTML = `
-        <div class="count">${message.split('✨')[0].trim()}</div>
-        <div class="message">✨ ${message.split('✨')[1].trim()}</div>
-    `;
-    photoCounter.style.display = 'block';
-}
-
-// Render photo grid with show more functionality
-function renderPhotoGrid() {
-    if (!photoGrid) return;
-
-    const showMoreBtn = document.getElementById('show-more-btn');
-    const maxVisiblePhotos = 6;
-    const totalPhotos = formData.photos.length;
-    let showAll = photoGrid.classList.contains('show-all');
-
-    if (totalPhotos === 0) {
-        photoGrid.innerHTML = '';
-        updatePhotoCounter();
-        if (showMoreBtn) showMoreBtn.style.display = 'none';
-        return;
-    }
-
-    // Determine how many photos to show
-    const photosToShow = showAll ? totalPhotos : Math.min(totalPhotos, maxVisiblePhotos);
-
-    // Render all photos but only show the limited set initially
-    photoGrid.innerHTML = formData.photos.map((photo, index) => `
-        <div class="photo-item" data-photo-id="${photo.id}" ${index >= maxVisiblePhotos && !showAll ? 'style="display:none;"' : ''}>
-            <img src="${photo.previewUrl}" alt="Uploaded memory" loading="lazy">
-            <button class="remove-photo" data-photo-id="${photo.id}" aria-label="Remove photo">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `).join('');
-
-    // Update show more button visibility
-    if (showMoreBtn) {
-        if (totalPhotos > maxVisiblePhotos) {
-            showMoreBtn.style.display = 'block';
-            showMoreBtn.textContent = showAll ? 'Show Less' : `Show ${totalPhotos - maxVisiblePhotos} More`;
-
-            // Toggle show all photos
-            showMoreBtn.onclick = () => {
-                const isShowingAll = photoGrid.classList.toggle('show-all');
-                showMoreBtn.textContent = isShowingAll ? 'Show Less' : `Show ${totalPhotos - maxVisiblePhotos} More`;
-
-                // Show/hide photos
-                const photoItems = photoGrid.querySelectorAll('.photo-item');
-                photoItems.forEach((item, index) => {
-                    if (index >= maxVisiblePhotos) {
-                        item.style.display = isShowingAll ? 'block' : 'none';
-                    }
+        if (window.leadTracker) {
+            if (formData.photos.length > 0) {
+                window.leadTracker.updateLead({
+                    imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
+                    photoCount: formData.photos.length,
+                    step: 'PHOTOS_UPLOADED'
                 });
-
-                // Toggle the limited class for the gradient effect
-                photoGrid.classList.toggle('limited', !isShowingAll);
-            };
-
-            // Apply limited class if not showing all
-            if (!showAll) {
-                photoGrid.classList.add('limited');
-            } else {
-                photoGrid.classList.remove('limited');
             }
-        } else {
-            showMoreBtn.style.display = 'none';
-            photoGrid.classList.remove('limited');
         }
-    }
 
-    // Add event listeners to remove buttons
-    document.querySelectorAll('.remove-photo').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const photoId = button.getAttribute('data-photo-id');
-            removePhoto(photoId);
-        });
-    });
-
-    // Update the photo counter
-    updatePhotoCounter();
-}
-
-// Remove a photo
-function removePhoto(photoId) {
-    // Find the photo to be removed and clean up its object URL
-    const photoToRemove = formData.photos.find(photo => photo.id === photoId);
-    if (photoToRemove && photoToRemove.previewUrl) {
-        URL.revokeObjectURL(photoToRemove.previewUrl);
-    }
-
-    // Remove the photo from the array
-    formData.photos = formData.photos.filter(photo => photo.id !== photoId);
-
-    // Update pricing
-    updatePricingDisplay();
-
-    // Save and update UI
-    saveToLocalStorage();
-    renderPhotoGrid();
-    const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
-    updateNextButton('next-to-music', allPhotosUploaded);
-    updateOrderSummary(); // Update the order summary after removing a photo
-}
-
-// Render music options
-function renderMusicOptions() {
-    if (!musicOptionsContainer) return;
-
-    musicOptionsContainer.innerHTML = musicOptions.map(music => `
-        <div class="music-option" data-music-id="${music.id}">
-            <div class="music-cover">
-                <i class="fas fa-music"></i>
-            </div>
-            <div class="music-info">
-                <div class="music-title">${music.title}</div>
-                <div class="music-duration">${music.duration}</div>
-            </div>
-            <button class="play-button" data-music-id="${music.id}" aria-label="Play ${music.title}">
-                <i class="fas fa-play"></i>
-            </button>
-        </div>
-    `).join('');
-
-    // Add event listeners to music options
-    document.querySelectorAll('.music-option').forEach(option => {
-        option.addEventListener('click', (e) => {
-            // Don't trigger if clicking the play button
-            if (e.target.closest('.play-button')) return;
-
-            const musicId = option.getAttribute('data-music-id');
-            selectMusic(musicId);
-        });
-    });
-
-    // Add event listeners to play buttons
-    document.querySelectorAll('.play-button').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const musicId = button.getAttribute('data-music-id');
-            toggleMusicPreview(musicId, button);
-        });
-    });
-}
-
-// Select music
-function selectMusic(musicId) {
-    // Update UI
-    document.querySelectorAll('.music-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-
-    const selectedOption = document.querySelector(`.music-option[data-music-id="${musicId}"]`);
-    if (selectedOption) {
-        selectedOption.classList.add('selected');
-    }
-
-    // Update form data
-    formData.music = musicId;
-    saveToLocalStorage();
-
-    // Enable next button
-    updateNextButton('next-to-checkout', true);
-}
-
-// Update music selection UI based on user choice
-function updateMusicSelectionUI() {
-    if (!teamChooseRadio || !chooseSongOption || !teamChooseOption) return;
-
-    const isTeamChoose = teamChooseRadio.checked;
-
-    // Update visual state
-    if (isTeamChoose) {
-        // For team choose option
-        chooseSongOption.classList.remove('selected');
-        teamChooseOption.classList.add('selected');
-        if (songSelectionForm) songSelectionForm.style.display = 'none';
-        if (teamChooseNote) teamChooseNote.style.display = 'block';
-    } else {
-        // For manual song selection
-        chooseSongOption.classList.add('selected');
-        teamChooseOption.classList.remove('selected');
-        if (songSelectionForm) songSelectionForm.style.display = 'block';
-        if (teamChooseNote) teamChooseNote.style.display = 'none';
-    }
-
-    // Update form data and validate
-    saveCurrentStep();
-
-    // Update button state
-    const nextButton = document.getElementById('next-to-checkout');
-    if (nextButton) {
-        nextButton.disabled = !(isTeamChoose || (songNameInput?.value.trim() && artistNameInput?.value.trim()));
-    }
-}
-
-// Update order summary
-function updateOrderSummary() {
-    const summaryName = document.getElementById('summary-name');
-    const summaryPhotoCount = document.getElementById('summary-photo-count');
-    const summaryMusic = document.getElementById('summary-music');
-    const summaryCurrency = document.getElementById('summary-currency');
-    
-    // Get currency symbol
-    const currencySymbol = CURRENCIES[formData.currency || 'ILS']?.symbol || '₪';
-    
-    // Update memory name
-    if (summaryName) {
-        summaryName.textContent = formData.memoryName || '-';
-    }
-
-    // Update photo count
-    const photoCount = formData.photos ? formData.photos.length : 0;
-    if (summaryPhotoCount) {
-        summaryPhotoCount.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-    }
-
-    // Update music selection
-    if (summaryMusic) {
-        if (formData.music && formData.music.songName && formData.music.artistName) {
-            summaryMusic.textContent = `${formData.music.songName} by ${formData.music.artistName}`;
-        } else if (formData.music && formData.music.teamChoose) {
-            summaryMusic.textContent = 'Our team will choose the perfect song';
-        } else {
-            summaryMusic.textContent = 'No music selected';
+        if (newPhotos.length > 0) {
+            showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
         }
-    }
-    
-    // Update currency display
-    if (summaryCurrency) {
-        const currencyName = CURRENCIES[formData.currency || 'ILS']?.name || 'Israeli Shekel';
-        summaryCurrency.textContent = `${formData.currency || 'ILS'} (${currencyName})`;
-    }
 
-    // Update the order total price with currency symbol
-    const orderTotalElement = document.getElementById('order-total-price');
-    if (orderTotalElement && formData.pricing) {
-        orderTotalElement.textContent = `${currencySymbol}${formData.pricing.totalPrice?.toFixed(2) || '0.00'}`;
-    }
-}
+        renderPhotoGrid();
+        updatePhotoCounter();
+        updatePricingDisplay();
+        updatePhotoContinueButtonState();
 
-// Complete purchase
-async function completePurchase() {
-    if (window.leadTracker) {
-        await window.leadTracker.updateLead({ step: 'PENDING_PAYMENT' }, true);
-    }
-    // Show loading state
-    const completeBtn = document.getElementById('complete-purchase');
-    const originalBtnText = completeBtn ? completeBtn.innerHTML : '';
-    
-    // Get the current currency information
-    const currency = formData.currency || 'ILS';
-    const currencySymbol = CURRENCIES[currency]?.symbol || '₪';
+        // Get DOM elements
+        const fileInput = document.getElementById('photo-upload');
+        const browseBtn = document.getElementById('browse-files');
+        const progressContainer = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressText = document.getElementById('upload-progress-text');
 
-    if (completeBtn) {
-        completeBtn.disabled = true;
-        completeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    }
+        if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) return;
 
-    try {
-        // Generate order ID using crypto.randomUUID if available, or fallback to timestamp
-        const orderId = typeof crypto !== 'undefined' && crypto.randomUUID 
-            ? `LP-${crypto.randomUUID()}` 
-            : `LP-${Date.now()}-${Math.floor(Math.random()*1e6)}`;
-
-        // Save order data to localStorage for the thank you page
-        const orderData = {
-            orderId: orderId,
-            date: new Date().toISOString(),
-            email: formData.customer?.email || '',
-            memoryName: formData.memoryName || 'My Memory',
-            photoCount: formData.photos?.length || 0,
-            items: formData.photos || [],
-            total: formData.pricing?.totalPrice || 0,
-            currency: currency,
-            currencySymbol: currencySymbol,
-            pricing: {
-                tier: formData.pricing?.currentTier || '1-5',
-                pricePerPhoto: formData.pricing?.pricePerPhoto || 0,
-                totalPrice: formData.pricing?.totalPrice || 0
-            },
-            customer: formData.customer || {}
+        // Function to trigger file input
+        const triggerFileInput = () => {
+            fileInput.click();
         };
 
-        localStorage.setItem('livingPictureOrder', JSON.stringify(orderData));
-
-        // Call Netlify function to create PayPlus payment
-        const functionUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
-            ? 'https://livingpicture.netlify.app/.netlify/functions/payplus-create-payment'
-            : '/.netlify/functions/payplus-create-payment';
-            
-        const response = await fetch(functionUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                amount: formData.pricing?.totalPrice || 0,
-                currency: currency,
-                leadId: window.leadTracker?.leadId || `lead_${Date.now()}`,
-                orderId: orderId
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.ok && result.paymentUrl) {
-            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
-                await window.leadTracker.trackStep('PENDING_PAYMENT', { orderId });
-            }
-            // Redirect to PayPlus payment page
-            window.location.href = result.paymentUrl;
-        } else {
-            throw new Error(result.error || 'Failed to create payment');
-        }
-    } catch (error) {
-        console.error('Payment error:', error);
-        
-        // Show error to user
-        if (typeof showError === 'function') {
-            showError('Payment processing failed. Please try again.');
-        } else {
-            alert('Payment processing failed. Please try again.');
-        }
-
-        // Restore button state
-        if (completeBtn) {
-            completeBtn.disabled = false;
-            completeBtn.innerHTML = originalBtnText;
-        }
-
-        // Optionally redirect to payment failed page
-        // window.location.href = 'payment-failed.html';
-    }
-}
-
-// Handle payment retry from payment-failed.html
-function retryPayment() {
-    // This function can be called from the payment-failed page
-    // to return to the checkout step
-    if (window.location.pathname.includes('payment-failed.html')) {
-        window.location.href = 'store.html#checkout';
-    }
-}
-
-// Show success modal
-function showSuccessModal() {
-    if (successModal) {
-        successModal.classList.add('active');
-    }
-}
-
-// Save current step data
-function saveCurrentStep() {
-    // Set validation attempted flag to true when trying to proceed
-    if (currentStep === 4) {
-        validationAttempted = true;
-    }
-    
-    switch (currentStep) {
-        case 1: {
-            const memoryName = memoryNameInput ? memoryNameInput.value.trim() : '';
-            formData.memoryName = memoryName;
-
-            // Validate memory name
-            if (!memoryName) {
-                // Show error message and highlight the input
-                if (memoryNameInput) {
-                    const formGroup = memoryNameInput.closest('.form-group');
-                    if (formGroup) {
-                        formGroup.classList.add('error');
-                        memoryNameInput.classList.add('error');
-
-                        // Create or update error message
-                        let errorElement = document.getElementById('memory-name-error');
-                        if (!errorElement) {
-                            errorElement = document.createElement('div');
-                            errorElement.id = 'memory-name-error';
-                            errorElement.className = 'error-message';
-                            // Insert after the form group
-                            formGroup.parentNode.insertBefore(errorElement, formGroup.nextSibling);
-                        }
-                        errorElement.textContent = 'Please enter a name for your memory';
-                        errorElement.style.display = 'block';
-                    }
-                }
-                return false;
-            } else {
-                // Remove error state if it exists
-                if (memoryNameInput) {
-                    const formGroup = memoryNameInput.closest('.form-group');
-                    if (formGroup) {
-                        formGroup.classList.remove('error');
-                        memoryNameInput.classList.remove('error');
-                        const errorElement = document.getElementById('memory-name-error');
-                        if (errorElement) {
-                            errorElement.remove();
-                        }
-                    }
-                }
-            }
-            break;
-        }
-        case 3: {
-            // Save music selection
-            if (selectSongRadio && selectSongRadio.checked) {
-                const songName = songNameInput ? songNameInput.value.trim() : '';
-                const artistName = artistNameInput ? artistNameInput.value.trim() : '';
-
-                // Validate the fields
-                if (!songName || !artistName) {
-                    validateMusicInputs();
-                    return false;
-                }
-
-                formData.music = {
-                    songName: songName,
-                    artistName: artistName,
-                    custom: true,
-                    teamChoose: false
-                };
-            } else if (teamChooseRadio && teamChooseRadio.checked) {
-                // Clear any existing errors when team choose is selected
-                clearMusicInputErrors();
-
-                formData.music = {
-                    songName: '',
-                    artistName: '',
-                    custom: false,
-                    teamChoose: true
-                };
-
-                // Enable the next button when team choose is selected
-                updateNextButton('next-to-checkout', true);
-            } else {
-                // If neither is selected (shouldn't happen with UI controls)
-                showError('Please select a music option');
-                return false;
-            }
-            break;
-        }
-        case 4: {
-            // Validate customer details
-            return validateCustomerDetails();
-        }
-    }
-
-    saveToLocalStorage();
-    return true;
-}
-
-// Save to local storage
-function saveToLocalStorage() {
-    formData.savedAt = new Date().toISOString();
-
-    // Create a copy of formData without the actual file data to save space
-    const dataToStore = {
-        memoryName: formData.memoryName,
-        photos: formData.photos.map(photo => ({
-            id: photo.id,
-            name: photo.name,
-            size: photo.size,
-            type: photo.file?.type || '',
-            permanentUrl: photo.permanentUrl,
-            publicId: photo.publicId,
-            uploadStatus: photo.uploadStatus
-        })),
-        music: formData.music,
-        customer: formData.customer,
-        pricing: formData.pricing,
-        currency: formData.currency || 'ILS',  // Ensure currency is saved
-        savedAt: formData.savedAt
-    };
-
-    try {
-        localStorage.setItem('memoryCreatorData', JSON.stringify(dataToStore));
-    } catch (e) {
-        console.warn('Could not save to local storage:', e);
-        // If we can't save, at least try to clear old data and save the most important info
-        if (e.name === 'QuotaExceededError') {
-            const minimalData = {
-                memoryName: formData.memoryName,
-                photoCount: formData.photos.length,
-                music: formData.music,
-                customer: formData.customer,
-                pricing: {
-                    tier: formData.pricing?.currentTier || '1-5',
-                    pricePerPhoto: formData.pricing?.pricePerPhoto || 20,
-                    totalPrice: formData.pricing?.totalPrice || 0,
-                    currency: formData.currency || 'ILS',
-                    currencySymbol: CURRENCIES[formData.currency || 'ILS']?.symbol || '₪'
-                },
-                timestamp: new Date().toISOString()
-            };
-            localStorage.setItem('memoryCreationData', JSON.stringify(minimalData));
-        }
-    }
-}
-
-// Load saved data
-function loadSavedData() {
-    try {
-        const savedData = localStorage.getItem('memoryCreatorData');
-        if (!savedData) return;
-
-        const parsedData = JSON.parse(savedData);
-
-        // Only load data that's less than 24 hours old
+        // Set up event listener for browse button
+        browseBtn.addEventListener('click', triggerFileInput);
         const savedAt = new Date(parsedData.savedAt);
         const now = new Date();
         const hoursDiff = Math.abs(now - savedAt) / 36e5;
@@ -1665,9 +912,8 @@ function loadSavedData() {
             formData.music = parsedData.music || null;
             formData.customer = parsedData.customer || null;
             formData.pricing = parsedData.pricing || null;
-            formData.currency = parsedData.currency || 'ILS';  // Load saved currency or default to ILS
             formData.savedAt = parsedData.savedAt;
-            
+
             // Update the current currency variable
             if (parsedData.currency && CURRENCIES[parsedData.currency]) {
                 currentCurrency = parsedData.currency;
@@ -1693,7 +939,7 @@ function loadSavedData() {
             if (parsedData.photos && parsedData.photos.length > 0) {
                 // Update pricing display with the loaded photo count
                 updatePricingDisplay();
-                updateNextButton('next-to-music', true);
+                // Do not update the next button state here
             }
 
             if (formData.music) {

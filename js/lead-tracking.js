@@ -12,26 +12,13 @@ class LeadTracker {
     }
 
     initialize() {
-        // Load or generate lead and session IDs
-        this.leadId = localStorage.getItem('lp_leadId');
-        this.sessionId = localStorage.getItem('lp_sessionId');
-        
-        // Generate new IDs if they don't exist
-        if (!this.leadId) {
-            this.leadId = `lead_${this.generateId()}`;
-            localStorage.setItem('lp_leadId', this.leadId);
-        }
-        
-        if (!this.sessionId) {
-            this.sessionId = `sess_${this.generateId()}`;
-            localStorage.setItem('lp_sessionId', this.sessionId);
-        }
+        // Always generate a fresh leadId + sessionId on each page load.
+        // This ensures every new visit/order attempt creates a NEW Leads row in Airtable.
+        this.leadId = `lead_${this.generateId()}`;
+        this.sessionId = `sess_${this.generateId()}`;
 
         const now = new Date().toISOString();
-        const createdAt = localStorage.getItem('lp_createdAt') || now;
-        if (!localStorage.getItem('lp_createdAt')) {
-            localStorage.setItem('lp_createdAt', createdAt);
-        }
+        const createdAt = now;
         
         // Initialize with default data
         this.leadData = {
@@ -56,7 +43,11 @@ class LeadTracker {
     }
 
     generateId() {
-        return Math.random().toString(36).substring(2, 15) + 
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+
+        return Math.random().toString(36).substring(2, 15) +
                Math.random().toString(36).substring(2, 15);
     }
 
