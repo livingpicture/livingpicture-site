@@ -634,6 +634,26 @@ input[type="text"]:focus + .input-underline {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.photo-upload-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 2;
+}
+
+.photo-upload-overlay--error {
+    background: rgba(185, 28, 28, 0.55);
+}
+
+.photo-item img {
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     -webkit-transform: translateZ(0);

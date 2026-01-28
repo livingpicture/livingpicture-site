@@ -96,7 +96,6 @@ function initStore() {
     // Top-left back button:
     // - If user is inside the multi-step flow (step > 1), go to previous step without leaving the page.
     // - If user is on step 1, navigate back home.
-    // Also: when running via file://, '/' is not a valid site root, so point to index.html.
     const topBackButton = document.querySelector('.back-button');
     if (topBackButton) {
         topBackButton.addEventListener('click', (e) => {
@@ -108,11 +107,7 @@ function initStore() {
             }
 
             // Step 1: leave store and go home
-            if (window.location.protocol === 'file:') {
-                window.location.href = 'index.html';
-            } else {
-                window.location.href = '/';
-            }
+            window.location.href = '/';
         });
     }
 
@@ -250,7 +245,7 @@ function setupEventListeners() {
             saveToLocalStorage();
             updateNextButton('next-to-photos', e.target.value.trim() !== '');
             if (window.leadTracker) {
-                window.leadTracker.updateLead({ memoryTitle: e.target.value, step: 'STORE_VIEW' });
+                window.leadTracker.updateLead({ memoryTitle: e.target.value });
             } else {
                 console.warn('leadTracker not available yet.');
             }
@@ -261,7 +256,7 @@ function setupEventListeners() {
             const value = (e?.target?.value || '').trim();
             if (!value) return;
             try {
-                await window.leadTracker.updateLead({ memoryTitle: value, step: 'STORE_VIEW' }, true);
+                await window.leadTracker.updateLead({ memoryTitle: value }, true);
             } catch (err) {
                 console.warn('Failed to commit memoryTitle to lead tracker:', err);
             }
@@ -611,7 +606,8 @@ function updateUIForStep(step) {
             // Update photo grid if we have photos
             if (formData.photos && formData.photos.length > 0) {
                 renderPhotoGrid();
-                updateNextButton('next-to-music', true);
+                const allPhotosUploaded = formData.photos.every(p => !!p.permanentUrl);
+                updateNextButton('next-to-music', allPhotosUploaded);
             } else {
                 updateNextButton('next-to-music', false);
             }
@@ -1165,10 +1161,17 @@ function updatePhotoGrid() {
 
     // Add photos to grid
     formData.photos.forEach(photo => {
+        const isUploading = !photo.permanentUrl && photo.uploadStatus === 'uploading';
+        const isFailed = photo.uploadStatus === 'failed';
+        const overlay = isUploading
+            ? '<div class="photo-upload-overlay">Uploading...</div>'
+            : (isFailed ? '<div class="photo-upload-overlay photo-upload-overlay--error">Upload failed</div>' : '');
+
         const photoItem = document.createElement('div');
         photoItem.className = 'photo-item';
         photoItem.innerHTML = `
             <img src="${photo.previewUrl}" alt="${photo.name}">
+            ${overlay}
             <button class="remove-photo" onclick="removePhoto('${photo.id}')">
                 <i class="fas fa-times"></i>
             </button>
@@ -1225,14 +1228,23 @@ function renderPhotoGrid() {
     const photosToShow = showAll ? totalPhotos : Math.min(totalPhotos, maxVisiblePhotos);
 
     // Render all photos but only show the limited set initially
-    photoGrid.innerHTML = formData.photos.map((photo, index) => `
+    photoGrid.innerHTML = formData.photos.map((photo, index) => {
+        const isUploading = !photo.permanentUrl && photo.uploadStatus === 'uploading';
+        const isFailed = photo.uploadStatus === 'failed';
+        const overlay = isUploading
+            ? '<div class="photo-upload-overlay">Uploading...</div>'
+            : (isFailed ? '<div class="photo-upload-overlay photo-upload-overlay--error">Upload failed</div>' : '');
+
+        return `
         <div class="photo-item" data-photo-id="${photo.id}" ${index >= maxVisiblePhotos && !showAll ? 'style="display:none;"' : ''}>
             <img src="${photo.previewUrl}" alt="Uploaded memory" loading="lazy">
+            ${overlay}
             <button class="remove-photo" data-photo-id="${photo.id}" aria-label="Remove photo">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Update show more button visibility
     if (showMoreBtn) {
