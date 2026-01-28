@@ -92,13 +92,31 @@ function initStore() {
     if (window.leadTracker && window.leadTracker.leadId) {
         formData.leadId = window.leadTracker.leadId;
     }
-    
+
+    // Top-left back button:
+    // - If user is inside the multi-step flow (step > 1), go to previous step without leaving the page.
+    // - If user is on step 1, navigate back home.
+    // Also: when running via file://, '/' is not a valid site root, so point to index.html.
+    const topBackButton = document.querySelector('.back-button');
+    if (topBackButton) {
+        if (window.location.protocol === 'file:') {
+            topBackButton.setAttribute('href', 'index.html');
+        }
+
+        topBackButton.addEventListener('click', (e) => {
+            if (currentStep && currentStep > 1) {
+                e.preventDefault();
+                showStep(currentStep - 1);
+            }
+        });
+    }
+
     // Set up event listeners
     setupEventListeners();
-    
+
     // Initialize the first step
     showStep(1);
-    
+
     // Render music options
     renderMusicOptions();
 }
@@ -1359,7 +1377,7 @@ function updateOrderSummary() {
     // Get currency symbol
     const currencyCode = formData.currency || 'ILS';
     const currencyMeta = CURRENCIES[currencyCode] || CURRENCIES['ILS'] || {};
-    const currencySymbol = currencyMeta.symbol || '';
+    const currencySymbol = currencyMeta.symbol || CURRENCIES['ILS']?.symbol || '₪';
     
     // Update memory name
     if (summaryName) {
