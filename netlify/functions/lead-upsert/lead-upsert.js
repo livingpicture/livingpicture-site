@@ -202,13 +202,17 @@ exports.handler = async (event, context) => {
             ? Number(totalAmount)
             : (pricingData && pricingData.total !== undefined ? Number(pricingData.total) : undefined);
 
+        const imageUrlsValue = Array.isArray(imageUrls)
+            ? imageUrls.filter(Boolean).join('\n')
+            : (typeof imageUrls === 'string' ? imageUrls : undefined);
+
         const airtableData = {
             leadId,
             updatedAt: updatedAt || new Date().toISOString(),
             memoryTitle,
             songChoice,
             photoCount,
-            imageUrls: Array.isArray(imageUrls) ? imageUrls : (typeof imageUrls === 'string' ? [imageUrls] : undefined),
+            imageUrls: imageUrlsValue,
             customerName,
             customerEmail,
             country,
