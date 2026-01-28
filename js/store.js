@@ -99,14 +99,19 @@ function initStore() {
     // Also: when running via file://, '/' is not a valid site root, so point to index.html.
     const topBackButton = document.querySelector('.back-button');
     if (topBackButton) {
-        if (window.location.protocol === 'file:') {
-            topBackButton.setAttribute('href', 'index.html');
-        }
-
         topBackButton.addEventListener('click', (e) => {
+            e.preventDefault();
+
             if (currentStep && currentStep > 1) {
-                e.preventDefault();
                 showStep(currentStep - 1);
+                return;
+            }
+
+            // Step 1: leave store and go home
+            if (window.location.protocol === 'file:') {
+                window.location.href = 'index.html';
+            } else {
+                window.location.href = '/';
             }
         });
     }
@@ -152,7 +157,7 @@ function setupEventListeners() {
     Object.keys(nextButtons).forEach(buttonId => {
         const button = document.getElementById(buttonId);
         if (button) {
-            button.addEventListener('click', (e) => {
+            button.addEventListener('click', async (e) => {
                 e.preventDefault();
                 if (buttonId === 'next-to-photos') {
                     console.log('Button clicked');
@@ -166,22 +171,26 @@ function setupEventListeners() {
 
                 // Commit step transitions immediately when user clicks Continue
                 if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
-                    if (buttonId === 'next-to-photos') {
-                        window.leadTracker.trackStep('STORE_VIEW', {
-                            memoryTitle: formData.memoryName || undefined
-                        });
-                    } else if (buttonId === 'next-to-music') {
-                        window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                            imageUrls: (formData.photos || []).map(p => p.permanentUrl).filter(Boolean),
-                            photoCount: (formData.photos || []).length
-                        });
-                    } else if (buttonId === 'next-to-checkout') {
-                        const songChoice = formData.music?.teamChoose
-                            ? 'team-choose'
-                            : (formData.music?.songName && formData.music?.artistName
-                                ? `${formData.music.songName} by ${formData.music.artistName}`
-                                : undefined);
-                        window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
+                    try {
+                        if (buttonId === 'next-to-photos') {
+                            await window.leadTracker.trackStep('STORE_VIEW', {
+                                memoryTitle: formData.memoryName || undefined
+                            });
+                        } else if (buttonId === 'next-to-music') {
+                            await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                                imageUrls: (formData.photos || []).map(p => p.permanentUrl).filter(Boolean),
+                                photoCount: (formData.photos || []).length
+                            });
+                        } else if (buttonId === 'next-to-checkout') {
+                            const songChoice = formData.music?.teamChoose
+                                ? 'team-choose'
+                                : (formData.music?.songName && formData.music?.artistName
+                                    ? `${formData.music.songName} by ${formData.music.artistName}`
+                                    : undefined);
+                            await window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
+                        }
+                    } catch (err) {
+                        console.warn('Failed to commit step transition to lead tracker:', err);
                     }
                 }
                 
