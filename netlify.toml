@@ -13,12 +13,6 @@
   node_bundler = "esbuild"
 
 [[redirects]]
-  from = "https://livingpicture.net/*"
-  to = "https://www.livingpicture.net/:splat"
-  status = 301
-  force = true
-
-[[redirects]]
   from = "/store"
   to = "/store.html"
   status = 200

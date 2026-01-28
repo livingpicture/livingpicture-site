@@ -170,22 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', handleFileUpload);
     
     // CTA button click handler removed as per request
-
-    // Ensure store CTA links work consistently across environments
-    const storeLinks = document.querySelectorAll('a[href="store.html"], a[href^="store.html#"], a[href^="/store"], a[href^="/store/"]');
-    storeLinks.forEach(link => {
-        const isFileProtocol = window.location.protocol === 'file:';
-        if (!isFileProtocol) {
-            link.setAttribute('href', '/store');
-        } else {
-            link.setAttribute('href', 'store.html');
-        }
-
-        link.addEventListener('click', () => {
-            // If the user clicked from the mobile nav, close it
-            closeMenu();
-        });
-    });
     
     // Add touch effect to buttons
     const buttons = document.querySelectorAll('button, a');

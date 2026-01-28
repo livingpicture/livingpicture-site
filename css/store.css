@@ -342,10 +342,6 @@ input[type="text"]:focus + .input-underline {
     background-color: rgba(239, 68, 68, 0.05);
 }
 
-.photo-upload-error.shake {
-    animation: shake 0.5s ease-in-out;
-}
-
 .photo-upload-error i {
     font-size: 1rem;
 }
