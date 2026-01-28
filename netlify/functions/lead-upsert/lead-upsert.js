@@ -198,18 +198,22 @@ exports.handler = async (event, context) => {
             pricingData = calculatePrice(photoCount, currency);
         }
 
+        const rawAmountValue = (totalAmount !== undefined && totalAmount !== null && totalAmount !== '')
+            ? Number(totalAmount)
+            : (pricingData && pricingData.total !== undefined ? Number(pricingData.total) : undefined);
+
         const airtableData = {
             leadId,
             updatedAt: updatedAt || new Date().toISOString(),
             memoryTitle,
             songChoice,
             photoCount,
-            imageUrls: Array.isArray(imageUrls) ? imageUrls.join(',') : (typeof imageUrls === 'string' ? imageUrls : undefined),
+            imageUrls: Array.isArray(imageUrls) ? imageUrls : (typeof imageUrls === 'string' ? [imageUrls] : undefined),
             customerName,
             customerEmail,
             country,
             currency,
-            totalAmount: totalAmount || (pricingData ? pricingData.total : undefined),
+            RawAmount: Number.isFinite(rawAmountValue) ? rawAmountValue : undefined,
             utmSource,
             utmCampaign,
             detectedCurrency,

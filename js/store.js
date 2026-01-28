@@ -163,6 +163,27 @@ function setupEventListeners() {
                 if (!saveCurrentStep()) {
                     return; // Don't proceed if validation fails
                 }
+
+                // Commit step transitions immediately when user clicks Continue
+                if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+                    if (buttonId === 'next-to-photos') {
+                        window.leadTracker.trackStep('STORE_VIEW', {
+                            memoryTitle: formData.memoryName || undefined
+                        });
+                    } else if (buttonId === 'next-to-music') {
+                        window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                            imageUrls: (formData.photos || []).map(p => p.permanentUrl).filter(Boolean),
+                            photoCount: (formData.photos || []).length
+                        });
+                    } else if (buttonId === 'next-to-checkout') {
+                        const songChoice = formData.music?.teamChoose
+                            ? 'team-choose'
+                            : (formData.music?.songName && formData.music?.artistName
+                                ? `${formData.music.songName} by ${formData.music.artistName}`
+                                : undefined);
+                        window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
+                    }
+                }
                 
                 if (nextStep === 'complete') {
                     completePurchase();
@@ -866,6 +887,7 @@ async function processFiles(files) {
 
     if (heicFiles.length > 0) {
         showError('HEIC/HEIF files are not supported. Please convert to JPG or PNG before uploading.');
+        reenableFileInput();
         return;
     }
 
@@ -1072,13 +1094,10 @@ async function processFiles(files) {
 
                 // After all files are uploaded and processed
                 if (window.leadTracker) {
-                    if (formData.photos.length > 0) {
-                        window.leadTracker.updateLead({
-                            imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
-                            photoCount: formData.photos.length,
-                            step: 'PHOTOS_UPLOADED'
-                        });
-                    }
+                    window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                        imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
+                        photoCount: formData.photos.length
+                    });
                 }
 
                 if (newPhotos.length > 0) {
