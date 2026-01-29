@@ -505,7 +505,7 @@ async function uploadToCloudinary(file) {
         size: file.size,
         type: file.type,
         folder: getCloudinaryFolderPath(),
-        preset: 'living-picture-preset'
+        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned'
     });
 
     const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
