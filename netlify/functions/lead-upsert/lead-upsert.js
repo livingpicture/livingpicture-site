@@ -157,6 +157,7 @@ exports.handler = async (event, context) => {
             songChoice,
             photoCount,
             imageUrls,
+            photosFolder,
             customerName,
             customerEmail,
             country,
@@ -188,6 +189,8 @@ exports.handler = async (event, context) => {
                 receivedData: {
                     hasLeadId: !!leadId,
                     hasStep: !!step,
+                    hasImageUrls: !!imageUrls,
+                    hasPhotosFolder: !!photosFolder,
                     otherFields: Object.keys(requestBody)
                 }
             });
@@ -206,6 +209,10 @@ exports.handler = async (event, context) => {
             ? imageUrls.filter(Boolean).join('\n')
             : (typeof imageUrls === 'string' ? imageUrls : undefined);
 
+        const photosFolderValue = (typeof photosFolder === 'string' && photosFolder.trim())
+            ? photosFolder.trim()
+            : undefined;
+
         const airtableData = {
             leadId,
             updatedAt: updatedAt || new Date().toISOString(),
@@ -213,6 +220,7 @@ exports.handler = async (event, context) => {
             songChoice,
             photoCount,
             imageUrls: imageUrlsValue,
+            PhotosFolder: photosFolderValue,
             customerName,
             customerEmail,
             country,

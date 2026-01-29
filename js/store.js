@@ -121,10 +121,22 @@ function initStore() {
     renderMusicOptions();
 }
 
+function getCloudinaryFolderPath() {
+    const leadId = formData.leadId || window.leadTracker?.leadId;
+    return leadId ? `living-picture/orders/${leadId}` : 'living-picture/orders/unknown';
+}
+
+function getCloudinaryConsoleFolderLink() {
+    const leadId = formData.leadId || window.leadTracker?.leadId;
+    const q = encodeURIComponent(leadId || '');
+    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/search?q=${q}`;
+}
+
 function handleCurrencyUpdate(newCurrency) {
     currentCurrency = newCurrency;
     formData.currency = newCurrency;
     updateAllPrices();
+
     document.querySelectorAll('.currency-dropdown').forEach(select => {
         select.value = newCurrency;
     });
@@ -172,11 +184,10 @@ function setupEventListeners() {
                                 memoryTitle: formData.memoryName || undefined
                             });
                         } else if (buttonId === 'next-to-music') {
-                            const imageUrlsArray = (formData.photos || []).map(p => p.permanentUrl).filter(Boolean);
-                            const imageUrls = imageUrlsArray.join(', ');
-                            console.log('PHOTOS_UPLOADED imageUrls:', imageUrls);
+                            const photosFolder = getCloudinaryConsoleFolderLink();
+                            console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
                             await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                                imageUrls,
+                                photosFolder,
                                 photoCount: (formData.photos || []).length
                             });
                         } else if (buttonId === 'next-to-checkout') {
@@ -380,7 +391,7 @@ function validatePhotoUpload() {
         }
         
         // Ensure the next button is disabled
-        updateNextButton('next-to-music', false);
+        updateContinueToMusicButtonState();
         
         return false;
     }
@@ -396,7 +407,7 @@ function validatePhotoUpload() {
     }
     
     // Enable the next button
-    updateNextButton('next-to-music', true);
+    updateContinueToMusicButtonState();
     return true;
 }
 
@@ -460,138 +471,6 @@ function showStep(stepNumber) {
     return true;
 }
 
-// Validate music inputs and show inline errors
-function validateMusicInputs() {
-    // If team choose is selected, always return true
-    if (teamChooseRadio && teamChooseRadio.checked) {
-        // Clear any existing errors
-        clearMusicInputErrors();
-        return true;
-    }
-    
-    // For manual song selection, validate both fields
-    const songName = songNameInput ? songNameInput.value.trim() : '';
-    const artistName = artistNameInput ? artistNameInput.value.trim() : '';
-    let isValid = true;
-    
-    // Clear previous errors
-    clearMusicInputErrors();
-    
-    // Validate song name
-    if (!songName) {
-        showInputError(songNameInput, 'Please enter a song name');
-        isValid = false;
-    }
-    
-    // Validate artist name
-    if (!artistName) {
-        showInputError(artistNameInput, 'Please enter an artist name');
-        isValid = false;
-    }
-    
-    // Update next button state
-    updateNextButton('next-to-checkout', isValid);
-    
-    return isValid;
-}
-
-// Show error for a specific input field
-function showInputError(inputElement, message) {
-    if (!inputElement) return;
-    
-    // Add error class to input
-    inputElement.classList.add('error');
-    
-    // Create or update error message
-    let errorElement = inputElement.nextElementSibling;
-    if (!errorElement || !errorElement.classList.contains('error-message')) {
-        errorElement = document.createElement('div');
-        errorElement.className = 'error-message';
-        inputElement.parentNode.insertBefore(errorElement, inputElement.nextSibling);
-    }
-    
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-    
-    // Scroll to the first error
-    inputElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-// Clear all music input errors
-function clearMusicInputErrors() {
-    const inputs = [songNameInput, artistNameInput];
-    inputs.forEach(input => {
-        if (input) {
-            input.classList.remove('error');
-            const errorElement = input.nextElementSibling;
-            if (errorElement && errorElement.classList.contains('error-message')) {
-                errorElement.style.display = 'none';
-            }
-        }
-    });
-}
-
-// Show error message
-function showError(message) {
-    console.error(message);
-    const errorElement = document.getElementById('photo-upload-error');
-    if (errorElement) {
-        errorElement.style.display = 'flex';
-        const errorText = errorElement.querySelector('span');
-        if (errorText) {
-            errorText.textContent = message;
-        }
-    }
-}
-
-// Show success message
-function showSuccess(message) {
-    console.log('Success:', message);
-    // Create or find success message element
-    let successElement = document.getElementById('success-message');
-    
-    if (!successElement) {
-        successElement = document.createElement('div');
-        successElement.id = 'success-message';
-        successElement.style.position = 'fixed';
-        successElement.style.top = '20px';
-        successElement.style.left = '50%';
-        successElement.style.transform = 'translateX(-50%)';
-        successElement.style.backgroundColor = '#4CAF50';
-        successElement.style.color = 'white';
-        successElement.style.padding = '15px 25px';
-        successElement.style.borderRadius = '4px';
-        successElement.style.zIndex = '1000';
-        successElement.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-        successElement.style.display = 'none';
-        document.body.appendChild(successElement);
-    }
-    
-    // Set message and show
-    successElement.textContent = message;
-    successElement.style.display = 'block';
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-        successElement.style.display = 'none';
-    }, 3000);
-}
-
-function clearPhotoUploadError() {
-    const errorElement = document.getElementById('photo-upload-error');
-    const dropZone = document.getElementById('drop-zone');
-    
-    if (errorElement) {
-        errorElement.style.display = 'none';
-        errorElement.style.visibility = 'hidden';
-        errorElement.style.opacity = '0';
-    }
-    
-    if (dropZone) {
-        dropZone.classList.remove('error');
-    }
-}
-
 // Update UI based on current step
 function updateUIForStep(step) {
     switch (step) {
@@ -609,10 +488,9 @@ function updateUIForStep(step) {
             // Update photo grid if we have photos
             if (formData.photos && formData.photos.length > 0) {
                 renderPhotoGrid();
-                const allPhotosUploaded = formData.photos.every(p => !!p.permanentUrl);
-                updateNextButton('next-to-music', allPhotosUploaded);
+                updateContinueToMusicButtonState();
             } else {
-                updateNextButton('next-to-music', false);
+                updateContinueToMusicButtonState();
             }
             break;
             
@@ -632,14 +510,8 @@ function updateUIForStep(step) {
                 updateNextButton('next-to-checkout', hasValidInput);
             }
 
-            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
-                const songChoice = (formData.music && formData.music.teamChoose)
-                    ? 'team-choose'
-                    : (formData.music && formData.music.songName && formData.music.artistName)
-                        ? `${formData.music.songName} by ${formData.music.artistName}`
-                        : undefined;
-
-                window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
+            if (window.leadTracker) {
+                window.leadTracker.updateLead({ songChoice: 'choose-song', step: 'SONG_SELECTED' });
             }
             break;
             
@@ -647,240 +519,11 @@ function updateUIForStep(step) {
             // Update order summary
             updateOrderSummary();
 
-            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+            if (window.leadTracker) {
                 window.leadTracker.trackStep('DETAILS_ENTERED');
             }
             break;
     }
-}
-
-// Validate the current step based on step number
-function validateCurrentStep(stepNumber) {
-    switch (stepNumber) {
-        case 1: // Name step
-            return formData.memoryName && formData.memoryName.trim() !== '';
-        case 2: // Photos step
-            return formData.photos && formData.photos.length > 0;
-        case 3: // Music step
-            if (teamChooseRadio && teamChooseRadio.checked) {
-                return true; // Team choose option is always valid
-            }
-            return !!(formData.music && formData.music.songName && formData.music.artistName);
-        case 4: // Customer details step
-            return validateCustomerDetails();
-        default:
-            return false;
-    }
-}
-
-// Update the next button state
-function updateNextButton(buttonId, isEnabled) {
-    const button = document.getElementById(buttonId);
-    if (button) {
-        button.disabled = !isEnabled;
-        if (isEnabled) {
-            button.classList.remove('btn-disabled');
-        } else {
-            button.classList.add('btn-disabled');
-        }
-    }
-}
-
-// Validate customer details
-function validateCustomerDetails() {
-    const name = document.getElementById('customer-name').value.trim();
-    const email = document.getElementById('customer-email').value.trim();
-    const country = document.getElementById('customer-country').value;
-    let isValid = true;
-
-    if (!name) {
-        showInputError(document.getElementById('customer-name'), 'Name is required');
-        isValid = false;
-    }
-
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-        showInputError(document.getElementById('customer-email'), 'A valid email is required');
-        isValid = false;
-    }
-
-    if (!country) {
-        showInputError(document.getElementById('customer-country'), 'Country is required');
-        isValid = false;
-    }
-
-    return isValid;
-}
-
-// Complete the purchase
-async function completePurchase() {
-    if (!validateCustomerDetails()) {
-        return;
-    }
-
-    // Update form data with customer details
-    formData.customer.name = document.getElementById('customer-name').value.trim();
-    formData.customer.email = document.getElementById('customer-email').value.trim();
-    formData.customer.country = document.getElementById('customer-country').value;
-    formData.customer.phone = document.getElementById('customer-phone').value.trim();
-
-    // Here you would typically integrate with a payment gateway
-    // For now, we'll just show a success message
-    showSuccess('Your order has been received!');
-
-    // Optionally, reset the form or redirect
-}
-
-// Handle file selection
-async function handleFileSelect(e) {
-    // Prevent default to handle everything ourselves
-    e.preventDefault();
-
-    // Get files from the event
-    const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-
-    // Process files if we have any
-    if (files && files.length > 0) {
-        console.log('Files selected:', files.length);
-        // Clear any existing error when new files are selected
-        clearPhotoUploadError();
-
-        try {
-            // Process the files and wait for completion
-            await processFiles(files);
-        } catch (error) {
-            console.error('Error in handleFileSelect:', error);
-            showError('Failed to process files. Please try again.');
-        }
-    } else {
-        // If no files were selected, validate to show error
-        validatePhotoUpload();
-    }
-}
-
-// Set up file upload handling with proper event delegation
-function setupFileUpload() {
-    // Get the file input and browse button
-    const fileInput = document.getElementById('photo-upload');
-    const browseBtn = document.getElementById('browse-files');
-
-    if (!fileInput || !browseBtn) return;
-
-    // Remove any existing event listeners by cloning the elements
-    const newInput = fileInput.cloneNode(true);
-    const newBrowseBtn = browseBtn.cloneNode(true);
-
-    // Replace the original elements with clones to remove existing listeners
-    if (fileInput.parentNode) {
-        fileInput.parentNode.replaceChild(newInput, fileInput);
-    }
-    if (browseBtn.parentNode) {
-        browseBtn.parentNode.replaceChild(newBrowseBtn, browseBtn);
-    }
-
-    // Handle click on browse button
-    newBrowseBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        newInput.click();
-    }, true); // Use capture phase to ensure we catch the event first
-
-    // Handle file selection
-    newInput.addEventListener('change', function (e) {
-        if (e.target.files && e.target.files.length > 0) {
-            handleFileSelect(e);
-            // Reset the input after handling
-            this.value = '';
-            // Stop any event propagation
-            e.stopPropagation();
-        }
-    }, true); // Use capture phase
-
-    // Prevent any other click handlers from interfering
-    newInput.addEventListener('click', function (e) {
-        e.stopPropagation();
-    }, true);
-}
-
-async function updatePricingDisplay() {
-    const photoCount = formData.photos.length;
-    const currency = currentCurrency;
-    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || '$';
-
-    const getTier = (count) => {
-        if (count >= 26) return '26+';
-        if (count >= 16) return '16-25';
-        if (count >= 6) return '6-15';
-        return '1-5';
-    };
-
-    const tier = getTier(photoCount);
-    const pricePerPhoto = PRICING[tier][currency];
-    const total = photoCount * pricePerPhoto;
-
-    // Update form data
-    formData.pricing = {
-        currentTier: tier,
-        pricePerPhoto: pricePerPhoto,
-        totalPrice: total,
-        currency: currency
-    };
-
-    // Update UI
-    const totalPriceElement = document.getElementById('total-price');
-    const photoCountText = document.getElementById('photo-count-text');
-    const priceDetails = document.getElementById('price-details');
-
-    if (totalPriceElement) {
-        totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
-    }
-
-    if (photoCountText) {
-        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
-    }
-
-    if (priceDetails) {
-        if (photoCount === 0) {
-            priceDetails.textContent = 'Add photos to see your price per photo';
-        } else {
-            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
-        }
-    }
-}
-
-// Generate a lightweight fingerprint for a file using metadata
-function generateFileFingerprint(file) {
-    // Use file name, size, and last modified time as a fingerprint
-    return `${file.name}-${file.size}-${file.lastModified}`;
-}
-
-async function uploadToCloudinary(file) {
-    const cloudName = window.CLOUDINARY_CLOUD_NAME || localStorage.getItem('CLOUDINARY_CLOUD_NAME');
-    const uploadPreset = window.CLOUDINARY_UPLOAD_PRESET || localStorage.getItem('CLOUDINARY_UPLOAD_PRESET');
-
-    if (!cloudName || !uploadPreset) {
-        throw new Error('Cloudinary is not configured');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: formData
-    });
-
-    if (!response.ok) {
-        let details = '';
-        try {
-            details = await response.text();
-        } catch (e) {
-            details = '';
-        }
-        throw new Error(`Cloudinary upload failed: ${response.status}${details ? ` | ${details}` : ''}`);
-    }
-
-    return response.json();
 }
 
 // Process selected files
@@ -964,7 +607,7 @@ async function processFiles(files) {
     updateProgress(0, files.length);
 
     // Lock the Continue button until Cloudinary uploads are done
-    updateNextButton('next-to-music', false);
+    updateContinueToMusicButtonState();
 
     // Check total size
     const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
@@ -1045,6 +688,12 @@ async function processFiles(files) {
                 uploadStatus: 'uploading'
             };
 
+            // Add immediately so UI can show uploading state
+            formData.photos.push(photo);
+            newPhotos.push(photo);
+            renderPhotoGrid();
+            updateContinueToMusicButtonState();
+
             try {
                 const uploadResult = await uploadToCloudinary(file);
                 photo.permanentUrl = uploadResult.secure_url;
@@ -1055,6 +704,9 @@ async function processFiles(files) {
                 photo.uploadStatus = 'failed';
             }
 
+            renderPhotoGrid();
+            updateContinueToMusicButtonState();
+
             // Add to results
             return { success: true, file, photo };
         };
@@ -1063,18 +715,10 @@ async function processFiles(files) {
         const processBatch = async (batch) => {
             const batchPromises = batch.map(file =>
                 processFile(file).then(result => {
-                    if (result.success) {
-                        formData.photos.push(result.photo);
-                        newPhotos.push(result.photo);
-                    }
-
-                    // Update progress
                     processed++;
 
-                    // Update progress more efficiently (throttled)
-                    if (processed % 2 === 0 || processed === filesToProcess.length) {
-                        updateProgress(processed, filesToProcess.length);
-                    }
+                    // Update progress
+                    updateProgress(processed, filesToProcess.length);
 
                     return result;
                 })
@@ -1102,11 +746,10 @@ async function processFiles(files) {
 
                 // After all files are uploaded and processed
                 if (window.leadTracker) {
-                    const imageUrlsArray = formData.photos.map(p => p.permanentUrl).filter(Boolean);
-                    const imageUrls = imageUrlsArray.join(', ');
-                    console.log('PHOTOS_UPLOADED imageUrls:', imageUrls);
+                    const photosFolder = getCloudinaryConsoleFolderLink();
+                    console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
                     await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                        imageUrls,
+                        photosFolder,
                         photoCount: formData.photos.length
                     });
                 }
@@ -1126,7 +769,7 @@ async function processFiles(files) {
                     console.error('Some photos are missing permanentUrl; keeping Continue disabled. Upload statuses:', formData.photos.map(p => ({ name: p.name, uploadStatus: p.uploadStatus })));
                     showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
                 }
-                updateNextButton('next-to-music', allPhotosUploaded);
+                updateContinueToMusicButtonState();
 
                 saveToLocalStorage();
             } catch (error) {
@@ -1167,14 +810,18 @@ function updatePhotoGrid() {
 
     // Add photos to grid
     formData.photos.forEach(photo => {
-        const isUploading = !photo.permanentUrl && photo.uploadStatus === 'uploading';
+        const isUploading = photo.uploadStatus === 'uploading';
         const isFailed = photo.uploadStatus === 'failed';
+        const isSuccess = photo.uploadStatus === 'uploaded';
+        const stateClass = isUploading ? 'is-uploading' : (isFailed ? 'is-error' : (isSuccess ? 'is-success' : ''));
         const overlay = isUploading
-            ? '<div class="photo-upload-overlay">Uploading...</div>'
-            : (isFailed ? '<div class="photo-upload-overlay photo-upload-overlay--error">Upload failed</div>' : '');
+            ? '<div class="photo-upload-overlay"><i class="fas fa-spinner fa-spin"></i></div>'
+            : (isFailed
+                ? `<div class="photo-upload-overlay photo-upload-overlay--error"><i class="fas fa-exclamation-triangle"></i><button class="photo-retry" data-photo-id="${photo.id}" type="button">Retry</button></div>`
+                : (isSuccess ? '<div class="photo-upload-badge photo-upload-badge--success"><i class="fas fa-check-circle"></i></div>' : ''));
 
         const photoItem = document.createElement('div');
-        photoItem.className = 'photo-item';
+        photoItem.className = `photo-item ${stateClass}`.trim();
         photoItem.innerHTML = `
             <img src="${photo.previewUrl}" alt="${photo.name}">
             ${overlay}
@@ -1183,6 +830,15 @@ function updatePhotoGrid() {
             </button>
         `;
         photoGrid.appendChild(photoItem);
+    });
+
+    photoGrid.querySelectorAll('.photo-retry').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const id = btn.getAttribute('data-photo-id');
+            retryPhotoUpload(id);
+        });
     });
 }
 
@@ -1235,14 +891,18 @@ function renderPhotoGrid() {
 
     // Render all photos but only show the limited set initially
     photoGrid.innerHTML = formData.photos.map((photo, index) => {
-        const isUploading = !photo.permanentUrl && photo.uploadStatus === 'uploading';
+        const isUploading = photo.uploadStatus === 'uploading';
         const isFailed = photo.uploadStatus === 'failed';
+        const isSuccess = photo.uploadStatus === 'uploaded';
+        const stateClass = isUploading ? 'is-uploading' : (isFailed ? 'is-error' : (isSuccess ? 'is-success' : ''));
         const overlay = isUploading
-            ? '<div class="photo-upload-overlay">Uploading...</div>'
-            : (isFailed ? '<div class="photo-upload-overlay photo-upload-overlay--error">Upload failed</div>' : '');
+            ? '<div class="photo-upload-overlay"><i class="fas fa-spinner fa-spin"></i></div>'
+            : (isFailed
+                ? `<div class="photo-upload-overlay photo-upload-overlay--error"><i class="fas fa-exclamation-triangle"></i><button class="photo-retry" data-photo-id="${photo.id}" type="button">Retry</button></div>`
+                : (isSuccess ? '<div class="photo-upload-badge photo-upload-badge--success"><i class="fas fa-check-circle"></i></div>' : ''));
 
         return `
-        <div class="photo-item" data-photo-id="${photo.id}" ${index >= maxVisiblePhotos && !showAll ? 'style="display:none;"' : ''}>
+        <div class="photo-item ${stateClass}" data-photo-id="${photo.id}" ${index >= maxVisiblePhotos && !showAll ? 'style="display:none;"' : ''}>
             <img src="${photo.previewUrl}" alt="Uploaded memory" loading="lazy">
             ${overlay}
             <button class="remove-photo" data-photo-id="${photo.id}" aria-label="Remove photo">
@@ -1296,8 +956,18 @@ function renderPhotoGrid() {
         });
     });
 
+    document.querySelectorAll('.photo-retry').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const photoId = button.getAttribute('data-photo-id');
+            retryPhotoUpload(photoId);
+        });
+    });
+
     // Update the photo counter
     updatePhotoCounter();
+    updateContinueToMusicButtonState();
 }
 
 // Remove a photo
@@ -1317,8 +987,7 @@ function removePhoto(photoId) {
     // Save and update UI
     saveToLocalStorage();
     renderPhotoGrid();
-    const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
-    updateNextButton('next-to-music', allPhotosUploaded);
+    updateContinueToMusicButtonState();
     updateOrderSummary(); // Update the order summary after removing a photo
 }
 
