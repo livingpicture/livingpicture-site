@@ -158,6 +158,63 @@ function updateAllPrices() {
     updateOrderSummary();
 }
 
+function updateNextButton(buttonId, isEnabled) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    button.disabled = !isEnabled;
+    if (isEnabled) {
+        button.classList.remove('btn-disabled');
+    } else {
+        button.classList.add('btn-disabled');
+    }
+}
+
+function updatePricingDisplay() {
+    const photoCount = formData.photos?.length || 0;
+    const currency = currentCurrency || formData.currency || 'ILS';
+    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+
+    const getTier = (count) => {
+        if (count >= 26) return '26+';
+        if (count >= 16) return '16-25';
+        if (count >= 6) return '6-15';
+        return '1-5';
+    };
+
+    const tier = getTier(photoCount);
+    const hasPricing = typeof PRICING !== 'undefined' && PRICING[tier] && PRICING[tier][currency] !== undefined;
+    const pricePerPhoto = hasPricing ? Number(PRICING[tier][currency]) : 0;
+    const total = photoCount * pricePerPhoto;
+
+    formData.currency = currency;
+    formData.pricing = {
+        currentTier: tier,
+        pricePerPhoto,
+        totalPrice: total,
+        currency
+    };
+
+    const totalPriceElement = document.getElementById('total-price');
+    const photoCountText = document.getElementById('photo-count-text');
+    const priceDetails = document.getElementById('price-details');
+
+    if (totalPriceElement) {
+        totalPriceElement.textContent = `${currencySymbol}${total.toFixed(2)}`;
+    }
+
+    if (photoCountText) {
+        photoCountText.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
+    }
+
+    if (priceDetails) {
+        if (photoCount === 0) {
+            priceDetails.textContent = 'Add photos to see your price per photo';
+        } else {
+            priceDetails.textContent = `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} • ${currencySymbol}${pricePerPhoto.toFixed(2)} each`;
+        }
+    }
+}
+
 // Set up all event listeners
 function setupEventListeners() {
     // Next step buttons
@@ -460,7 +517,7 @@ function showStep(stepNumber) {
     });
 
     // Validate the current step
-    validateCurrentStep(stepNumber);
+    if (!validateCurrentStep(stepNumber)) return;
 
     // Update current step
     currentStep = stepNumber;
@@ -469,6 +526,28 @@ function showStep(stepNumber) {
     updateUIForStep(stepNumber);
 
     return true;
+}
+
+function validateCurrentStep(stepNumber) {
+    switch (stepNumber) {
+        case 1:
+            return !!(formData.memoryName && formData.memoryName.trim());
+        case 2: {
+            const photos = formData.photos || [];
+            if (photos.length === 0) return false;
+            const allUploaded = photos.every(p => p.uploadStatus === 'uploaded');
+            return allUploaded;
+        }
+        case 3: {
+            // Team-choose is always valid. Otherwise require both song + artist.
+            if (formData.music?.teamChoose) return true;
+            return !!(formData.music?.songName && formData.music?.artistName);
+        }
+        case 4:
+            return typeof validateCustomerDetails === 'function' ? validateCustomerDetails() : true;
+        default:
+            return true;
+    }
 }
 
 // Update UI based on current step
@@ -1375,10 +1454,10 @@ function saveToLocalStorage() {
                 customer: formData.customer,
                 pricing: {
                     tier: formData.pricing?.currentTier || '1-5',
-                    pricePerPhoto: formData.pricing?.pricePerPhoto || 20,
+                    pricePerPhoto: formData.pricing?.pricePerPhoto || 0,
                     totalPrice: formData.pricing?.totalPrice || 0,
                     currency: formData.currency || 'ILS',
-                    currencySymbol: CURRENCIES[formData.currency || 'ILS']?.symbol || '₪'
+                    currencySymbol: CURRENCIES.find(c => c.code === (formData.currency || 'ILS'))?.symbol || '₪'
                 },
                 timestamp: new Date().toISOString()
             };
@@ -1410,7 +1489,7 @@ function loadSavedData() {
             formData.savedAt = parsedData.savedAt;
             
             // Update the current currency variable
-            if (parsedData.currency && CURRENCIES[parsedData.currency]) {
+            if (parsedData.currency && CURRENCIES.find(c => c.code === parsedData.currency)) {
                 currentCurrency = parsedData.currency;
             }
 
