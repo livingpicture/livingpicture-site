@@ -122,13 +122,17 @@ function initStore() {
 }
 
 function getCloudinaryFolderPath() {
-    const leadId = formData.leadId || window.leadTracker?.leadId;
-    return leadId ? `living-picture/orders/${leadId}` : 'living-picture/orders/unknown';
+    // Ensure we always have a leadId; fallback to generated one if missing
+    if (!formData.leadId) {
+        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+    return `living-picture/orders/${formData.leadId}`;
 }
 
 function getCloudinaryConsoleFolderLink() {
-    const leadId = formData.leadId || window.leadTracker?.leadId;
-    const q = encodeURIComponent(leadId || '');
+    const leadId = formData.leadId;
+    if (!leadId) return '';
+    const q = encodeURIComponent(leadId);
     return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/search?q=${q}`;
 }
 
@@ -337,7 +341,13 @@ function setupEventListeners() {
         if (!button) return;
         button.addEventListener('click', (e) => {
             e.preventDefault();
-            showStep(backButtons[buttonId]);
+            const targetStep = backButtons[buttonId];
+            // If we're on step 1 and back is clicked, go to home
+            if (currentStep === 1 && targetStep < 1) {
+                window.location.href = '/';
+            } else {
+                showStep(targetStep);
+            }
         });
     });
 
@@ -487,7 +497,7 @@ function updateUIForStep(step) {
 async function uploadToCloudinary(file) {
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
-    formDataToUpload.append('upload_preset', 'living-picture-preset');
+    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
     formDataToUpload.append('folder', getCloudinaryFolderPath());
 
     console.log('Uploading to Cloudinary:', {
