@@ -252,272 +252,136 @@ function setupFileUpload() {
     }, true);
 }
 
-// Set up all event listeners
+function validateMusicInputs() {
+    if (teamChooseRadio && teamChooseRadio.checked) {
+        updateNextButton('next-to-checkout', true);
+        return true;
+    }
+
+    const song = songNameInput ? songNameInput.value.trim() : '';
+    const artist = artistNameInput ? artistNameInput.value.trim() : '';
+    const isValid = !!(song && artist);
+    updateNextButton('next-to-checkout', isValid);
+    return isValid;
+}
+
+async function handleFileSelect(e) {
+    try {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        const files = e?.target?.files || e?.dataTransfer?.files;
+
+        if (!files || files.length === 0) {
+            if (typeof validatePhotoUpload === 'function') validatePhotoUpload();
+            return;
+        }
+
+        if (typeof clearPhotoUploadError === 'function') clearPhotoUploadError();
+        await processFiles(files);
+    } catch (error) {
+        console.error('Error in handleFileSelect:', error);
+        if (typeof showError === 'function') showError('Failed to process files. Please try again.');
+    }
+}
+
 function setupEventListeners() {
     // Next step buttons
     Object.keys(nextButtons).forEach(buttonId => {
         const button = document.getElementById(buttonId);
-        if (button) {
-            button.addEventListener('click', async (e) => {
-                e.preventDefault();
-                if (buttonId === 'next-to-photos') {
-                    console.log('Button clicked');
-                }
-                const nextStep = nextButtons[buttonId];
-                
-                // Save current step data and validate
-                if (!saveCurrentStep()) {
-                    return; // Don't proceed if validation fails
-                }
+        if (!button) return;
 
-                // Commit step transitions immediately when user clicks Continue
-                if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
-                    try {
-                        if (buttonId === 'next-to-photos') {
-                            await window.leadTracker.trackStep('STORE_VIEW', {
-                                memoryTitle: formData.memoryName || undefined
-                            });
-                        } else if (buttonId === 'next-to-music') {
-                            const photosFolder = getCloudinaryConsoleFolderLink();
-                            console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
-                            await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                                photosFolder,
-                                photoCount: (formData.photos || []).length
-                            });
-                        } else if (buttonId === 'next-to-checkout') {
-                            const songChoice = formData.music?.teamChoose
-                                ? 'team-choose'
-                                : (formData.music?.songName && formData.music?.artistName
-                                    ? `${formData.music.songName} by ${formData.music.artistName}`
-                                    : undefined);
-                            await window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
-                        }
-                    } catch (err) {
-                        console.warn('Failed to commit step transition to lead tracker:', err);
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const nextStep = nextButtons[buttonId];
+
+            if (typeof saveCurrentStep === 'function' && !saveCurrentStep()) return;
+
+            if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
+                try {
+                    if (buttonId === 'next-to-photos') {
+                        await window.leadTracker.trackStep('STORE_VIEW', {
+                            memoryTitle: formData.memoryName || undefined
+                        });
+                    } else if (buttonId === 'next-to-music') {
+                        const photosFolder = typeof getCloudinaryConsoleFolderLink === 'function'
+                            ? getCloudinaryConsoleFolderLink()
+                            : undefined;
+                        await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                            photosFolder,
+                            photoCount: (formData.photos || []).length
+                        });
+                    } else if (buttonId === 'next-to-checkout') {
+                        const songChoice = formData.music?.teamChoose
+                            ? 'team-choose'
+                            : (formData.music?.songName && formData.music?.artistName
+                                ? `${formData.music.songName} by ${formData.music.artistName}`
+                                : undefined);
+                        await window.leadTracker.trackStep('SONG_SELECTED', songChoice ? { songChoice } : {});
                     }
+                } catch (err) {
+                    console.warn('Failed to commit step transition to lead tracker:', err);
                 }
-                
-                if (nextStep === 'complete') {
-                    completePurchase();
-                } else {
-                    showStep(nextStep);
-                }
-            });
-        }
-    });
-    
-    // Add input event listeners for music step
-    if (songNameInput && artistNameInput) {
-        const musicInputs = [songNameInput, artistNameInput];
-        musicInputs.forEach(input => {
-            input.addEventListener('input', () => {
-                // Update form data on input
-                formData.music.songName = songNameInput.value.trim();
-                formData.music.artistName = artistNameInput.value.trim();
-                if (window.leadTracker) {
-                    window.leadTracker.updateLead({ songChoice: `${formData.music.songName} by ${formData.music.artistName}`, step: 'SONG_SELECTED' });
-                }
-                
-                // Enable/disable next button based on input
-                const hasValidInput = formData.music.songName && formData.music.artistName;
-                updateNextButton('next-to-checkout', hasValidInput);
-            });
-            
-            // Add focus/blur effects
-            input.addEventListener('focus', (e) => {
-                e.target.parentElement.classList.add('focused');
-            });
-            
-            input.addEventListener('blur', (e) => {
-                e.target.parentElement.classList.remove('focused');
-            });
+            }
+
+            if (nextStep === 'complete') {
+                if (typeof completePurchase === 'function') await completePurchase();
+                return;
+            }
+
+            showStep(nextStep);
         });
-    }
-    
+    });
+
     // Back buttons
     Object.keys(backButtons).forEach(buttonId => {
         const button = document.getElementById(buttonId);
-        if (button) {
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
-                const prevStep = backButtons[buttonId];
-                showStep(prevStep);
-            });
-        }
-    });
-    
-    // Memory name input
-    if (memoryNameInput) {
-        memoryNameInput.addEventListener('input', (e) => {
-            formData.memoryName = e.target.value;
-            saveToLocalStorage();
-            updateNextButton('next-to-photos', e.target.value.trim() !== '');
-            if (window.leadTracker) {
-                window.leadTracker.updateLead({ memoryTitle: e.target.value });
-            } else {
-                console.warn('leadTracker not available yet.');
-            }
+        if (!button) return;
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            showStep(backButtons[buttonId]);
         });
+    });
 
-        const commitMemoryTitle = async (e) => {
-            if (!window.leadTracker) return;
-            const value = (e?.target?.value || '').trim();
-            if (!value) return;
-            try {
-                await window.leadTracker.updateLead({ memoryTitle: value }, true);
-            } catch (err) {
-                console.warn('Failed to commit memoryTitle to lead tracker:', err);
-            }
-        };
+    // Music validation
+    if (songNameInput) songNameInput.addEventListener('input', validateMusicInputs);
+    if (artistNameInput) artistNameInput.addEventListener('input', validateMusicInputs);
 
-        memoryNameInput.addEventListener('blur', commitMemoryTitle);
-        memoryNameInput.addEventListener('change', commitMemoryTitle);
-    }
-    
-    // Initialize file upload handling after DOM is fully loaded
+    // File upload init
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', setupFileUpload);
     } else {
-        // DOM is already ready
         setTimeout(setupFileUpload, 0);
     }
-    
-    // Drag and drop for photos
+
+    // Drag & drop
     if (dropZone) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
         });
-        
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, highlight, false);
         });
-        
         ['dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, unhighlight, false);
         });
-        
         dropZone.addEventListener('drop', handleDrop, false);
     }
-    
-    // Close modal
+
+    // Modal close
     if (closeModalBtn) {
         closeModalBtn.addEventListener('click', () => {
-            successModal.classList.remove('active');
+            if (successModal) successModal.classList.remove('active');
         });
     }
-    
-    // Music selection options
-    chooseSongOption.addEventListener('click', () => {
-        selectSongRadio.checked = true;
-        updateMusicSelectionUI();
-    });
-    
-    teamChooseOption.addEventListener('click', () => {
-        teamChooseRadio.checked = true;
-        updateMusicSelectionUI();
-    });
-    
-    // Radio button changes
-    selectSongRadio.addEventListener('change', () => {
-        updateMusicSelectionUI();
-        if (window.leadTracker) {
-            window.leadTracker.updateLead({ songChoice: 'choose-song', step: 'SONG_SELECTED' });
-        }
-    });
-    teamChooseRadio.addEventListener('change', () => {
-        updateMusicSelectionUI();
-        if (window.leadTracker) {
-            window.leadTracker.updateLead({ songChoice: 'team-choose', step: 'SONG_SELECTED' });
-        }
-    });
-    
-    // Music input validation
-    songNameInput.addEventListener('input', validateMusicInputs);
-    artistNameInput.addEventListener('input', validateMusicInputs);
-}
-
-// Save data to local storage
-function saveToLocalStorage() {
-    try {
-        localStorage.setItem('formData', JSON.stringify(formData));
-    } catch (e) {
-        console.error('Could not save to local storage:', e);
-    }
-}
-
-// Validate photo upload
-function validatePhotoUpload() {
-    const dropZone = document.getElementById('drop-zone');
-    const errorElement = document.getElementById('photo-upload-error');
-    
-    // Check if there are any photos
-    const hasPhotos = formData.photos && formData.photos.length > 0;
-    
-    if (!hasPhotos) {
-        // Show error state
-        if (dropZone) {
-            dropZone.classList.add('error');
-            // Force reflow to ensure the animation plays
-            void dropZone.offsetWidth;
-        }
-        if (errorElement) {
-            // Update error message text
-            const errorText = errorElement.querySelector('span');
-            if (errorText) {
-                errorText.textContent = 'Please upload at least one photo to continue';
-            }
-            
-            // Make sure error is visible
-            errorElement.style.display = 'flex';
-            errorElement.style.visibility = 'visible';
-            errorElement.style.opacity = '1';
-            errorElement.style.position = 'static';
-            errorElement.style.marginTop = '1rem';
-            
-            // Log for debugging
-            console.log('Showing error message: Please upload at least one photo to continue');
-        }
-        
-        // Scroll to the upload area
-        const uploadArea = document.querySelector('.photo-upload-container');
-        if (uploadArea) {
-            uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        
-        // Ensure the next button is disabled
-        updateContinueToMusicButtonState();
-        
-        return false;
-    }
-    
-    // Clear error state if we have photos
-    if (dropZone) {
-        dropZone.classList.remove('error');
-    }
-    if (errorElement) {
-        errorElement.style.display = 'none';
-        errorElement.style.visibility = 'hidden';
-        errorElement.style.opacity = '0';
-    }
-    
-    // Enable the next button
-    updateContinueToMusicButtonState();
-    return true;
 }
 
 function showStep(stepNumber) {
-    // Hide all steps
     document.querySelectorAll('.store-step').forEach(step => {
         step.classList.remove('active');
     });
 
-    // Show the selected step
     const stepElement = document.getElementById(`step-${stepNumber}`);
-    if (stepElement) {
-        stepElement.classList.add('active');
-    }
+    if (stepElement) stepElement.classList.add('active');
 
-    // Update active state in progress steps
     document.querySelectorAll('.step').forEach(step => {
         if (parseInt(step.getAttribute('data-step')) === stepNumber) {
             step.classList.add('active');
@@ -526,42 +390,19 @@ function showStep(stepNumber) {
         }
     });
 
-    // Update progress bars
     const progress = (stepNumber / 4) * 100;
-
-    // Update desktop progress bar
     const desktopProgress = document.querySelector('.progress');
-    if (desktopProgress) {
-        desktopProgress.style.width = `${progress}%`;
-    }
-
-    // Update mobile progress bar
+    if (desktopProgress) desktopProgress.style.width = `${progress}%`;
     const mobileProgressBar = document.getElementById('mobile-progress-bar');
-    if (mobileProgressBar) {
-        mobileProgressBar.style.width = `${progress}%`;
-    }
-
-    // Update mobile step indicator
+    if (mobileProgressBar) mobileProgressBar.style.width = `${progress}%`;
     const currentStepElement = document.getElementById('current-step');
-    if (currentStepElement) {
-        currentStepElement.textContent = stepNumber;
-    }
+    if (currentStepElement) currentStepElement.textContent = stepNumber;
 
-    // Scroll to top of the step
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Validate the current step
     if (!validateCurrentStep(stepNumber)) return;
-
-    // Update current step
     currentStep = stepNumber;
-
-    // Update UI based on the current step
     updateUIForStep(stepNumber);
-
     return true;
 }
 
@@ -1086,6 +927,43 @@ function renderPhotoGrid() {
     updateContinueToMusicButtonState();
 }
 
+// Update the Continue to Music button state based on photo upload statuses
+function updateContinueToMusicButtonState() {
+    const continueBtn = document.getElementById('next-to-music');
+    if (!continueBtn) return;
+
+    const photos = formData.photos || [];
+    if (photos.length === 0) {
+        continueBtn.disabled = true;
+        continueBtn.textContent = 'Continue';
+        continueBtn.classList.add('btn-disabled');
+        return;
+    }
+
+    const uploadingCount = photos.filter(p => p.uploadStatus === 'uploading').length;
+    const failedCount = photos.filter(p => p.uploadStatus === 'error').length;
+    const uploadedCount = photos.filter(p => p.uploadStatus === 'uploaded').length;
+
+    if (uploadingCount > 0) {
+        continueBtn.disabled = true;
+        continueBtn.textContent = `Uploading ${uploadingCount}/${photos.length}...`;
+        continueBtn.classList.add('btn-disabled');
+    } else if (failedCount > 0) {
+        continueBtn.disabled = true;
+        continueBtn.textContent = `Fix ${failedCount} error${failedCount > 1 ? 's' : ''} to continue`;
+        continueBtn.classList.add('btn-disabled');
+    } else if (uploadedCount === photos.length) {
+        continueBtn.disabled = false;
+        continueBtn.textContent = 'Continue';
+        continueBtn.classList.remove('btn-disabled');
+    } else {
+        // Mixed or unknown state
+        continueBtn.disabled = true;
+        continueBtn.textContent = 'Processing...';
+        continueBtn.classList.add('btn-disabled');
+    }
+}
+
 // Remove a photo
 function removePhoto(photoId) {
     // Find the photo to be removed and clean up its object URL
@@ -1349,6 +1227,104 @@ function retryPayment() {
     }
 }
 
+// Show success message
+function showSuccess(message) {
+    // Simple implementation: you can replace with a toast/modal if desired
+    console.log('Success:', message);
+    // Optionally use a temporary UI element
+    const successEl = document.createElement('div');
+    successEl.className = 'alert alert-success';
+    successEl.textContent = message;
+    successEl.style.position = 'fixed';
+    successEl.style.top = '20px';
+    successEl.style.right = '20px';
+    successEl.style.zIndex = '9999';
+    successEl.style.padding = '12px 20px';
+    successEl.style.background = '#10b981';
+    successEl.style.color = 'white';
+    successEl.style.borderRadius = '6px';
+    successEl.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+    document.body.appendChild(successEl);
+    setTimeout(() => {
+        if (successEl.parentNode) {
+            successEl.parentNode.removeChild(successEl);
+        }
+    }, 4000);
+}
+
+// Show error message
+function showError(message) {
+    console.error('Error:', message);
+    // Optionally use a temporary UI element
+    const errorEl = document.createElement('div');
+    errorEl.className = 'alert alert-error';
+    errorEl.textContent = message;
+    errorEl.style.position = 'fixed';
+    errorEl.style.top = '20px';
+    errorEl.style.right = '20px';
+    errorEl.style.zIndex = '9999';
+    errorEl.style.padding = '12px 20px';
+    errorEl.style.background = '#ef4444';
+    errorEl.style.color = 'white';
+    errorEl.style.borderRadius = '6px';
+    errorEl.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+    document.body.appendChild(errorEl);
+    setTimeout(() => {
+        if (errorEl.parentNode) {
+            errorEl.parentNode.removeChild(errorEl);
+        }
+    }, 6000);
+}
+
+// Retry photo upload
+async function retryPhotoUpload(photoId) {
+    const photo = formData.photos.find(p => p.id === photoId);
+    if (!photo) {
+        console.error('Photo not found for retry:', photoId);
+        return;
+    }
+
+    // Reset status
+    photo.uploadStatus = 'uploading';
+    renderPhotoGrid();
+    updateContinueToMusicButtonState();
+
+    try {
+        // Re-upload to Cloudinary
+        const formDataToUpload = new FormData();
+        formDataToUpload.append('file', photo.file);
+        formDataToUpload.append('upload_preset', 'living-picture-preset');
+        formDataToUpload.append('folder', getCloudinaryFolderPath());
+
+        const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
+            method: 'POST',
+            body: formDataToUpload
+        });
+
+        if (!response.ok) {
+            throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Update photo with Cloudinary data
+        photo.permanentUrl = result.secure_url;
+        photo.publicId = result.public_id;
+        photo.uploadStatus = 'uploaded';
+
+        showSuccess('Photo uploaded successfully');
+    } catch (error) {
+        console.error('Retry upload failed for photo', photoId, error);
+        photo.uploadStatus = 'error';
+        showError('Failed to upload photo. Please try again.');
+    }
+
+    // Update UI
+    renderPhotoGrid();
+    updateContinueToMusicButtonState();
+    saveToLocalStorage();
+}
+
 // Show success modal
 function showSuccessModal() {
     if (successModal) {
@@ -1498,7 +1474,7 @@ function saveToLocalStorage() {
                 },
                 timestamp: new Date().toISOString()
             };
-            localStorage.setItem('memoryCreationData', JSON.stringify(minimalData));
+            localStorage.setItem('memoryCreatorData', JSON.stringify(minimalData));
         }
     }
 }
@@ -1536,7 +1512,9 @@ function loadSavedData() {
             } else {
                 formData.pricing = {
                     currentTier: PRICING_TIERS[0],
-                    totalPrice: 0
+                    pricePerPhoto: 0,
+                    totalPrice: 0,
+                    currency: formData.currency || 'ILS'
                 };
             }
 
@@ -1607,7 +1585,9 @@ function clearFormData() {
     };
     formData.pricing = {
         currentTier: PRICING_TIERS[0],
-        totalPrice: 0
+        pricePerPhoto: 0,
+        totalPrice: 0,
+        currency: formData.currency || 'ILS'
     };
     formData.savedAt = null;
 
