@@ -172,8 +172,11 @@ function setupEventListeners() {
                                 memoryTitle: formData.memoryName || undefined
                             });
                         } else if (buttonId === 'next-to-music') {
+                            const imageUrlsArray = (formData.photos || []).map(p => p.permanentUrl).filter(Boolean);
+                            const imageUrls = imageUrlsArray.join(', ');
+                            console.log('PHOTOS_UPLOADED imageUrls:', imageUrls);
                             await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                                imageUrls: (formData.photos || []).map(p => p.permanentUrl).filter(Boolean),
+                                imageUrls,
                                 photoCount: (formData.photos || []).length
                             });
                         } else if (buttonId === 'next-to-checkout') {
@@ -1099,8 +1102,11 @@ async function processFiles(files) {
 
                 // After all files are uploaded and processed
                 if (window.leadTracker) {
-                    window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                        imageUrls: formData.photos.map(p => p.permanentUrl).filter(Boolean),
+                    const imageUrlsArray = formData.photos.map(p => p.permanentUrl).filter(Boolean);
+                    const imageUrls = imageUrlsArray.join(', ');
+                    console.log('PHOTOS_UPLOADED imageUrls:', imageUrls);
+                    await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                        imageUrls,
                         photoCount: formData.photos.length
                     });
                 }
@@ -1416,8 +1422,8 @@ function updateOrderSummary() {
     
     // Get currency symbol
     const currencyCode = formData.currency || 'ILS';
-    const currencyMeta = CURRENCIES[currencyCode] || CURRENCIES['ILS'] || {};
-    const currencySymbol = currencyMeta.symbol || CURRENCIES['ILS']?.symbol || '₪';
+    const currencyMeta = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES.find(c => c.code === 'ILS') || {};
+    const currencySymbol = currencyMeta.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
     
     // Update memory name
     if (summaryName) {
@@ -1465,7 +1471,7 @@ async function completePurchase() {
     
     // Get the current currency information
     const currency = formData.currency || 'ILS';
-    const currencySymbol = CURRENCIES[currency]?.symbol || '₪';
+    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
 
     if (completeBtn) {
         completeBtn.disabled = true;
