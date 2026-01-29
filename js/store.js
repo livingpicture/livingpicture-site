@@ -215,6 +215,43 @@ function updatePricingDisplay() {
     }
 }
 
+function setupFileUpload() {
+    const fileInput = document.getElementById('photo-upload');
+    const browseBtn = document.getElementById('browse-files');
+
+    if (!fileInput || !browseBtn) return;
+
+    // Replace the elements with clones to clear any previously attached listeners
+    const newInput = fileInput.cloneNode(true);
+    const newBrowseBtn = browseBtn.cloneNode(true);
+
+    if (fileInput.parentNode) {
+        fileInput.parentNode.replaceChild(newInput, fileInput);
+    }
+    if (browseBtn.parentNode) {
+        browseBtn.parentNode.replaceChild(newBrowseBtn, browseBtn);
+    }
+
+    newBrowseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        newInput.click();
+    }, true);
+
+    newInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleFileSelect(e);
+            // reset input so selecting the same file again triggers change
+            e.target.value = '';
+        }
+        e.stopPropagation();
+    }, true);
+
+    newInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    }, true);
+}
+
 // Set up all event listeners
 function setupEventListeners() {
     // Next step buttons
