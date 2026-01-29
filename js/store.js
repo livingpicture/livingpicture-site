@@ -483,6 +483,53 @@ function updateUIForStep(step) {
     }
 }
 
+// Upload a single file to Cloudinary
+async function uploadToCloudinary(file) {
+    const formDataToUpload = new FormData();
+    formDataToUpload.append('file', file);
+    formDataToUpload.append('upload_preset', 'living-picture-preset');
+    formDataToUpload.append('folder', getCloudinaryFolderPath());
+
+    console.log('Uploading to Cloudinary:', {
+        file: file.name,
+        size: file.size,
+        type: file.type,
+        folder: getCloudinaryFolderPath(),
+        preset: 'living-picture-preset'
+    });
+
+    const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
+        method: 'POST',
+        body: formDataToUpload
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error('Cloudinary HTTP error:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errText
+        });
+        throw new Error(`Cloudinary upload failed: ${response.statusText} | ${errText}`);
+    }
+
+    const result = await response.json();
+    console.log('Cloudinary upload success:', {
+        public_id: result.public_id,
+        secure_url: result.secure_url,
+        format: result.format,
+        bytes: result.bytes
+    });
+
+    // Ensure required fields exist
+    if (!result.secure_url || !result.public_id) {
+        console.error('Cloudinary response missing required fields:', result);
+        throw new Error('Invalid Cloudinary response: missing secure_url or public_id');
+    }
+
+    return result;
+}
+
 // Process selected files
 async function processFiles(files) {
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];

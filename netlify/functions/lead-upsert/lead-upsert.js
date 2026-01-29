@@ -219,8 +219,7 @@ exports.handler = async (event, context) => {
             memoryTitle,
             songChoice,
             photoCount,
-            imageUrls: imageUrlsValue,
-            PhotosFolder: photosFolderValue,
+            imageUrls: photosFolderValue || imageUrlsValue, // Temporary: use existing field
             customerName,
             customerEmail,
             country,
