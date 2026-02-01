@@ -600,26 +600,26 @@ async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
     if (!formData.leadId) {
         formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        console.warn('Lead ID was missing during upload, using:', formData.leadId);
+        console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
     const folderPath = 'living-picture/leads/' + formData.leadId + '/';
     
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
-    // Try a different preset that might allow folder creation
-    formDataToUpload.append('upload_preset', 'ml_default');
-    // Temporarily comment out folder to test basic upload
-    // formDataToUpload.append('folder', folderPath);
+    // Use the original preset that should be whitelisted for unsigned uploads
+    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
+    // Re-enable folder parameter
+    formDataToUpload.append('folder', folderPath);
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
         size: file.size,
         type: file.type,
-        folder: folderPath, // Still showing for debugging
-        preset: 'ml_default',
+        folder: folderPath,
+        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
         leadId: formData.leadId,
-        note: 'Trying ml_default preset, folder disabled for testing'
+        note: 'Back to original preset, folder re-enabled'
     });
 
     try {
