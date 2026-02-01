@@ -607,17 +607,19 @@ async function uploadToCloudinary(file) {
     
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
-    // Use the correct upload preset
-    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
-    formDataToUpload.append('folder', folderPath);
+    // Try a different preset that might allow folder creation
+    formDataToUpload.append('upload_preset', 'ml_default');
+    // Temporarily comment out folder to test basic upload
+    // formDataToUpload.append('folder', folderPath);
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
         size: file.size,
         type: file.type,
-        folder: folderPath,
-        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
-        leadId: formData.leadId
+        folder: folderPath, // Still showing for debugging
+        preset: 'ml_default',
+        leadId: formData.leadId,
+        note: 'Trying ml_default preset, folder disabled for testing'
     });
 
     try {
