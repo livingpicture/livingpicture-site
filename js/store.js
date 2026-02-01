@@ -604,49 +604,62 @@ async function uploadToCloudinary(file) {
         console.warn('Lead ID was missing during upload, using:', formData.leadId);
     }
 
+    const folderPath = 'living-picture/leads/' + formData.leadId;
+    
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
-    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
-    formDataToUpload.append('folder', 'living-picture/leads/' + formData.leadId);
+    // Use a generic unsigned preset that allows folder creation
+    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_unsigned');
+    formDataToUpload.append('folder', folderPath);
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
         size: file.size,
         type: file.type,
-        folder: 'living-picture/leads/' + formData.leadId,
-        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned'
+        folder: folderPath,
+        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_unsigned',
+        leadId: formData.leadId
     });
 
-    const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
-        method: 'POST',
-        body: formDataToUpload
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        console.error('Cloudinary HTTP error:', {
-            status: response.status,
-            statusText: response.statusText,
-            body: errText
+    try {
+        const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
+            method: 'POST',
+            body: formDataToUpload
         });
-        throw new Error(`Cloudinary upload failed: ${response.statusText} | ${errText}`);
+
+        console.log('Cloudinary response status:', response.status);
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('Cloudinary HTTP error:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: errText,
+                folder: folderPath
+            });
+            throw new Error(`Cloudinary upload failed: ${response.statusText} | ${errText}`);
+        }
+
+        const result = await response.json();
+        console.log('Cloudinary upload success:', {
+            public_id: result.public_id,
+            secure_url: result.secure_url,
+            format: result.format,
+            bytes: result.bytes,
+            folder: result.folder || folderPath
+        });
+
+        // Ensure required fields exist
+        if (!result.secure_url || !result.public_id) {
+            console.error('Cloudinary response missing required fields:', result);
+            throw new Error('Invalid Cloudinary response: missing secure_url or public_id');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Upload failed for file:', file.name, error);
+        throw error;
     }
-
-    const result = await response.json();
-    console.log('Cloudinary upload success:', {
-        public_id: result.public_id,
-        secure_url: result.secure_url,
-        format: result.format,
-        bytes: result.bytes
-    });
-
-    // Ensure required fields exist
-    if (!result.secure_url || !result.public_id) {
-        console.error('Cloudinary response missing required fields:', result);
-        throw new Error('Invalid Cloudinary response: missing secure_url or public_id');
-    }
-
-    return result;
 }
 
 // Process selected files
