@@ -107,7 +107,12 @@ function initStore() {
             }
 
             // Step 1: leave store and go home
-            window.location.href = '/';
+            // Use index.html for local testing, root for production
+            if (window.location.protocol === 'file:') {
+                window.location.href = 'index.html';
+            } else {
+                window.location.href = '/';
+            }
         });
     }
 
@@ -126,7 +131,7 @@ function getCloudinaryFolderPath() {
     if (!formData.leadId) {
         formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
-    return `living-picture/orders/${formData.leadId}`;
+    return `living-picture/leads/${formData.leadId}`;
 }
 
 function getCloudinaryConsoleFolderLink() {
@@ -344,7 +349,12 @@ function setupEventListeners() {
             const targetStep = backButtons[buttonId];
             // If we're on step 1 and back is clicked, go to home
             if (currentStep === 1 && targetStep < 1) {
-                window.location.href = '/';
+                // Use index.html for local testing, root for production
+                if (window.location.protocol === 'file:') {
+                    window.location.href = 'index.html';
+                } else {
+                    window.location.href = '/';
+                }
             } else {
                 showStep(targetStep);
             }
@@ -354,6 +364,36 @@ function setupEventListeners() {
     // Music validation
     if (songNameInput) songNameInput.addEventListener('input', validateMusicInputs);
     if (artistNameInput) artistNameInput.addEventListener('input', validateMusicInputs);
+
+    // Music selection radio buttons
+    if (selectSongRadio) {
+        selectSongRadio.addEventListener('change', () => {
+            updateMusicSelectionUI();
+        });
+    }
+    if (teamChooseRadio) {
+        teamChooseRadio.addEventListener('change', () => {
+            updateMusicSelectionUI();
+        });
+    }
+
+    // Music selection option clicks (for better UX)
+    if (chooseSongOption) {
+        chooseSongOption.addEventListener('click', () => {
+            if (selectSongRadio) {
+                selectSongRadio.checked = true;
+                updateMusicSelectionUI();
+            }
+        });
+    }
+    if (teamChooseOption) {
+        teamChooseOption.addEventListener('click', () => {
+            if (teamChooseRadio) {
+                teamChooseRadio.checked = true;
+                updateMusicSelectionUI();
+            }
+        });
+    }
 
     // File upload init
     if (document.readyState === 'loading') {
@@ -477,6 +517,11 @@ function updateUIForStep(step) {
                 updateNextButton('next-to-checkout', hasValidInput);
             }
 
+            // Initialize music selection UI
+            if (typeof updateMusicSelectionUI === 'function') {
+                updateMusicSelectionUI();
+            }
+
             if (window.leadTracker) {
                 window.leadTracker.updateLead({ songChoice: 'choose-song', step: 'SONG_SELECTED' });
             }
@@ -495,16 +540,22 @@ function updateUIForStep(step) {
 
 // Upload a single file to Cloudinary
 async function uploadToCloudinary(file) {
+    // Ensure leadId is available before upload
+    if (!formData.leadId) {
+        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        console.warn('Lead ID was missing during upload, using:', formData.leadId);
+    }
+
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
     formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
-    formDataToUpload.append('folder', getCloudinaryFolderPath());
+    formDataToUpload.append('folder', 'living-picture/leads/' + formData.leadId);
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
         size: file.size,
         type: file.type,
-        folder: getCloudinaryFolderPath(),
+        folder: 'living-picture/leads/' + formData.leadId,
         preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned'
     });
 
@@ -542,6 +593,12 @@ async function uploadToCloudinary(file) {
 
 // Process selected files
 async function processFiles(files) {
+    // Ensure we have a valid leadId before any uploads start
+    if (!formData.leadId) {
+        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        console.log('Initialized leadId for uploads:', formData.leadId);
+    }
+
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const heicTypes = ['image/heic', 'image/heif', 'image/heif-sequence'];
 
@@ -760,12 +817,24 @@ async function processFiles(files) {
 
                 // After all files are uploaded and processed
                 if (window.leadTracker) {
-                    const photosFolder = getCloudinaryConsoleFolderLink();
-                    console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
-                    await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                        photosFolder,
-                        photoCount: formData.photos.length
-                    });
+                    // Check if at least one upload succeeded before sending photosFolder
+                    const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
+                    
+                    if (successfulUploads.length > 0) {
+                        const photosFolder = getCloudinaryConsoleFolderLink();
+                        console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
+                        console.log(`Successful uploads: ${successfulUploads.length}/${formData.photos.length}`);
+                        
+                        await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                            photosFolder,
+                            photoCount: successfulUploads.length
+                        });
+                    } else {
+                        console.warn('No successful uploads, skipping photosFolder tracking');
+                        await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                            photoCount: 0
+                        });
+                    }
                 }
 
                 if (newPhotos.length > 0) {
@@ -1115,12 +1184,20 @@ function updateMusicSelectionUI() {
         teamChooseOption.classList.add('selected');
         if (songSelectionForm) songSelectionForm.style.display = 'none';
         if (teamChooseNote) teamChooseNote.style.display = 'block';
+        
+        // Update form data for team choose
+        formData.music.teamChoose = true;
+        formData.music.songName = '';
+        formData.music.artistName = '';
     } else {
         // For manual song selection
         chooseSongOption.classList.add('selected');
         teamChooseOption.classList.remove('selected');
         if (songSelectionForm) songSelectionForm.style.display = 'block';
         if (teamChooseNote) teamChooseNote.style.display = 'none';
+        
+        // Update form data for manual selection
+        formData.music.teamChoose = false;
     }
 
     // Update form data and validate
