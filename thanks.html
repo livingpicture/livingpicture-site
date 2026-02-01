@@ -269,6 +269,92 @@
         const orderNumber = 'LP-' + Math.floor(100000 + Math.random() * 900000);
         document.getElementById('order-number').textContent = orderNumber;
         
+        // TODO: Implement lead-to-order migration after successful payment
+        // This should be called when payment is confirmed successful
+        async function handlePaymentSuccess() {
+            try {
+                // Get order data from localStorage (saved during checkout)
+                const orderData = JSON.parse(localStorage.getItem('livingPictureOrder') || '{}');
+                const leadId = orderData.leadId || window.leadTracker?.leadId;
+                
+                if (leadId) {
+                    console.log(`Payment successful - initiating lead-to-order migration for ${leadId}`);
+                    
+                    // Call the migration function (this would be implemented via cloud function)
+                    await migrateLeadToOrder(leadId);
+                    
+                    // Update order status
+                    if (window.leadTracker) {
+                        await window.leadTracker.trackStep('PAYMENT_SUCCESS', { 
+                            leadId, 
+                            orderId: orderData.orderId,
+                            orderNumber: orderNumber 
+                        });
+                    }
+                    
+                    console.log(`Successfully migrated lead ${leadId} to order`);
+                } else {
+                    console.warn('No leadId found for migration');
+                }
+            } catch (error) {
+                console.error('Failed to migrate lead to order:', error);
+                // Don't show error to user, just log it
+            }
+        }
+        
+        // Placeholder for migration function - should be implemented via cloud function
+        async function migrateLeadToOrder(leadId) {
+            /*
+             * This function should be implemented as a Netlify function or cloud function
+             * that uses the Cloudinary Admin API to move folders from leads/ to orders/
+             * 
+             * Example implementation in a Netlify function:
+             * 
+             * const cloudinary = require('cloudinary').v2;
+             * cloudinary.config({
+             *   cloud_name: 'dojuekij4',
+             *   api_key: process.env.CLOUDINARY_API_KEY,
+             *   api_secret: process.env.CLOUDINARY_API_SECRET
+             * });
+             * 
+             * exports.handler = async (event) => {
+             *   const { leadId } = JSON.parse(event.body);
+             *   
+             *   try {
+             *     await cloudinary.api.rename_folder(
+             *       `living-picture/leads/${leadId}`,
+             *       `living-picture/orders/${leadId}`
+             *     );
+             *     
+             *     return {
+             *       statusCode: 200,
+             *       body: JSON.stringify({ success: true })
+             *     };
+             *   } catch (error) {
+             *     return {
+             *       statusCode: 500,
+             *       body: JSON.stringify({ error: error.message })
+             *     };
+             *   }
+             * };
+             */
+            
+            console.log(`TODO: Implement cloud function to migrate lead ${leadId} to orders directory`);
+            
+            // For now, just track the migration intent
+            if (typeof window.leadTracker !== 'undefined') {
+                await window.leadTracker.trackStep('LEAD_MIGRATED_TO_ORDER', { leadId });
+            }
+            
+            return Promise.resolve();
+        }
+        
+        // Trigger migration on page load (assuming payment was successful)
+        window.addEventListener('DOMContentLoaded', () => {
+            // Add a small delay to ensure all tracking is loaded
+            setTimeout(handlePaymentSuccess, 1000);
+        });
+        
         // You can add more dynamic content here based on the order details
         // For example, from URL parameters or localStorage
     </script>

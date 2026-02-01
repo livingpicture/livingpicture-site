@@ -137,8 +137,66 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    const q = encodeURIComponent(leadId);
+    // Search specifically in the leads directory for better organization
+    const q = encodeURIComponent(`living-picture/leads/${leadId}`);
     return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/search?q=${q}`;
+}
+
+// TODO: Implement lead-to-order migration after successful payment
+// This function should be called in the payment success callback
+async function migrateLeadToOrder(leadId) {
+    /*
+     * Implementation options:
+     * 1. Use Cloudinary Admin API to move/rename folder from leads/ to orders/
+     * 2. Duplicate folder contents to orders/ and optionally clean up leads/ later
+     * 3. Update folder metadata to mark as converted order
+     * 
+     * Required Cloudinary Admin API endpoints:
+     * - POST /admin/folders/rename (to move folder)
+     * - POST /admin/assets/rename (to move assets if needed)
+     * 
+     * Example implementation:
+     * 
+     * const cloudinary = require('cloudinary').v2;
+     * cloudinary.config({
+     *   cloud_name: 'dojuekij4',
+     *   api_key: 'your_admin_api_key',
+     *   api_secret: 'your_admin_api_secret'
+     * });
+     * 
+     * try {
+     *   await cloudinary.api.rename_folder(
+     *     `living-picture/leads/${leadId}`,
+     *     `living-picture/orders/${leadId}`
+     *   );
+     *   console.log(`Successfully migrated lead ${leadId} to order`);
+     * } catch (error) {
+     *   console.error(`Failed to migrate lead ${leadId}:`, error);
+     *   throw error;
+     * }
+     */
+    
+    console.log(`TODO: Migrate lead ${leadId} to orders directory after payment success`);
+    
+    // For now, just log the migration intent
+    if (window.leadTracker) {
+        await window.leadTracker.trackStep('LEAD_MIGRATED_TO_ORDER', { leadId });
+    }
+    
+    return Promise.resolve();
+}
+
+// Helper function to get orders folder path (for post-payment use)
+function getOrdersFolderPath(leadId) {
+    const targetLeadId = leadId || formData.leadId;
+    if (!targetLeadId) return '';
+    return `living-picture/orders/${targetLeadId}`;
+}
+
+// Helper function to check if lead has been converted to order
+function isLeadConvertedToOrder() {
+    // This could be stored in localStorage, formData, or checked via API
+    return formData.orderStatus === 'completed' || formData.isConvertedOrder === true;
 }
 
 function handleCurrencyUpdate(newCurrency) {
