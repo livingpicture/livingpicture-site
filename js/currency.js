@@ -81,7 +81,7 @@ function formatPrice(amount, currency) {
 function createCurrencyDropdown(currentCurrency, className = '') {
     return `
         <div class="currency-selector ${className}">
-            <select class="currency-dropdown" aria-label="Select currency">
+            <select class="currency-dropdown" id="currency-selector" aria-label="Select currency">
                 ${CURRENCIES.map(currency => 
                     `<option value="${currency.code}" ${currentCurrency === currency.code ? 'selected' : ''}>
                         ${currency.code} (${currency.symbol})

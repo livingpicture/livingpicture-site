@@ -137,9 +137,8 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Search specifically in the leads directory for better organization
-    const q = encodeURIComponent(`living-picture/leads/${leadId}`);
-    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/search?q=${q}`;
+    // Direct link to the leads folder
+    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/living-picture/leads/${leadId}`;
 }
 
 // TODO: Implement lead-to-order migration after successful payment
@@ -604,12 +603,12 @@ async function uploadToCloudinary(file) {
         console.warn('Lead ID was missing during upload, using:', formData.leadId);
     }
 
-    const folderPath = 'living-picture/leads/' + formData.leadId;
+    const folderPath = 'living-picture/leads/' + formData.leadId + '/';
     
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
-    // Use a generic unsigned preset that allows folder creation
-    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_unsigned');
+    // Use the correct upload preset
+    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
     formDataToUpload.append('folder', folderPath);
 
     console.log('Uploading to Cloudinary:', {
@@ -617,7 +616,7 @@ async function uploadToCloudinary(file) {
         size: file.size,
         type: file.type,
         folder: folderPath,
-        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_unsigned',
+        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
         leadId: formData.leadId
     });
 
