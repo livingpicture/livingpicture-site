@@ -152,6 +152,7 @@ exports.handler = async (event, context) => {
         // Extract and validate required fields
         const {
             leadId,
+            persistentUserId,
             step,
             memoryTitle,
             songChoice,
@@ -215,6 +216,7 @@ exports.handler = async (event, context) => {
 
         const airtableData = {
             leadId,
+            persistentUserId,
             updatedAt: updatedAt || new Date().toISOString(),
             memoryTitle,
             songChoice,

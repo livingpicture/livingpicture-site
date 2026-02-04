@@ -93,26 +93,12 @@ function initStore() {
         formData.leadId = window.leadTracker.leadId;
     }
 
-    // Top-left back button:
-    // - If user is inside the multi-step flow (step > 1), go to previous step without leaving the page.
-    // - If user is on step 1, navigate back home.
+    // Top-left back button: Always navigate to home page
     const topBackButton = document.querySelector('.back-button');
     if (topBackButton) {
         topBackButton.addEventListener('click', (e) => {
             e.preventDefault();
-
-            if (currentStep && currentStep > 1) {
-                showStep(currentStep - 1);
-                return;
-            }
-
-            // Step 1: leave store and go home
-            // Use index.html for local testing, root for production
-            if (window.location.protocol === 'file:') {
-                window.location.href = 'index.html';
-            } else {
-                window.location.href = '/';
-            }
+            window.location.href = 'index.html';
         });
     }
 
@@ -137,8 +123,8 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Use search with folder: syntax
-    return `https://console.cloudinary.com/app/c-73acfd08b3303cefc38086c17c07f4/assets/media_library/search?q=folder%3Dlivingpicture%2Fleads%2F${leadId}&view_mode=mosaic`;
+    // Use folder search URL for direct access
+    return `https://console.cloudinary.com/app/c-73acfd08b3303cefc38086c17c07f4/assets/media_library/folders/search?q=${encodeURIComponent('livingpicture/leads/' + leadId)}`;
 }
 
 // TODO: Implement lead-to-order migration after successful payment
@@ -206,6 +192,14 @@ function handleCurrencyUpdate(newCurrency) {
     document.querySelectorAll('.currency-dropdown').forEach(select => {
         select.value = newCurrency;
     });
+    
+    // Track selectedCurrency change in leadTracker
+    if (window.leadTracker) {
+        window.leadTracker.updateLead({
+            selectedCurrency: newCurrency,
+            currency: newCurrency
+        });
+    }
 }
 
 document.addEventListener('currencyLoaded', (e) => {

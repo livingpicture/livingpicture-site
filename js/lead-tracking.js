@@ -2,6 +2,7 @@ class LeadTracker {
     constructor() {
         this.leadId = null;
         this.sessionId = null;
+        this.persistentUserId = null;
         this.pendingUpdate = null;
         this.isUpdating = false;
         this.retryCount = 0;
@@ -12,6 +13,13 @@ class LeadTracker {
     }
 
     initialize() {
+        // Check localStorage for persistentUserId, create if doesn't exist
+        this.persistentUserId = localStorage.getItem('persistentUserId');
+        if (!this.persistentUserId) {
+            this.persistentUserId = `user_${this.generateId()}`;
+            localStorage.setItem('persistentUserId', this.persistentUserId);
+        }
+        
         // Always generate a fresh leadId + sessionId on each page load.
         // This ensures every new visit/order attempt creates a NEW Leads row in Airtable.
         this.leadId = `lead_${this.generateId()}`;
@@ -20,15 +28,23 @@ class LeadTracker {
         const now = new Date().toISOString();
         const createdAt = now;
         
+        // Detect currency based on geo/browser (stored when first detected)
+        const detectedCurrency = localStorage.getItem('detectedCurrency') || this.detectCurrencyFromBrowser();
+        // Selected currency is what user chose in dropdown
+        const selectedCurrency = localStorage.getItem('preferredCurrency') || detectedCurrency;
+        
         // Initialize with default data
         this.leadData = {
             leadId: this.leadId,
+            persistentUserId: this.persistentUserId,
             createdAt: createdAt,
             updatedAt: now,
             sessionId: this.sessionId,
             step: 'STORE_VIEW',
             country: this.getUserCountry(),
-            currency: localStorage.getItem('preferredCurrency') || 'ILS',
+            detectedCurrency: detectedCurrency,
+            selectedCurrency: selectedCurrency,
+            currency: selectedCurrency,
             userAgent: navigator.userAgent,
             screenResolution: `${window.screen.width}x${window.screen.height}`,
             referrer: document.referrer || 'direct',
@@ -40,6 +56,33 @@ class LeadTracker {
         };
 
         Object.keys(this.leadData).forEach(key => this.leadData[key] === undefined && delete this.leadData[key]);
+    }
+    
+    detectCurrencyFromBrowser() {
+        // Try to detect currency from browser locale
+        try {
+            const locale = navigator.language || navigator.userLanguage || 'he-IL';
+            const country = locale.split('-')[1]?.toUpperCase() || 'IL';
+            
+            // Map countries to currencies
+            const countryCurrencyMap = {
+                'IL': 'ILS',
+                'US': 'USD',
+                'GB': 'USD',
+                'EU': 'EUR',
+                'DE': 'EUR',
+                'FR': 'EUR',
+                'IT': 'EUR',
+                'ES': 'EUR',
+                'RU': 'RUB'
+            };
+            
+            const detected = countryCurrencyMap[country] || 'ILS';
+            localStorage.setItem('detectedCurrency', detected);
+            return detected;
+        } catch (e) {
+            return 'ILS';
+        }
     }
 
     generateId() {
