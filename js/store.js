@@ -137,9 +137,9 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Cloudinary Media Library folder URL with encoded path
-    const folderPath = encodeURIComponent(`livingpicture/leads/${leadId}`);
-    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/search?q=folder%3A${folderPath}`;
+    // Return folder path - Cloudinary uses internal folder IDs for URLs which we can't construct
+    // This path tells you where to find the photos: Media Library > livingpicture > leads > {leadId}
+    return `livingpicture/leads/${leadId}`;
 }
 
 // TODO: Implement lead-to-order migration after successful payment
