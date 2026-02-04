@@ -1,4 +1,12 @@
 const Airtable = require('airtable');
+const cloudinary = require('cloudinary').v2;
+
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dojuekij4',
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 function createResponse(statusCode, body) {
     return {
@@ -6,6 +14,56 @@ function createResponse(statusCode, body) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     };
+}
+
+// Migrate photos from leads folder to orders folder in Cloudinary
+async function migratePhotosToOrdersFolder(leadId, orderId) {
+    const sourceFolder = `livingpicture/leads/${leadId}`;
+    const targetFolder = `livingpicture/orders/${orderId}`;
+    
+    console.log(`Migrating photos from ${sourceFolder} to ${targetFolder}`);
+    
+    try {
+        // Get all assets in the leads folder
+        const result = await cloudinary.search
+            .expression(`folder:${sourceFolder}`)
+            .max_results(100)
+            .execute();
+        
+        if (!result.resources || result.resources.length === 0) {
+            console.log(`No photos found in ${sourceFolder}`);
+            return { success: true, migratedCount: 0, newFolder: targetFolder };
+        }
+        
+        console.log(`Found ${result.resources.length} photos to migrate`);
+        
+        // Move each asset to the orders folder
+        const migratedUrls = [];
+        for (const asset of result.resources) {
+            const oldPublicId = asset.public_id;
+            const fileName = oldPublicId.split('/').pop();
+            const newPublicId = `${targetFolder}/${fileName}`;
+            
+            try {
+                // Rename (move) the asset to the new folder
+                const renameResult = await cloudinary.uploader.rename(oldPublicId, newPublicId);
+                migratedUrls.push(renameResult.secure_url);
+                console.log(`Migrated: ${oldPublicId} -> ${newPublicId}`);
+            } catch (renameError) {
+                console.error(`Failed to migrate ${oldPublicId}:`, renameError.message);
+            }
+        }
+        
+        return {
+            success: true,
+            migratedCount: migratedUrls.length,
+            newFolder: targetFolder,
+            imageUrls: migratedUrls
+        };
+    } catch (error) {
+        console.error('Error migrating photos:', error);
+        return { success: false, error: error.message };
+    }
 }
 
 exports.handler = async (event, context) => {
@@ -84,37 +142,64 @@ exports.handler = async (event, context) => {
         }
     }
 
-    const orderFields = {
-        orderId: metadata.orderId || `ord_${transaction.uuid}`,
-        createdAt: now,
-        paymentstatus: 'PAID',
-        customerEmail: data.customer?.email || leadRecord.customerEmail,
-        customerName: data.customer?.name || leadRecord.customerName,
-        country: data.customer?.country_iso || leadRecord.country,
-        memoryTitle: leadRecord.memoryTitle || metadata.memoryTitle,
-        songChoice: leadRecord.songChoice || metadata.songChoice,
-        photoCount: Number(leadRecord.photoCount || metadata.photoCount) || undefined,
-        packageKey: leadRecord.packageKey || metadata.packageKey,
-        imageUrls: leadRecord.imageUrls || metadata.imageUrls,
-        transactionId: transaction.uuid,
-        paymentProvider: 'PayPlus',
-        paymentStatusRaw: JSON.stringify(data),
-        'Customer (link)': [],
-        currency: transaction.currency,
-        totalAmount: Number(transaction.amount_in_cents) / 100,
-        payplusPaymentLink: data.payment_page_link,
-        paidAt: now,
-        fulfillmentStatus: 'PAID',
-        leadId: leadId,
-        detectedCurrency: leadRecord.detectedCurrency || metadata.detectedCurrency,
-        selectedCurrency: leadRecord.selectedCurrency || metadata.selectedCurrency,
-        // No 'notes' field in the user request, so it is omitted.
-    };
-
     try {
+        const orderId = metadata.orderId || `ord_${transaction.uuid}`;
+        
+        // Migrate photos from leads folder to orders folder in Cloudinary
+        let migrationResult = { success: false, migratedCount: 0 };
+        if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+            migrationResult = await migratePhotosToOrdersFolder(leadId, orderId);
+            console.log('Photo migration result:', migrationResult);
+        } else {
+            console.warn('Cloudinary credentials not configured, skipping photo migration');
+        }
+        
+        // Update imageUrls with migrated URLs if migration was successful
+        const finalImageUrls = migrationResult.success && migrationResult.imageUrls?.length > 0
+            ? migrationResult.imageUrls.join('\n')
+            : (leadRecord.imageUrls || metadata.imageUrls);
+        
+        // Update photosFolder to point to orders folder
+        const photosFolder = migrationResult.success 
+            ? `livingpicture/orders/${orderId}`
+            : (leadRecord.imageUrls || metadata.imageUrls);
+        
+        const orderFields = {
+            orderId: orderId,
+            createdAt: now,
+            paymentstatus: 'PAID',
+            customerEmail: data.customer?.email || leadRecord.customerEmail,
+            customerName: data.customer?.name || leadRecord.customerName,
+            country: data.customer?.country_iso || leadRecord.country,
+            memoryTitle: leadRecord.memoryTitle || metadata.memoryTitle,
+            songChoice: leadRecord.songChoice || metadata.songChoice,
+            photoCount: Number(leadRecord.photoCount || metadata.photoCount) || undefined,
+            packageKey: leadRecord.packageKey || metadata.packageKey,
+            imageUrls: photosFolder,
+            transactionId: transaction.uuid,
+            paymentProvider: 'PayPlus',
+            paymentStatusRaw: JSON.stringify(data),
+            'Customer (link)': [],
+            currency: transaction.currency,
+            totalAmount: Number(transaction.amount_in_cents) / 100,
+            payplusPaymentLink: data.payment_page_link,
+            paidAt: now,
+            fulfillmentStatus: 'PAID',
+            leadId: leadId,
+            detectedCurrency: leadRecord.detectedCurrency || metadata.detectedCurrency,
+            selectedCurrency: leadRecord.selectedCurrency || metadata.selectedCurrency,
+        };
+        
         const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
         console.log('Successfully created order in Airtable:', createdRecord[0].id);
-        return createResponse(200, { ok: true, message: 'Order created successfully', orderId: createdRecord[0].id });
+        
+        return createResponse(200, { 
+            ok: true, 
+            message: 'Order created successfully', 
+            orderId: createdRecord[0].id,
+            photosMigrated: migrationResult.migratedCount || 0,
+            photosFolder: photosFolder
+        });
     } catch (error) {
         console.error('Error creating order record in Airtable:', error);
         return createResponse(500, { ok: false, error: 'Airtable Error', message: error.message });
