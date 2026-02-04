@@ -1,0 +1,9 @@
+{
+  "name": "payplus-callback",
+  "version": "1.0.0",
+  "description": "PayPlus payment callback handler with Cloudinary migration",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "cloudinary": "^1.41.0"
+  }
+}
