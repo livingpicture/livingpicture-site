@@ -1,0 +1,9 @@
+{
+  "name": "lead-upsert",
+  "version": "1.0.0",
+  "description": "Lead upsert function with Cloudinary folder migration for post-payment workflow",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "cloudinary": "^1.41.0"
+  }
+}
