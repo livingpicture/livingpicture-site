@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "airtable": "^0.12.2"
+    "airtable": "^0.12.2",
+    "cloudinary": "^2.9.0"
   }
 }
