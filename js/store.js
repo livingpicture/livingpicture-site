@@ -897,12 +897,16 @@ async function processFiles(files) {
                     const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
                     
                     if (successfulUploads.length > 0) {
-                        const photosFolder = getCloudinaryConsoleFolderLink();
-                        console.log('PHOTOS_UPLOADED photosFolder:', photosFolder);
+                        // Send folder path and first image URL for easy access
+                        const folderPath = getCloudinaryFolderPath();
+                        const firstImageUrl = successfulUploads[0]?.permanentUrl || '';
+                        console.log('PHOTOS_UPLOADED folderPath:', folderPath);
+                        console.log('PHOTOS_UPLOADED firstImageUrl:', firstImageUrl);
                         console.log(`Successful uploads: ${successfulUploads.length}/${formData.photos.length}`);
                         
                         await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                            photosFolder,
+                            photosFolder: folderPath,
+                            imageUrls: firstImageUrl,
                             photoCount: successfulUploads.length
                         });
                     } else {
