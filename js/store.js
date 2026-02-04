@@ -131,14 +131,14 @@ function getCloudinaryFolderPath() {
     if (!formData.leadId) {
         formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
-    return `living-picture/leads/${formData.leadId}`;
+    return 'livingpicture/leads/' + formData.leadId;
 }
 
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Direct link to the leads folder
-    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/living-picture/leads/${leadId}`;
+    // Direct link to the leads folder (exact match, no trailing slash)
+    return `https://console.cloudinary.com/console/c-dojuekij4/media_library/folders/livingpicture/leads/${leadId}`;
 }
 
 // TODO: Implement lead-to-order migration after successful payment
@@ -165,8 +165,8 @@ async function migrateLeadToOrder(leadId) {
      * 
      * try {
      *   await cloudinary.api.rename_folder(
-     *     `living-picture/leads/${leadId}`,
-     *     `living-picture/orders/${leadId}`
+     *     `livingpicture/leads/${leadId}`,
+     *     `livingpicture/orders/${leadId}`
      *   );
      *   console.log(`Successfully migrated lead ${leadId} to order`);
      * } catch (error) {
@@ -189,7 +189,7 @@ async function migrateLeadToOrder(leadId) {
 function getOrdersFolderPath(leadId) {
     const targetLeadId = leadId || formData.leadId;
     if (!targetLeadId) return '';
-    return `living-picture/orders/${targetLeadId}`;
+    return 'livingpicture/orders/' + targetLeadId;
 }
 
 // Helper function to check if lead has been converted to order
@@ -591,10 +591,6 @@ function updateUIForStep(step) {
             if (window.leadTracker) {
                 window.leadTracker.trackStep('DETAILS_ENTERED');
             }
-            break;
-    }
-}
-
 // Upload a single file to Cloudinary
 async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
@@ -603,23 +599,27 @@ async function uploadToCloudinary(file) {
         console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
-    const folderPath = 'living-picture/leads/' + formData.leadId + '/';
+    const folderPath = getCloudinaryFolderPath();
     
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', file);
     // Use the original preset that should be whitelisted for unsigned uploads
     formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
-    // Re-enable folder parameter
+    // Try folder parameter to override preset default
     formDataToUpload.append('folder', folderPath);
+    // Use public_id for consistent naming
+    const publicId = folderPath + '/' + file.name.split('.')[0];
+    formDataToUpload.append('public_id', publicId);
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
         size: file.size,
         type: file.type,
+        publicId: publicId,
         folder: folderPath,
         preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
         leadId: formData.leadId,
-        note: 'Back to original preset, folder re-enabled'
+        note: 'Using both folder and public_id to override preset default'
     });
 
     try {
@@ -1499,7 +1499,7 @@ async function retryPhotoUpload(photoId) {
         // Re-upload to Cloudinary
         const formDataToUpload = new FormData();
         formDataToUpload.append('file', photo.file);
-        formDataToUpload.append('upload_preset', 'living-picture-preset');
+        formDataToUpload.append('upload_preset', 'livingpicture-preset');
         formDataToUpload.append('folder', getCloudinaryFolderPath());
 
         const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
@@ -2085,3 +2085,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
+}
