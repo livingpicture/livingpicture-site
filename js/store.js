@@ -591,6 +591,10 @@ function updateUIForStep(step) {
             if (window.leadTracker) {
                 window.leadTracker.trackStep('DETAILS_ENTERED');
             }
+            break;
+    }
+}
+
 // Upload a single file to Cloudinary
 async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
@@ -2085,6 +2089,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
-
-}
-}
