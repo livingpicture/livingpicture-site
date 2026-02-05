@@ -62,7 +62,7 @@ function calculatePrice(photoCount, currency) {
 
 // Generate Cloudinary console folder search URL
 function getCloudinaryFolderUrl(folderPath) {
-    return `https://console.cloudinary.com/console/c-${CLOUDINARY_CLOUD_ID}/media_library/folders/search?q=${encodeURIComponent(folderPath)}`;
+    return `https://console.cloudinary.com/app/${CLOUDINARY_CLOUD_ID}/assets/media_library/folders/search?q=${encodeURIComponent(folderPath)}`;
 }
 
 // Migrate photos from leads folder to orders folder in Cloudinary using rename_folder
