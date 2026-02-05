@@ -123,8 +123,8 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Use folder search URL for direct access
-    return `https://console.cloudinary.com/app/c-73acfd08b3303cefc38086c17c07f4/assets/media_library/folders/search?q=${encodeURIComponent('livingpicture/leads/' + leadId)}`;
+    // Use folder search URL for direct access with cloud name
+    return `https://console.cloudinary.com/app/dojuekij4/assets/media_library/folders/search?q=${encodeURIComponent('livingpicture/leads/' + leadId)}`;
 }
 
 // TODO: Implement lead-to-order migration after successful payment
