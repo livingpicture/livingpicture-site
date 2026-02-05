@@ -123,7 +123,7 @@ function getCloudinaryFolderPath() {
 function getCloudinaryConsoleFolderLink() {
     const leadId = formData.leadId;
     if (!leadId) return '';
-    // Use folder search URL for direct access with cloud name
+    // Use folders/search structure for direct folder access
     return `https://console.cloudinary.com/app/dojuekij4/assets/media_library/folders/search?q=${encodeURIComponent('livingpicture/leads/' + leadId)}`;
 }
 

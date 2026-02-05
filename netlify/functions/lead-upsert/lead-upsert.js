@@ -62,10 +62,10 @@ function calculatePrice(photoCount, currency) {
 
 // Generate Cloudinary console folder search URL
 function getCloudinaryFolderUrl(folderPath) {
-    return `https://console.cloudinary.com/app/${CLOUDINARY_CLOUD_ID}/assets/media_library/folders/search?q=${encodeURIComponent(folderPath)}`;
+    return `https://console.cloudinary.com/console/c-${CLOUDINARY_CLOUD_ID}/media_library/folders/search?q=${encodeURIComponent(folderPath)}`;
 }
 
-// Migrate photos from leads folder to orders folder in Cloudinary
+// Migrate photos from leads folder to orders folder in Cloudinary using rename_folder
 async function migrateLeadToOrdersFolder(leadId) {
     const sourceFolder = `livingpicture/leads/${leadId}`;
     const targetFolder = `livingpicture/orders/${leadId}`;
@@ -81,71 +81,48 @@ async function migrateLeadToOrdersFolder(leadId) {
             success: false, 
             error: 'Cloudinary credentials not configured',
             sourceFolder,
-            targetFolder
+            targetFolder,
+            newFolderUrl: getCloudinaryFolderUrl(targetFolder)
         };
     }
     
     try {
-        // First, check if source folder has any assets
-        const searchResult = await cloudinary.search
-            .expression(`folder:${sourceFolder}`)
-            .max_results(100)
-            .execute();
+        // Use rename_folder API to move entire folder at once
+        console.log(`Attempting to rename folder: ${sourceFolder} -> ${targetFolder}`);
+        const result = await cloudinary.api.rename_folder(sourceFolder, targetFolder);
         
-        if (!searchResult.resources || searchResult.resources.length === 0) {
-            console.log(`No assets found in source folder: ${sourceFolder}`);
-            return { 
-                success: true, 
-                migratedCount: 0, 
-                message: 'No assets to migrate',
+        console.log(`=== Folder migration complete ===`);
+        console.log(`Rename result:`, JSON.stringify(result, null, 2));
+        
+        return {
+            success: true,
+            message: 'Folder renamed successfully',
+            sourceFolder,
+            targetFolder,
+            newFolderUrl: getCloudinaryFolderUrl(targetFolder),
+            result
+        };
+    } catch (error) {
+        console.error('Error during folder migration:', error);
+        
+        // If folder doesn't exist or is empty, still return success with the new URL
+        if (error.error && error.error.message && error.error.message.includes('not found')) {
+            console.log('Source folder not found, returning success with new folder URL');
+            return {
+                success: true,
+                message: 'Source folder not found (may be empty or already migrated)',
                 sourceFolder,
                 targetFolder,
                 newFolderUrl: getCloudinaryFolderUrl(targetFolder)
             };
         }
         
-        console.log(`Found ${searchResult.resources.length} assets to migrate`);
-        
-        // Move each asset to the orders folder
-        const migratedAssets = [];
-        const failedAssets = [];
-        
-        for (const asset of searchResult.resources) {
-            const oldPublicId = asset.public_id;
-            const fileName = oldPublicId.split('/').pop();
-            const newPublicId = `${targetFolder}/${fileName}`;
-            
-            try {
-                await cloudinary.uploader.rename(oldPublicId, newPublicId);
-                migratedAssets.push({ oldPublicId, newPublicId });
-                console.log(`✓ Migrated: ${oldPublicId} -> ${newPublicId}`);
-            } catch (renameError) {
-                console.error(`✗ Failed to migrate ${oldPublicId}:`, renameError.message);
-                failedAssets.push({ oldPublicId, error: renameError.message });
-            }
-        }
-        
-        console.log(`=== Migration complete ===`);
-        console.log(`Successfully migrated: ${migratedAssets.length}`);
-        console.log(`Failed: ${failedAssets.length}`);
-        
-        return {
-            success: true,
-            migratedCount: migratedAssets.length,
-            failedCount: failedAssets.length,
-            sourceFolder,
-            targetFolder,
-            newFolderUrl: getCloudinaryFolderUrl(targetFolder),
-            migratedAssets,
-            failedAssets
-        };
-    } catch (error) {
-        console.error('Error during folder migration:', error);
         return { 
             success: false, 
-            error: error.message,
+            error: error.message || JSON.stringify(error),
             sourceFolder,
-            targetFolder
+            targetFolder,
+            newFolderUrl: getCloudinaryFolderUrl(targetFolder)
         };
     }
 }
@@ -315,6 +292,17 @@ exports.handler = async (event, context) => {
             ? photosFolder.trim()
             : undefined;
 
+        // Normalize currency fields - convert empty strings to undefined
+        const normalizedDetectedCurrency = (detectedCurrency && detectedCurrency.trim()) ? detectedCurrency.trim() : undefined;
+        const normalizedSelectedCurrency = (selectedCurrency && selectedCurrency.trim()) ? selectedCurrency.trim() : undefined;
+        
+        console.log('Currency fields:', { 
+            detectedCurrency, 
+            selectedCurrency, 
+            normalizedDetectedCurrency, 
+            normalizedSelectedCurrency 
+        });
+
         const airtableData = {
             leadId,
             persistentUserId,
@@ -330,8 +318,8 @@ exports.handler = async (event, context) => {
             RawAmount: Number.isFinite(rawAmountValue) ? rawAmountValue : undefined,
             utmSource,
             utmCampaign,
-            detectedCurrency,
-            selectedCurrency,
+            detectedCurrency: normalizedDetectedCurrency,
+            selectedCurrency: normalizedSelectedCurrency,
             sessionId,
             step,
             orderId,
@@ -390,9 +378,7 @@ exports.handler = async (event, context) => {
             const leadRecord = airtableRecord.fields;
             
             // Build the new photosFolder URL pointing to orders location
-            const newPhotosFolder = migrationResult.success 
-                ? migrationResult.newFolderUrl 
-                : getCloudinaryFolderUrl(`livingpicture/orders/${leadId}`);
+            const newPhotosFolder = migrationResult.newFolderUrl || getCloudinaryFolderUrl(`livingpicture/orders/${leadId}`);
             
             const orderFields = {
                 leadId: leadId,
@@ -410,11 +396,11 @@ exports.handler = async (event, context) => {
                 photosFolder: newPhotosFolder,
                 currency: currency || leadRecord.currency,
                 totalAmount: Number.isFinite(rawAmountValue) ? rawAmountValue : (leadRecord.RawAmount || 0),
-                detectedCurrency: detectedCurrency || leadRecord.detectedCurrency,
-                selectedCurrency: selectedCurrency || leadRecord.selectedCurrency,
+                detectedCurrency: normalizedDetectedCurrency || leadRecord.detectedCurrency,
+                selectedCurrency: normalizedSelectedCurrency || leadRecord.selectedCurrency,
                 sessionId: sessionId || leadRecord.sessionId,
                 migrationStatus: migrationResult.success ? 'SUCCESS' : 'FAILED',
-                migratedPhotoCount: migrationResult.migratedCount || 0,
+                migrationMessage: migrationResult.message || '',
             };
             
             // Remove undefined fields
