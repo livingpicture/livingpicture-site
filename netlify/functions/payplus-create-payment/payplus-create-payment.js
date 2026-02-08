@@ -106,20 +106,27 @@ exports.handler = async (event, context) => {
 
 
         // Prepare PayPlus request payload
+        const effectiveLeadId = leadId || `lead_${Date.now()}`;
+        const effectiveOrderId = orderId || `ord_${effectiveLeadId}`;
+        
         const paymentData = {
             payment_page_uid: env.PAYPLUS_PAYMENT_PAGE_UID,
-            amount: amount, // Convert to agorot/cent (smallest currency unit)
+            amount: amount,
             currency_code: currency,
             item_name: 'Memory Book Order',
             item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
             success_url: successUrl,
             cancel_url: `${env.SITE_URL}/payment-failed.html`,
             callback_url: `${env.SITE_URL}/.netlify/functions/payplus-callback`,
-            metadata: {
-                leadId: leadId || `lead_${Date.now()}`,
-                orderId: orderId,
-                source: 'memory-book-order',
-                timestamp: new Date().toISOString()
+            // more_info is passed back in the callback - critical for identifying the lead
+            more_info: JSON.stringify({
+                leadId: effectiveLeadId,
+                orderId: effectiveOrderId,
+                source: 'memory-book-order'
+            }),
+            // Customer external_id for additional tracking
+            customer: {
+                external_id: effectiveLeadId
             }
         };
 

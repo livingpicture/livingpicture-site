@@ -99,14 +99,73 @@
             <i class="fas fa-check-circle"></i>
         </div>
         
-        <h1 class="thank-you-title">Message Sent Successfully!</h1>
+        <h1 class="thank-you-title">Thank You for Your Order!</h1>
         <p class="thank-you-message">
-            Thank you for reaching out to us. We've received your message and will get back to you within 24 hours.
+            Your payment was successful and your Memory Book order is being processed. 
+            We'll send you a confirmation email shortly with all the details.
         </p>
         
         <a href="index.html" class="btn-return">
             <i class="fas fa-home"></i> Back to Home
         </a>
     </div>
+    
+    <script>
+    // Process payment success - update lead status and create order
+    (async function() {
+        try {
+            // Get order data from localStorage
+            const orderDataStr = localStorage.getItem('livingPictureOrder');
+            if (!orderDataStr) {
+                console.log('No order data found in localStorage');
+                return;
+            }
+            
+            const orderData = JSON.parse(orderDataStr);
+            const leadId = orderData.leadId;
+            const orderId = orderData.orderId;
+            
+            if (!leadId) {
+                console.log('No leadId found in order data');
+                return;
+            }
+            
+            console.log('Processing payment success for lead:', leadId);
+            
+            // Call lead-upsert with step='PAID' to update status and create order
+            const functionUrl = '/.netlify/functions/lead-upsert';
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    leadId: leadId,
+                    orderId: orderId,
+                    step: 'PAID',
+                    customerName: orderData.customerName,
+                    customerEmail: orderData.customerEmail,
+                    country: orderData.country,
+                    currency: orderData.currency,
+                    totalAmount: orderData.totalAmount,
+                    photoCount: orderData.photoCount,
+                    memoryTitle: orderData.memoryName,
+                    songChoice: orderData.songChoice
+                })
+            });
+            
+            const result = await response.json();
+            console.log('Lead-upsert PAID result:', result);
+            
+            if (result.ok) {
+                console.log('Order created successfully:', result.orderId);
+                // Clear localStorage after successful order creation
+                localStorage.removeItem('livingPictureOrder');
+            } else {
+                console.error('Failed to create order:', result.error);
+            }
+        } catch (error) {
+            console.error('Error processing payment success:', error);
+        }
+    })();
+    </script>
 </body>
 </html>

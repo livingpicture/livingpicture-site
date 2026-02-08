@@ -67,8 +67,12 @@ async function migratePhotosToOrdersFolder(leadId, orderId) {
 }
 
 exports.handler = async (event, context) => {
-    const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_ORDERS_TABLE } = process.env;
-    const missingEnvVars = ['AIRTABLE_API_KEY', 'AIRTABLE_BASE_ID', 'AIRTABLE_ORDERS_TABLE'].filter(key => !process.env[key]);
+    console.log('=== PayPlus Callback Function Started ===');
+    console.log('Request body:', event.body);
+    
+    const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
+    const AIRTABLE_ORDERS_TABLE = process.env.AIRTABLE_ORDERS_TABLE || 'Orders';
+    const missingEnvVars = ['AIRTABLE_API_KEY', 'AIRTABLE_BASE_ID'].filter(key => !process.env[key]);
 
     if (missingEnvVars.length > 0) {
         const errorMessage = `Missing environment variables: ${missingEnvVars.join(', ')}`;
@@ -93,13 +97,29 @@ exports.handler = async (event, context) => {
         return createResponse(200, { ok: true, message: 'Payment not successful, no order created.' });
     }
 
-    const metadata = data.data?.metadata || {};
-    const leadId = metadata.leadId;
+    // Parse more_info field (JSON string passed in payment request)
+    let moreInfo = {};
+    if (data.more_info) {
+        try {
+            moreInfo = typeof data.more_info === 'string' ? JSON.parse(data.more_info) : data.more_info;
+            console.log('Parsed more_info:', moreInfo);
+        } catch (e) {
+            console.warn('Failed to parse more_info:', e.message);
+        }
+    }
+    
+    // Try multiple sources for leadId: more_info, customer.external_id, or legacy metadata
+    const leadId = moreInfo.leadId 
+        || data.customer?.external_id 
+        || data.data?.metadata?.leadId;
+    const orderId = moreInfo.orderId || data.data?.metadata?.orderId;
     const now = new Date().toISOString();
 
+    console.log('Extracted IDs:', { leadId, orderId, source: moreInfo.leadId ? 'more_info' : (data.customer?.external_id ? 'customer.external_id' : 'metadata') });
+
     if (!leadId) {
-        console.error('Missing leadId in PayPlus metadata.');
-        return createResponse(400, { ok: false, error: 'Missing leadId in payment metadata' });
+        console.error('Missing leadId in PayPlus callback data. Available fields:', Object.keys(data));
+        return createResponse(400, { ok: false, error: 'Missing leadId in payment data' });
     }
 
     let leadRecord = {};
@@ -123,6 +143,8 @@ exports.handler = async (event, context) => {
     }
 
     // Update lead step to PAID
+    const effectiveOrderId = orderId || `ord_${transaction.uuid}`;
+    
     if (leadAirtableId) {
         try {
             await base('Leads').update([
@@ -130,7 +152,7 @@ exports.handler = async (event, context) => {
                     id: leadAirtableId,
                     fields: {
                         step: 'PAID',
-                        orderId: metadata.orderId,
+                        orderId: effectiveOrderId,
                         updatedAt: now
                     }
                 }
@@ -143,12 +165,10 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const orderId = metadata.orderId || `ord_${transaction.uuid}`;
-        
         // Migrate photos from leads folder to orders folder in Cloudinary
         let migrationResult = { success: false, migratedCount: 0 };
         if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-            migrationResult = await migratePhotosToOrdersFolder(leadId, orderId);
+            migrationResult = await migratePhotosToOrdersFolder(leadId, effectiveOrderId);
             console.log('Photo migration result:', migrationResult);
         } else {
             console.warn('Cloudinary credentials not configured, skipping photo migration');
@@ -157,24 +177,24 @@ exports.handler = async (event, context) => {
         // Update imageUrls with migrated URLs if migration was successful
         const finalImageUrls = migrationResult.success && migrationResult.imageUrls?.length > 0
             ? migrationResult.imageUrls.join('\n')
-            : (leadRecord.imageUrls || metadata.imageUrls);
+            : (leadRecord.imageUrls || moreInfo.imageUrls);
         
         // Update photosFolder to point to orders folder
         const photosFolder = migrationResult.success 
-            ? `livingpicture/orders/${orderId}`
-            : (leadRecord.imageUrls || metadata.imageUrls);
+            ? `livingpicture/orders/${effectiveOrderId}`
+            : (leadRecord.imageUrls || moreInfo.imageUrls);
         
         const orderFields = {
-            orderId: orderId,
+            orderId: effectiveOrderId,
             createdAt: now,
             paymentstatus: 'PAID',
             customerEmail: data.customer?.email || leadRecord.customerEmail,
             customerName: data.customer?.name || leadRecord.customerName,
             country: data.customer?.country_iso || leadRecord.country,
-            memoryTitle: leadRecord.memoryTitle || metadata.memoryTitle,
-            songChoice: leadRecord.songChoice || metadata.songChoice,
-            photoCount: Number(leadRecord.photoCount || metadata.photoCount) || undefined,
-            packageKey: leadRecord.packageKey || metadata.packageKey,
+            memoryTitle: leadRecord.memoryTitle || moreInfo.memoryTitle,
+            songChoice: leadRecord.songChoice || moreInfo.songChoice,
+            photoCount: Number(leadRecord.photoCount || moreInfo.photoCount) || undefined,
+            packageKey: leadRecord.packageKey || moreInfo.packageKey,
             imageUrls: photosFolder,
             transactionId: transaction.uuid,
             paymentProvider: 'PayPlus',
@@ -186,8 +206,8 @@ exports.handler = async (event, context) => {
             paidAt: now,
             fulfillmentStatus: 'PAID',
             leadId: leadId,
-            detectedCurrency: leadRecord.detectedCurrency || metadata.detectedCurrency,
-            selectedCurrency: leadRecord.selectedCurrency || metadata.selectedCurrency,
+            detectedCurrency: leadRecord.detectedCurrency || moreInfo.detectedCurrency,
+            selectedCurrency: leadRecord.selectedCurrency || moreInfo.selectedCurrency,
         };
         
         const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
