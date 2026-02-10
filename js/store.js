@@ -1,5 +1,5 @@
 const PRICING_TIERS = [
-    { photos: '1-5', price: 20 },
+    { photos: '1-5', price: 1 },
     { photos: '6-10', price: 18 },
     { photos: '11-20', price: 15 },
     { photos: '21+', price: 12 },

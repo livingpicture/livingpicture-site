@@ -97,28 +97,44 @@ exports.handler = async (event, context) => {
         return createResponse(200, { ok: true, message: 'Payment not successful, no order created.' });
     }
 
-    // Parse more_info field (JSON string passed in payment request)
+    // Parse more_info field - PayPlus returns it inside transaction object
+    // Can be in transaction.more_info or transaction.more_info_1 through more_info_5
     let moreInfo = {};
-    if (data.more_info) {
+    const moreInfoRaw = transaction.more_info || transaction.more_info_1 || data.more_info;
+    
+    if (moreInfoRaw) {
         try {
-            moreInfo = typeof data.more_info === 'string' ? JSON.parse(data.more_info) : data.more_info;
+            moreInfo = typeof moreInfoRaw === 'string' ? JSON.parse(moreInfoRaw) : moreInfoRaw;
             console.log('Parsed more_info:', moreInfo);
         } catch (e) {
-            console.warn('Failed to parse more_info:', e.message);
+            // If not JSON, treat as plain leadId string
+            console.log('more_info is plain string:', moreInfoRaw);
+            moreInfo = { leadId: moreInfoRaw };
         }
     }
     
-    // Try multiple sources for leadId: more_info, customer.external_id, or legacy metadata
+    // Try multiple sources for leadId - check all PayPlus fields
     const leadId = moreInfo.leadId 
-        || data.customer?.external_id 
-        || data.data?.metadata?.leadId;
-    const orderId = moreInfo.orderId || data.data?.metadata?.orderId;
+        || transaction.more_info_1  // Plain leadId string
+        || data.customer?.customer_external_id
+        || data.data?.customer_external_id;
+    const orderId = moreInfo.orderId || transaction.more_info_2;
     const now = new Date().toISOString();
+    
+    // Log all potential ID sources for debugging
+    console.log('ID extraction debug:', {
+        'moreInfo.leadId': moreInfo.leadId,
+        'transaction.more_info': transaction.more_info,
+        'transaction.more_info_1': transaction.more_info_1,
+        'data.customer': data.customer,
+        'payment_page_request_uid': transaction.payment_page_request_uid
+    });
 
-    console.log('Extracted IDs:', { leadId, orderId, source: moreInfo.leadId ? 'more_info' : (data.customer?.external_id ? 'customer.external_id' : 'metadata') });
+    console.log('Extracted IDs:', { leadId, orderId });
 
     if (!leadId) {
-        console.error('Missing leadId in PayPlus callback data. Available fields:', Object.keys(data));
+        console.error('Missing leadId in PayPlus callback data.');
+        console.error('Full transaction object:', JSON.stringify(transaction, null, 2));
         return createResponse(400, { ok: false, error: 'Missing leadId in payment data' });
     }
 

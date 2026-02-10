@@ -20,7 +20,7 @@ const CORS_HEADERS = {
 
 const PRICING = {
     '1-5': {
-        ILS: 20,
+        ILS: 1,
         USD: 5.50,
         EUR: 5.00,
         RUB: 500

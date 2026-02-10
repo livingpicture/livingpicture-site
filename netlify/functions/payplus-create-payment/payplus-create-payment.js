@@ -109,24 +109,31 @@ exports.handler = async (event, context) => {
         const effectiveLeadId = leadId || `lead_${Date.now()}`;
         const effectiveOrderId = orderId || `ord_${effectiveLeadId}`;
         
+        // PayPlus more_info fields - use multiple fields to ensure leadId is passed
+        const moreInfoJson = JSON.stringify({
+            leadId: effectiveLeadId,
+            orderId: effectiveOrderId,
+            source: 'memory-book-order'
+        });
+        
         const paymentData = {
             payment_page_uid: env.PAYPLUS_PAYMENT_PAGE_UID,
             amount: amount,
             currency_code: currency,
-            item_name: 'Memory Book Order',
-            item_description: `Memory Book Order${leadId ? ` (${leadId})` : ''}${orderId ? ` [orderId: ${orderId}]` : ''}`,
+            // Include leadId in product name so it appears in PayPlus dashboard
+            product_name: `Memory Book - ${effectiveLeadId}`,
+            // more_info fields - PayPlus supports more_info through more_info_5
+            more_info: moreInfoJson,
+            more_info_1: effectiveLeadId,
+            more_info_2: effectiveOrderId,
             success_url: successUrl,
             cancel_url: `${env.SITE_URL}/payment-failed.html`,
             callback_url: `${env.SITE_URL}/.netlify/functions/payplus-callback`,
-            // more_info is passed back in the callback - critical for identifying the lead
-            more_info: JSON.stringify({
-                leadId: effectiveLeadId,
-                orderId: effectiveOrderId,
-                source: 'memory-book-order'
-            }),
-            // Customer external_id for additional tracking
+            // Customer with external identifier
             customer: {
-                external_id: effectiveLeadId
+                customer_external_id: effectiveLeadId,
+                name: requestBody.customerName || '',
+                email: requestBody.customerEmail || ''
             }
         };
 
@@ -157,6 +164,13 @@ exports.handler = async (event, context) => {
         console.log("Sending headers keys:", Object.keys(headers));
         const requestUrl = `${env.PAYPLUS_BASE_URL}/PaymentPages/generateLink`;
         console.log("Request URL:", requestUrl);
+        console.log("Payment data being sent:", {
+            ...paymentData,
+            more_info: paymentData.more_info,
+            more_info_1: paymentData.more_info_1,
+            more_info_2: paymentData.more_info_2,
+            customer: paymentData.customer
+        });
 
         // Make request to PayPlus API
         const response = await fetch(requestUrl, {
