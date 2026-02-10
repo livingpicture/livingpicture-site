@@ -158,7 +158,7 @@ exports.handler = async (event, context) => {
         // Proceeding with metadata even if lead fetch fails
     }
 
-    // Update lead step to PAID
+    // Update lead step to PAID - this is critical and should always happen
     const effectiveOrderId = orderId || `ord_${transaction.uuid}`;
     
     if (leadAirtableId) {
@@ -173,68 +173,89 @@ exports.handler = async (event, context) => {
                     }
                 }
             ]);
-            console.log('Updated lead step to PAID for lead:', leadAirtableId);
+            console.log('✓ Updated lead step to PAID for lead:', leadAirtableId);
         } catch (error) {
-            console.error('Error updating lead step to PAID:', error);
-            return createResponse(500, { ok: false, error: 'Airtable Error', message: error.message });
+            console.error('✗ Error updating lead step to PAID:', error);
+            // Don't return here - we still want to try creating the order
         }
+    } else {
+        console.warn('⚠️ No leadAirtableId found - cannot update lead status to PAID');
     }
 
     try {
-        // Migrate photos from leads folder to orders folder in Cloudinary
+        // Create Order record first (don't wait for migration)
+        console.log('=== Creating Order record in Airtable ===');
+        
+        // Get photos folder from lead record or create new one
+        const photosFolder = leadRecord.imageUrls || `livingpicture/orders/${effectiveOrderId}`;
+        
+        const orderFields = {
+            leadId: leadId,
+            orderId: effectiveOrderId,
+            createdAt: now,
+            paidAt: now,
+            paymentStatus: 'PAID',
+            customerName: leadRecord.customerName || data.customer?.name,
+            customerEmail: leadRecord.customerEmail || data.customer?.email,
+            country: leadRecord.country || data.customer?.country_iso,
+            memoryTitle: leadRecord.memoryTitle,
+            songChoice: leadRecord.songChoice,
+            photoCount: Number(leadRecord.photoCount) || 0,
+            photosFolder: photosFolder,
+            currency: transaction.currency || leadRecord.currency,
+            totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100),
+            transactionId: transaction.uid,
+            paymentProvider: 'PayPlus',
+            paidAt: now,
+            fulfillmentStatus: 'PAID',
+            detectedCurrency: leadRecord.detectedCurrency,
+            selectedCurrency: leadRecord.selectedCurrency,
+            sessionId: leadRecord.sessionId
+        };
+        
+        // Remove undefined fields
+        Object.keys(orderFields).forEach(key => orderFields[key] === undefined && delete orderFields[key]);
+        
+        const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
+        console.log('✓ Order record created successfully:', createdRecord[0].id);
+        
+        // Now migrate photos in the background
         let migrationResult = { success: false, migratedCount: 0 };
         if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+            console.log('Starting photo migration...');
             migrationResult = await migratePhotosToOrdersFolder(leadId, effectiveOrderId);
             console.log('Photo migration result:', migrationResult);
+            
+            // Update order with migration results if successful
+            if (migrationResult.success) {
+                try {
+                    await base(AIRTABLE_ORDERS_TABLE).update([
+                        {
+                            id: createdRecord[0].id,
+                            fields: {
+                                photosFolder: `livingpicture/orders/${effectiveOrderId}`,
+                                migrationStatus: 'SUCCESS',
+                                migratedPhotoCount: migrationResult.migratedCount || 0
+                            }
+                        }
+                    ]);
+                    console.log('Updated order with migration results');
+                } catch (updateError) {
+                    console.warn('Failed to update order with migration results:', updateError);
+                }
+            }
         } else {
             console.warn('Cloudinary credentials not configured, skipping photo migration');
         }
-        
-        // Update imageUrls with migrated URLs if migration was successful
-        const finalImageUrls = migrationResult.success && migrationResult.imageUrls?.length > 0
-            ? migrationResult.imageUrls.join('\n')
-            : (leadRecord.imageUrls || moreInfo.imageUrls);
-        
-        // Update photosFolder to point to orders folder
-        const photosFolder = migrationResult.success 
-            ? `livingpicture/orders/${effectiveOrderId}`
-            : (leadRecord.imageUrls || moreInfo.imageUrls);
-        
-        const orderFields = {
-            orderId: effectiveOrderId,
-            createdAt: now,
-            paymentstatus: 'PAID',
-            customerEmail: data.customer?.email || leadRecord.customerEmail,
-            customerName: data.customer?.name || leadRecord.customerName,
-            country: data.customer?.country_iso || leadRecord.country,
-            memoryTitle: leadRecord.memoryTitle || moreInfo.memoryTitle,
-            songChoice: leadRecord.songChoice || moreInfo.songChoice,
-            photoCount: Number(leadRecord.photoCount || moreInfo.photoCount) || undefined,
-            packageKey: leadRecord.packageKey || moreInfo.packageKey,
-            imageUrls: photosFolder,
-            transactionId: transaction.uuid,
-            paymentProvider: 'PayPlus',
-            paymentStatusRaw: JSON.stringify(data),
-            'Customer (link)': [],
-            currency: transaction.currency,
-            totalAmount: Number(transaction.amount_in_cents) / 100,
-            payplusPaymentLink: data.payment_page_link,
-            paidAt: now,
-            fulfillmentStatus: 'PAID',
-            leadId: leadId,
-            detectedCurrency: leadRecord.detectedCurrency || moreInfo.detectedCurrency,
-            selectedCurrency: leadRecord.selectedCurrency || moreInfo.selectedCurrency,
-        };
-        
-        const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
-        console.log('Successfully created order in Airtable:', createdRecord[0].id);
         
         return createResponse(200, { 
             ok: true, 
             message: 'Order created successfully', 
             orderId: createdRecord[0].id,
-            photosMigrated: migrationResult.migratedCount || 0,
-            photosFolder: photosFolder
+            leadId: leadId,
+            orderAirtableId: createdRecord[0].id,
+            leadAirtableId: leadAirtableId,
+            photosMigrated: migrationResult.migratedCount || 0
         });
     } catch (error) {
         console.error('Error creating order record in Airtable:', error);
