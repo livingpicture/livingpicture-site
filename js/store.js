@@ -27,7 +27,7 @@ const formData = {
     currency: 'ILS',
     pricing: {
         currentTier: '1-5',
-        pricePerPhoto: 20,
+        pricePerPhoto: 1,
         totalPrice: 0
     },
     savedAt: null
@@ -242,8 +242,9 @@ function updatePricingDisplay() {
     };
 
     const tier = getTier(photoCount);
-    const hasPricing = typeof PRICING !== 'undefined' && PRICING[tier] && PRICING[tier][currency] !== undefined;
-    const pricePerPhoto = hasPricing ? Number(PRICING[tier][currency]) : 0;
+    // Use PRICING_TIERS array instead of undefined PRICING object
+    const tierConfig = PRICING_TIERS.find(t => t.photos === tier);
+    const pricePerPhoto = tierConfig ? tierConfig.price : 0;
     const total = photoCount * pricePerPhoto;
 
     formData.currency = currency;
