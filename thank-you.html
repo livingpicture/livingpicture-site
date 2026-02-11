@@ -159,11 +159,23 @@
                 console.log('Order created successfully:', result.orderId);
                 // Clear localStorage after successful order creation
                 localStorage.removeItem('livingPictureOrder');
+                localStorage.removeItem('memoryCreatorData');
+                localStorage.removeItem('leadId');
+                localStorage.removeItem('livingPictureLead');
+                localStorage.removeItem('formData');
+                console.log('Cleared all localStorage data after successful payment');
             } else {
                 console.error('Failed to create order:', result.error);
             }
         } catch (error) {
             console.error('Error processing payment success:', error);
+            // Even if the API call fails, clear localStorage to ensure fresh start
+            localStorage.removeItem('livingPictureOrder');
+            localStorage.removeItem('memoryCreatorData');
+            localStorage.removeItem('leadId');
+            localStorage.removeItem('livingPictureLead');
+            localStorage.removeItem('formData');
+            console.log('Cleared localStorage due to error in payment processing');
         }
     })();
     </script>

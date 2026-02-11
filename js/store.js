@@ -1106,10 +1106,10 @@ function renderPhotoGrid() {
 
     // Add event listeners to remove buttons
     document.querySelectorAll('.remove-photo').forEach(button => {
-        button.addEventListener('click', (e) => {
+        button.addEventListener('click', async (e) => {
             e.stopPropagation();
             const photoId = button.getAttribute('data-photo-id');
-            removePhoto(photoId);
+            await removePhoto(photoId);
         });
     });
 
@@ -1165,10 +1165,44 @@ function updateContinueToMusicButtonState() {
 }
 
 // Remove a photo
-function removePhoto(photoId) {
-    // Find the photo to be removed and clean up its object URL
+async function removePhoto(photoId) {
+    // Find the photo to be removed
     const photoToRemove = formData.photos.find(photo => photo.id === photoId);
-    if (photoToRemove && photoToRemove.previewUrl) {
+    if (!photoToRemove) {
+        console.warn('Photo not found:', photoId);
+        return;
+    }
+
+    // If photo is uploaded to Cloudinary, delete it first
+    if (photoToRemove.publicId && photoToRemove.uploadStatus === 'uploaded') {
+        try {
+            console.log('Deleting photo from Cloudinary:', photoToRemove.publicId);
+            const response = await fetch('/.netlify/functions/delete-photo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    publicId: photoToRemove.publicId,
+                    leadId: formData.leadId
+                })
+            });
+
+            const result = await response.json();
+            if (result.ok) {
+                console.log('Successfully deleted from Cloudinary:', photoToRemove.publicId);
+            } else {
+                console.error('Failed to delete from Cloudinary:', result.error);
+                // Still remove from UI even if Cloudinary deletion fails
+            }
+        } catch (error) {
+            console.error('Error deleting photo from Cloudinary:', error);
+            // Still remove from UI even if Cloudinary deletion fails
+        }
+    }
+
+    // Clean up object URL
+    if (photoToRemove.previewUrl) {
         URL.revokeObjectURL(photoToRemove.previewUrl);
     }
 

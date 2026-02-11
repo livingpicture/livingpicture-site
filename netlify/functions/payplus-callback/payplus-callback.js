@@ -138,18 +138,23 @@ exports.handler = async (event, context) => {
     }
 
     // Update lead step to PAID - this is critical and should always happen
-    const effectiveOrderId = orderId || `ord_${transaction.uuid}`;
+    const effectiveOrderId = orderId || `ord_${transaction.uid}`;
     
     if (leadAirtableId) {
         try {
+            console.log('=== Updating Lead record ===');
+            const leadUpdateFields = {
+                step: 'PAID',
+                orderId: effectiveOrderId,
+                updatedAt: now
+            };
+            
+            console.log('Lead update fields:', leadUpdateFields);
+            
             await base('Leads').update([
                 {
                     id: leadAirtableId,
-                    fields: {
-                        step: 'PAID',
-                        orderId: effectiveOrderId,
-                        updatedAt: now
-                    }
+                    fields: leadUpdateFields
                 }
             ]);
             console.log('✓ Updated lead step to PAID for lead:', leadAirtableId);
@@ -165,35 +170,38 @@ exports.handler = async (event, context) => {
         // Create Order record first (don't wait for migration)
         console.log('=== Creating Order record in Airtable ===');
         
-        // Get photos folder from lead record or create new one
-        const photosFolder = leadRecord.imageUrls || `livingpicture/orders/${effectiveOrderId}`;
+        // Get imageUrls from lead record
+        const imageUrls = leadRecord.imageUrls || '';
         
         const orderFields = {
-            leadId: leadId,
             orderId: effectiveOrderId,
-            createdAt: now,
-            paidAt: now,
+            leadId: leadId,
             paymentStatus: 'PAID',
-            customerName: leadRecord.customerName || data.customer?.name,
-            customerEmail: leadRecord.customerEmail || data.customer?.email,
-            country: leadRecord.country || data.customer?.country_iso,
-            memoryTitle: leadRecord.memoryTitle,
-            songChoice: leadRecord.songChoice,
+            customerEmail: leadRecord.customerEmail || data.customer?.email || '',
+            customerName: leadRecord.customerName || data.customer?.name || '',
+            country: leadRecord.country || data.customer?.country_iso || '',
+            memoryTitle: leadRecord.memoryTitle || '',
+            songChoice: leadRecord.songChoice || '',
             photoCount: Number(leadRecord.photoCount) || 0,
-            photosFolder: photosFolder,
-            currency: transaction.currency || leadRecord.currency,
-            totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100),
-            transactionId: transaction.uid,
+            packageKey: leadRecord.packageKey || '',
+            imageUrls: imageUrls,
+            transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus',
+            currency: transaction.currency || leadRecord.currency || 'ILS',
+            totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
-            fulfillmentStatus: 'PAID',
-            detectedCurrency: leadRecord.detectedCurrency,
-            selectedCurrency: leadRecord.selectedCurrency,
-            sessionId: leadRecord.sessionId
+            detectedCurrency: leadRecord.detectedCurrency || '',
+            selectedCurrency: leadRecord.selectedCurrency || ''
         };
         
-        // Remove undefined fields
-        Object.keys(orderFields).forEach(key => orderFields[key] === undefined && delete orderFields[key]);
+        // Remove undefined fields and ensure all fields are strings or numbers
+        Object.keys(orderFields).forEach(key => {
+            if (orderFields[key] === undefined || orderFields[key] === null) {
+                delete orderFields[key];
+            }
+        });
+        
+        console.log('Order fields to create:', JSON.stringify(orderFields, null, 2));
         
         const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
         console.log('✓ Order record created successfully:', createdRecord[0].id);
