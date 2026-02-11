@@ -70,6 +70,16 @@ exports.handler = async (event, context) => {
     console.log('=== PayPlus Callback Function Started ===');
     console.log('Request body:', event.body);
     
+    // Debug environment variables
+    console.log('Environment variables check:', {
+        AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY ? 'SET' : 'NOT SET',
+        AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID ? 'SET' : 'NOT SET',
+        CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT SET',
+        CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT SET',
+        CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'NOT SET',
+        AIRTABLE_ORDERS_TABLE: process.env.AIRTABLE_ORDERS_TABLE || 'Orders (default)'
+    });
+    
     const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
     const AIRTABLE_ORDERS_TABLE = process.env.AIRTABLE_ORDERS_TABLE || 'Orders';
     const missingEnvVars = ['AIRTABLE_API_KEY', 'AIRTABLE_BASE_ID'].filter(key => !process.env[key]);
@@ -208,8 +218,14 @@ exports.handler = async (event, context) => {
         
         // Now migrate photos in the background
         let migrationResult = { success: false, migratedCount: 0 };
+        console.log('Checking Cloudinary credentials for migration:', {
+            hasApiKey: !!process.env.CLOUDINARY_API_KEY,
+            hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
+        });
+        
         if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-            console.log('Starting photo migration...');
+            console.log('✓ Cloudinary credentials found, starting photo migration...');
+            console.log('Migration parameters:', { leadId, orderId: effectiveOrderId });
             migrationResult = await migratePhotosToOrdersFolder(leadId, effectiveOrderId);
             console.log('Photo migration result:', migrationResult);
             

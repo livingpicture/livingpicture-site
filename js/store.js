@@ -1166,6 +1166,8 @@ function updateContinueToMusicButtonState() {
 
 // Remove a photo
 async function removePhoto(photoId) {
+    console.log('=== removePhoto called ===', { photoId, totalPhotos: formData.photos.length });
+    
     // Find the photo to be removed
     const photoToRemove = formData.photos.find(photo => photo.id === photoId);
     if (!photoToRemove) {
@@ -1173,10 +1175,23 @@ async function removePhoto(photoId) {
         return;
     }
 
+    console.log('Photo to remove:', {
+        id: photoToRemove.id,
+        name: photoToRemove.name,
+        publicId: photoToRemove.publicId,
+        uploadStatus: photoToRemove.uploadStatus,
+        leadId: formData.leadId
+    });
+
     // If photo is uploaded to Cloudinary, delete it first
     if (photoToRemove.publicId && photoToRemove.uploadStatus === 'uploaded') {
         try {
-            console.log('Deleting photo from Cloudinary:', photoToRemove.publicId);
+            console.log('Attempting to delete from Cloudinary...');
+            console.log('Request payload:', {
+                publicId: photoToRemove.publicId,
+                leadId: formData.leadId
+            });
+            
             const response = await fetch('/.netlify/functions/delete-photo', {
                 method: 'POST',
                 headers: {
@@ -1188,17 +1203,26 @@ async function removePhoto(photoId) {
                 })
             });
 
+            console.log('Delete response status:', response.status);
             const result = await response.json();
+            console.log('Delete response body:', result);
+            
             if (result.ok) {
-                console.log('Successfully deleted from Cloudinary:', photoToRemove.publicId);
+                console.log('✓ Successfully deleted from Cloudinary:', photoToRemove.publicId);
             } else {
-                console.error('Failed to delete from Cloudinary:', result.error);
+                console.error('✗ Failed to delete from Cloudinary:', result.error);
+                console.error('Full error response:', result);
                 // Still remove from UI even if Cloudinary deletion fails
             }
         } catch (error) {
-            console.error('Error deleting photo from Cloudinary:', error);
+            console.error('✗ Error deleting photo from Cloudinary:', error);
             // Still remove from UI even if Cloudinary deletion fails
         }
+    } else {
+        console.log('Photo not uploaded to Cloudinary, skipping deletion', {
+            hasPublicId: !!photoToRemove.publicId,
+            uploadStatus: photoToRemove.uploadStatus
+        });
     }
 
     // Clean up object URL
@@ -1208,6 +1232,7 @@ async function removePhoto(photoId) {
 
     // Remove the photo from the array
     formData.photos = formData.photos.filter(photo => photo.id !== photoId);
+    console.log('Photo removed from array. Remaining photos:', formData.photos.length);
 
     // Update pricing
     updatePricingDisplay();
