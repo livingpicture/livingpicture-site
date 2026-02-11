@@ -97,40 +97,19 @@ exports.handler = async (event, context) => {
         return createResponse(200, { ok: true, message: 'Payment not successful, no order created.' });
     }
 
-    // Parse more_info field - PayPlus returns it inside transaction object
-    // Can be in transaction.more_info or transaction.more_info_1 through more_info_5
-    let moreInfo = {};
-    const moreInfoRaw = transaction.more_info || transaction.more_info_1 || data.more_info;
+    // PayPlus truncates more_info, so we rely on more_info_1 and more_info_2
+    // more_info_1 = leadId, more_info_2 = orderId
+    const leadId = transaction.more_info_1;
+    const orderId = transaction.more_info_2;
     
-    if (moreInfoRaw) {
-        try {
-            moreInfo = typeof moreInfoRaw === 'string' ? JSON.parse(moreInfoRaw) : moreInfoRaw;
-            console.log('Parsed more_info:', moreInfo);
-        } catch (e) {
-            // If not JSON, treat as plain leadId string
-            console.log('more_info is plain string:', moreInfoRaw);
-            moreInfo = { leadId: moreInfoRaw };
-        }
-    }
-    
-    // Try multiple sources for leadId - check all PayPlus fields
-    const leadId = moreInfo.leadId 
-        || transaction.more_info_1  // Plain leadId string
-        || data.customer?.customer_external_id
-        || data.data?.customer_external_id;
-    const orderId = moreInfo.orderId || transaction.more_info_2;
-    const now = new Date().toISOString();
-    
-    // Log all potential ID sources for debugging
-    console.log('ID extraction debug:', {
-        'moreInfo.leadId': moreInfo.leadId,
-        'transaction.more_info': transaction.more_info,
-        'transaction.more_info_1': transaction.more_info_1,
-        'data.customer': data.customer,
-        'payment_page_request_uid': transaction.payment_page_request_uid
+    console.log('Extracted IDs from PayPlus fields:', { 
+        leadId, 
+        orderId,
+        more_info_1: transaction.more_info_1,
+        more_info_2: transaction.more_info_2,
+        more_info_truncated: transaction.more_info?.substring(0, 100) + '...'
     });
-
-    console.log('Extracted IDs:', { leadId, orderId });
+    const now = new Date().toISOString();
 
     if (!leadId) {
         console.error('Missing leadId in PayPlus callback data.');
