@@ -183,6 +183,9 @@ exports.handler = async (event, context) => {
         // Get imageUrls from lead record
         const imageUrls = leadRecord.imageUrls || '';
         
+        // Create Cloudinary console folder link
+        const cloudinaryFolderUrl = `https://console.cloudinary.com/pm/c-dojuekij4/media-explorer/livingpicture/orders/${effectiveOrderId}`;
+        
         const orderFields = {
             orderId: effectiveOrderId,
             leadId: leadId,
@@ -194,7 +197,7 @@ exports.handler = async (event, context) => {
             songChoice: leadRecord.songChoice || '',
             photoCount: Number(leadRecord.photoCount) || 0,
             packageKey: leadRecord.packageKey || '',
-            imageUrls: imageUrls,
+            imageUrls: cloudinaryFolderUrl, // Update to use the direct Cloudinary console link
             transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus',
             currency: transaction.currency || leadRecord.currency || 'ILS',
@@ -232,20 +235,25 @@ exports.handler = async (event, context) => {
             // Update order with migration results if successful
             if (migrationResult.success) {
                 try {
+                    // The folder now exists, so we can confirm the Cloudinary console link
                     await base(AIRTABLE_ORDERS_TABLE).update([
                         {
                             id: createdRecord[0].id,
                             fields: {
                                 photosFolder: `livingpicture/orders/${effectiveOrderId}`,
                                 migrationStatus: 'SUCCESS',
-                                migratedPhotoCount: migrationResult.migratedCount || 0
+                                migratedPhotoCount: migrationResult.migratedCount || 0,
+                                imageUrls: cloudinaryFolderUrl // Confirm the Cloudinary console link after successful migration
                             }
                         }
                     ]);
                     console.log('Updated order with migration results');
+                    console.log('✓ Cloudinary folder link confirmed:', cloudinaryFolderUrl);
                 } catch (updateError) {
                     console.warn('Failed to update order with migration results:', updateError);
                 }
+            } else {
+                console.log('Migration failed, but order was created with initial Cloudinary link');
             }
         } else {
             console.warn('Cloudinary credentials not configured, skipping photo migration');
