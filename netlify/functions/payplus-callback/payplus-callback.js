@@ -188,7 +188,6 @@ exports.handler = async (event, context) => {
         
         const orderFields = {
             orderId: effectiveOrderId,
-            leadId: leadId,
             paymentStatus: 'PAID',
             customerEmail: leadRecord.customerEmail || data.customer?.email || '',
             customerName: leadRecord.customerName || data.customer?.name || '',
@@ -197,14 +196,16 @@ exports.handler = async (event, context) => {
             songChoice: leadRecord.songChoice || '',
             photoCount: Number(leadRecord.photoCount) || 0,
             packageKey: leadRecord.packageKey || '',
-            imageUrls: cloudinaryFolderUrl, // Update to use the direct Cloudinary console link
+            imageUrls: cloudinaryFolderUrl, // Direct Cloudinary console link
             transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus',
             currency: transaction.currency || leadRecord.currency || 'ILS',
             totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
-            detectedCurrency: leadRecord.detectedCurrency || '',
-            selectedCurrency: leadRecord.selectedCurrency || ''
+            fulfillmentStatus: 'PAID',
+            leadId: leadId,
+            selectedCurrency: leadRecord.selectedCurrency || '',
+            // 'Customer (link)': leadAirtableId ? [leadAirtableId] : undefined // Commented out - linking to lead requires Airtable record ID array
         };
         
         // Remove undefined fields and ensure all fields are strings or numbers
