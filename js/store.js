@@ -1186,6 +1186,9 @@ async function removePhoto(photoId) {
     // If photo is uploaded to Cloudinary, delete it first
     if (photoToRemove.publicId && photoToRemove.uploadStatus === 'uploaded') {
         try {
+            console.log('🗑️ Sending publicId for deletion:', photoToRemove.publicId);
+            console.log('🗑️ PublicId type:', typeof photoToRemove.publicId);
+            console.log('🗑️ PublicId length:', photoToRemove.publicId ? photoToRemove.publicId.length : 'null');
             console.log('Deleting photo from Cloudinary:', photoToRemove.publicId);
             console.log('Attempting to delete from Cloudinary...');
             console.log('Request payload:', {
