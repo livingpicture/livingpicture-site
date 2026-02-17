@@ -187,8 +187,9 @@ exports.handler = async (event, context) => {
         const cloudinaryFolderUrl = `https://console.cloudinary.com/pm/c-dojuekij4/media-explorer/livingpicture/orders/${effectiveOrderId}`;
         
         const orderFields = {
+            // Exact match with Airtable Orders table fields
             orderId: effectiveOrderId,
-            paymentStatus: 'PAID',
+            paymentStatus: String('PAID').trim(),
             customerEmail: leadRecord.customerEmail || data.customer?.email || '',
             customerName: leadRecord.customerName || data.customer?.name || '',
             country: leadRecord.country || data.customer?.country_iso || '',
@@ -196,16 +197,16 @@ exports.handler = async (event, context) => {
             songChoice: leadRecord.songChoice || '',
             photoCount: Number(leadRecord.photoCount) || 0,
             packageKey: leadRecord.packageKey || '',
-            imageUrls: cloudinaryFolderUrl, // Direct Cloudinary console link
+            imageUrls: cloudinaryFolderUrl,
             transactionId: transaction.uid || '',
-            paymentProvider: 'PayPlus',
+            paymentProvider: String('PayPlus').trim(),
             currency: transaction.currency || leadRecord.currency || 'ILS',
             totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
-            fulfillmentStatus: 'PAID',
+            fulfillmentStatus: String('PAID').trim(),
             leadId: leadId,
-            selectedCurrency: leadRecord.selectedCurrency || '',
-            // 'Customer (link)': leadAirtableId ? [leadAirtableId] : undefined // Commented out - linking to lead requires Airtable record ID array
+            selectedCurrency: leadRecord.selectedCurrency || ''
+            // Note: 'Customer (link)' field is commented out as it requires special array format
         };
         
         // Remove undefined fields and ensure all fields are strings or numbers
@@ -214,6 +215,34 @@ exports.handler = async (event, context) => {
                 delete orderFields[key];
             }
         });
+        
+        // Special handling for string fields to remove any extra quotes
+        const stringFields = ['paymentStatus', 'fulfillmentStatus', 'paymentProvider'];
+        stringFields.forEach(field => {
+            if (orderFields[field] && typeof orderFields[field] === 'string') {
+                // Remove any surrounding quotes
+                orderFields[field] = orderFields[field].replace(/^"|"$/g, '').trim();
+            }
+        });
+        
+        // Verify all required fields are present
+        const requiredFields = [
+            'orderId', 'paymentStatus', 'customerEmail', 'customerName', 
+            'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
+            'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
+            'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency'
+        ];
+        
+        console.log('📋 Field verification:');
+        requiredFields.forEach(field => {
+            const hasField = orderFields.hasOwnProperty(field);
+            const value = orderFields[field];
+            console.log(`  ${field}: ${hasField ? '✅' : '❌'} = ${JSON.stringify(value)}`);
+        });
+        
+        // Log the final paymentStatus value to verify
+        console.log('🔍 Final paymentStatus value:', JSON.stringify(orderFields.paymentStatus));
+        console.log('🔍 paymentStatus type:', typeof orderFields.paymentStatus);
         
         console.log('Order fields to create:', JSON.stringify(orderFields, null, 2));
         
