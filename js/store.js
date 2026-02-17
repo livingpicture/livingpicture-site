@@ -589,6 +589,47 @@ function updateUIForStep(step) {
     }
 }
 
+// Compress image before upload
+async function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.85) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+            // Calculate new dimensions
+            let { width, height } = img;
+            
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width *= ratio;
+                height *= ratio;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw and compress
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+                console.log(`Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+                resolve(new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                }));
+            }, 'image/jpeg', quality);
+        };
+        
+        img.onerror = () => {
+            console.warn('Failed to load image for compression, using original');
+            resolve(file);
+        };
+        
+        img.src = URL.createObjectURL(file);
+    });
+}
+
 // Upload a single file to Cloudinary
 async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
@@ -597,10 +638,17 @@ async function uploadToCloudinary(file) {
         console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
+    // Compress image before upload for mobile performance
+    let processedFile = file;
+    if (file.size > 1024 * 1024) { // Only compress if larger than 1MB
+        console.log(`Compressing ${file.name} before upload...`);
+        processedFile = await compressImage(file);
+    }
+
     const folderPath = getCloudinaryFolderPath();
     
     const formDataToUpload = new FormData();
-    formDataToUpload.append('file', file);
+    formDataToUpload.append('file', processedFile);
     // Use the original preset that should be whitelisted for unsigned uploads
     formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
     // Try folder parameter to override preset default
@@ -611,8 +659,10 @@ async function uploadToCloudinary(file) {
 
     console.log('Uploading to Cloudinary:', {
         file: file.name,
-        size: file.size,
-        type: file.type,
+        originalSize: file.size,
+        compressedSize: processedFile.size,
+        compressionRatio: file.size !== processedFile.size ? `${((1 - processedFile.size / file.size) * 100).toFixed(1)}%` : 'N/A',
+        type: processedFile.type,
         publicId: publicId,
         folder: folderPath,
         preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
@@ -783,24 +833,16 @@ async function processFiles(files) {
 
     // Determine concurrency based on device type (mobile or desktop)
     const isMobile = window.innerWidth <= 768; // Common breakpoint for mobile devices
-    // Mobile: 2-3 concurrent, Desktop: 4-6 concurrent based on device capabilities
-    const maxConcurrent = isMobile ?
-        Math.min(3, Math.max(2, navigator.hardwareConcurrency || 2)) : // Mobile: 2-3
-        Math.min(6, Math.max(4, navigator.hardwareConcurrency || 4)); // Desktop: 4-6
-
-    // Process files with optimized concurrency control
     const processFilesOptimized = async (filesToProcess) => {
-        const results = [];
-        const processing = new Set();
         const newPhotos = [];
         let processed = 0;
 
-        // Process files with controlled concurrency
-        const processFile = async (file) => {
+        // Process files one by one
+        for (const file of filesToProcess) {
             // Check file type first (fast check before hashing)
             if (!file.type.startsWith('image/')) {
                 console.log('Skipping non-image file:', file.name);
-                return { success: false, file, error: 'Not an image' };
+                continue;
             }
 
             // Generate file fingerprint (quick hash based on name, size, and last modified)
@@ -809,19 +851,16 @@ async function processFiles(files) {
             // Check for duplicates
             if (existingHashes.has(fileFingerprint)) {
                 duplicateCount++;
-                return { success: false, file, error: 'Duplicate file' };
+                continue;
             }
 
             // Mark as processed
             existingHashes.add(fileFingerprint);
 
-            // Create object URL (this is the most expensive part)
-            const objectUrl = URL.createObjectURL(file);
-
-            // Create photo object
+            // Create photo object with temporary placeholder (no expensive objectUrl yet)
             const photo = {
                 id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                previewUrl: objectUrl,
+                previewUrl: null, // Will be set after Cloudinary upload
                 file: file,
                 name: file.name,
                 size: file.size,
@@ -829,50 +868,37 @@ async function processFiles(files) {
                 uploadStatus: 'uploading'
             };
 
-            // Add immediately so UI can show uploading state
+            // Add to array immediately
             formData.photos.push(photo);
             newPhotos.push(photo);
-            renderPhotoGrid();
-            updateContinueToMusicButtonState();
 
             try {
+                // Upload to Cloudinary
                 const uploadResult = await uploadToCloudinary(file);
+                
+                // Update photo with Cloudinary data and optimized thumbnail URL
                 photo.permanentUrl = uploadResult.secure_url;
                 photo.publicId = uploadResult.public_id;
                 photo.uploadStatus = 'uploaded';
+                
+                // Create optimized thumbnail URL (200px width, auto height, limited crop)
+                photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
+                
             } catch (e) {
                 console.error('Cloudinary upload failed for', file.name, e);
                 photo.uploadStatus = 'failed';
+                // Create a fallback preview for failed uploads
+                photo.previewUrl = null;
             }
 
+            processed++;
+            
+            // Update progress
+            updateProgress(processed, filesToProcess.length);
+
+            // Batch UI updates - only update after each file is fully processed
             renderPhotoGrid();
             updateContinueToMusicButtonState();
-
-            // Add to results
-            return { success: true, file, photo };
-        };
-
-        // Process a batch of files
-        const processBatch = async (batch) => {
-            const batchPromises = batch.map(file =>
-                processFile(file).then(result => {
-                    processed++;
-
-                    // Update progress
-                    updateProgress(processed, filesToProcess.length);
-
-                    return result;
-                })
-            );
-
-            return Promise.all(batchPromises);
-        };
-
-        // Process files in batches with controlled concurrency
-        const batchSize = maxConcurrent;
-        for (let i = 0; i < filesToProcess.length; i += batchSize) {
-            const batch = filesToProcess.slice(i, i + batchSize);
-            await processBatch(batch);
         }
 
         return newPhotos;
@@ -886,6 +912,7 @@ async function processFiles(files) {
                 const newPhotos = await processFilesOptimized(validFiles);
 
                 // After all files are uploaded and processed
+                console.log('📸 All photos processed. Current step:', getCurrentStep());
                 if (window.leadTracker) {
                     // Check if at least one upload succeeded before sending photosFolder
                     const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
@@ -898,11 +925,13 @@ async function processFiles(files) {
                         console.log('PHOTOS_UPLOADED firstImageUrl:', firstImageUrl);
                         console.log(`Successful uploads: ${successfulUploads.length}/${formData.photos.length}`);
                         
+                        console.log('⚠️ About to call trackStep PHOTOS_UPLOADED...');
                         await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
                             photosFolder: folderPath,
                             imageUrls: firstImageUrl,
                             photoCount: successfulUploads.length
                         });
+                        console.log('✅ trackStep PHOTOS_UPLOADED completed');
                     } else {
                         console.warn('No successful uploads, skipping photosFolder tracking');
                         await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
@@ -1125,6 +1154,17 @@ function renderPhotoGrid() {
     // Update the photo counter
     updatePhotoCounter();
     updateContinueToMusicButtonState();
+}
+
+// Get current step number
+function getCurrentStep() {
+    const activeStep = document.querySelector('.store-step.active');
+    if (activeStep) {
+        const stepId = activeStep.id;
+        const stepNumber = parseInt(stepId.replace('step-', ''));
+        return stepNumber;
+    }
+    return null;
 }
 
 // Update the Continue to Music button state based on photo upload statuses
