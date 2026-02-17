@@ -189,7 +189,7 @@ exports.handler = async (event, context) => {
         const orderFields = {
             // Exact match with Airtable Orders table fields
             orderId: effectiveOrderId,
-            paymentStatus: String('PAID').trim(),
+            paymentStatus: 'PAID', // Clean string, no extra quotes
             customerEmail: leadRecord.customerEmail || data.customer?.email || '',
             customerName: leadRecord.customerName || data.customer?.name || '',
             country: leadRecord.country || data.customer?.country_iso || '',
@@ -199,14 +199,15 @@ exports.handler = async (event, context) => {
             packageKey: leadRecord.packageKey || '',
             imageUrls: cloudinaryFolderUrl,
             transactionId: transaction.uid || '',
-            paymentProvider: String('PayPlus').trim(),
+            paymentProvider: 'PayPlus', // Clean string
             currency: transaction.currency || leadRecord.currency || 'ILS',
             totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
-            fulfillmentStatus: String('PAID').trim(),
+            fulfillmentStatus: 'NEW', // Use valid option from Airtable
             leadId: leadId,
-            selectedCurrency: leadRecord.selectedCurrency || ''
-            // Note: 'Customer (link)' field is commented out as it requires special array format
+            selectedCurrency: leadRecord.selectedCurrency || '',
+            // Customer (link) as plain string since it's Single line text in Airtable
+            'Customer (link)': leadRecord.airtableRecordId || leadId
         };
         
         // Remove undefined fields and ensure all fields are strings or numbers
@@ -216,21 +217,13 @@ exports.handler = async (event, context) => {
             }
         });
         
-        // Special handling for string fields to remove any extra quotes
-        const stringFields = ['paymentStatus', 'fulfillmentStatus', 'paymentProvider'];
-        stringFields.forEach(field => {
-            if (orderFields[field] && typeof orderFields[field] === 'string') {
-                // Remove any surrounding quotes
-                orderFields[field] = orderFields[field].replace(/^"|"$/g, '').trim();
-            }
-        });
-        
         // Verify all required fields are present
         const requiredFields = [
             'orderId', 'paymentStatus', 'customerEmail', 'customerName', 
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
             'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
-            'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency'
+            'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
+            'Customer (link)'
         ];
         
         console.log('📋 Field verification:');
