@@ -5,12 +5,6 @@ const PRICING_TIERS = [
     { photos: '26+', price: 12 },
 ];
 
-const CURRENCIES = [
-    { code: 'ILS', symbol: '₪' },
-    { code: 'USD', symbol: '$' },
-    { code: 'EUR', symbol: '€' }
-];
-
 let currentCurrency = 'ILS';
 
 // Store the current step and form data
