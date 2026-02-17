@@ -1,9 +1,16 @@
 const PRICING_TIERS = [
     { photos: '1-5', price: 1 },
-    { photos: '6-10', price: 18 },
-    { photos: '11-20', price: 15 },
-    { photos: '21+', price: 12 },
+    { photos: '6-15', price: 18 },
+    { photos: '16-25', price: 15 },
+    { photos: '26+', price: 12 },
 ];
+
+const CURRENCIES = [
+    { code: 'ILS', symbol: '₪' },
+    { code: 'USD', symbol: '$' },
+    { code: 'EUR', symbol: '€' }
+];
+
 let currentCurrency = 'ILS';
 
 // Store the current step and form data
@@ -899,6 +906,8 @@ async function processFiles(files) {
             // Batch UI updates - only update after each file is fully processed
             renderPhotoGrid();
             updateContinueToMusicButtonState();
+            updatePricingDisplay(); // Update pricing after each photo is processed
+            
         }
 
         return newPhotos;
