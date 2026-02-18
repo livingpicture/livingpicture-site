@@ -116,7 +116,7 @@ function initStore() {
 function getCloudinaryFolderPath() {
     // Ensure we always have a leadId; fallback to generated one if missing
     if (!formData.leadId) {
-        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        formData.leadId = window.leadTracker?.leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
     }
     return 'livingpicture/leads/' + formData.leadId;
 }
@@ -354,6 +354,36 @@ function setupEventListeners() {
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             const nextStep = nextButtons[buttonId];
+            const currentStepNum = currentStep;
+
+            // Validate current step before proceeding
+            if (!validateCurrentStep(currentStepNum)) {
+                // Show appropriate error message based on current step
+                let errorMessage = '';
+                switch (currentStepNum) {
+                    case 1:
+                        errorMessage = 'Please enter a memory name before continuing.';
+                        break;
+                    case 2:
+                        errorMessage = 'Please add at least one photo and wait for it to finish uploading before continuing.';
+                        break;
+                    case 3:
+                        errorMessage = 'Please select a song or choose team selection before continuing.';
+                        break;
+                    case 4:
+                        errorMessage = 'Please fill in all required customer details before continuing.';
+                        break;
+                    default:
+                        errorMessage = 'Please complete the current step before continuing.';
+                }
+                
+                if (typeof showError === 'function') {
+                    showError(errorMessage);
+                } else {
+                    alert(errorMessage);
+                }
+                return;
+            }
 
             if (typeof saveCurrentStep === 'function' && !saveCurrentStep()) return;
 
@@ -422,11 +452,15 @@ function setupEventListeners() {
     if (selectSongRadio) {
         selectSongRadio.addEventListener('change', () => {
             updateMusicSelectionUI();
+            // Validate when choose song is selected (to disable button if fields are empty)
+            validateMusicInputs();
         });
     }
     if (teamChooseRadio) {
         teamChooseRadio.addEventListener('change', () => {
             updateMusicSelectionUI();
+            // Immediately validate when team choose is selected
+            validateMusicInputs();
         });
     }
 
@@ -436,6 +470,8 @@ function setupEventListeners() {
             if (selectSongRadio) {
                 selectSongRadio.checked = true;
                 updateMusicSelectionUI();
+                // Validate when choose song is selected (to disable button if fields are empty)
+                validateMusicInputs();
             }
         });
     }
@@ -444,6 +480,8 @@ function setupEventListeners() {
             if (teamChooseRadio) {
                 teamChooseRadio.checked = true;
                 updateMusicSelectionUI();
+                // Immediately validate when team choose is selected
+                validateMusicInputs();
             }
         });
     }
@@ -635,7 +673,7 @@ async function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 
 async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
     if (!formData.leadId) {
-        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        formData.leadId = window.leadTracker?.leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
         console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
@@ -716,7 +754,7 @@ async function uploadToCloudinary(file) {
 async function processFiles(files) {
     // Ensure we have a valid leadId before any uploads start
     if (!formData.leadId) {
-        formData.leadId = window.leadTracker?.leadId || `lead_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        formData.leadId = window.leadTracker?.leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
         console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
@@ -1456,10 +1494,9 @@ async function completePurchase() {
     }
 
     try {
-        // Generate order ID using crypto.randomUUID if available, or fallback to timestamp
-        const orderId = typeof crypto !== 'undefined' && crypto.randomUUID 
-            ? `LP-${crypto.randomUUID()}` 
-            : `LP-${Date.now()}-${Math.floor(Math.random()*1e6)}`;
+        // Generate short, clean order number (5-6 digit random number)
+        const orderNumber = Math.floor(10000 + Math.random() * 90000); // 5-digit number between 10000-99999
+        const orderId = orderNumber.toString();
 
         // Save order data to localStorage for the thank you page
         const orderData = {

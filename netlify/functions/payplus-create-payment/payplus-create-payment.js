@@ -106,7 +106,7 @@ exports.handler = async (event, context) => {
 
 
         // Prepare PayPlus request payload
-        const effectiveLeadId = leadId || `lead_${Date.now()}`;
+        const effectiveLeadId = leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
         const effectiveOrderId = orderId || `ord_${effectiveLeadId}`;
         
         // PayPlus more_info fields - use multiple fields to ensure leadId is passed

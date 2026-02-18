@@ -171,6 +171,150 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // CTA button click handler removed as per request
     
+    // Video autoplay functionality
+    const initVideoAutoplay = () => {
+        const videos = document.querySelectorAll('video[autoplay]');
+        
+        if (videos.length === 0) return;
+        
+        // Create IntersectionObserver to detect when videos are in viewport
+        const videoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const video = entry.target;
+                
+                if (entry.isIntersecting) {
+                    // Video is in viewport - try to play
+                    playVideo(video);
+                } else {
+                    // Video is out of viewport - pause to save resources
+                    if (!video.hasAttribute('data-always-play')) {
+                        video.pause();
+                    }
+                }
+            });
+        }, {
+            threshold: 0.5, // Play when 50% of video is visible
+            rootMargin: '50px' // Start playing 50px before video comes into view
+        });
+        
+        // Observe all videos
+        videos.forEach(video => {
+            // Set up video event listeners
+            video.addEventListener('loadeddata', () => {
+                videoObserver.observe(video);
+            });
+            
+            video.addEventListener('error', () => {
+                console.warn('Video failed to load:', video.src);
+                // Try to reload video
+                video.load();
+            });
+            
+            // Handle user interaction fallback
+            video.addEventListener('click', () => {
+                if (video.paused) {
+                    playVideo(video);
+                } else {
+                    video.pause();
+                }
+            });
+            
+            // Try to play immediately if already loaded
+            if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+                videoObserver.observe(video);
+            }
+        });
+    };
+    
+    // Function to play video with proper error handling
+    const playVideo = async (video) => {
+        try {
+            // Ensure video is muted for autoplay compatibility
+            video.muted = true;
+            
+            // Try to play
+            await video.play();
+            
+            // If successful, ensure it's looping
+            video.loop = true;
+            
+        } catch (error) {
+            console.warn('Autoplay failed, trying with user interaction:', error);
+            
+            // Fallback: try to play with a silent user interaction
+            const playAttempt = () => {
+                video.muted = true;
+                video.play().catch(e => {
+                    console.warn('Video play failed even with interaction:', e);
+                    // Show a play button overlay as last resort
+                    showPlayButton(video);
+                });
+            };
+            
+            // Try immediate play
+            playAttempt();
+        }
+    };
+    
+    // Function to show play button overlay for videos that can't autoplay
+    const showPlayButton = (video) => {
+        // Check if play button already exists
+        if (video.parentNode.querySelector('.video-play-overlay')) return;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'video-play-overlay';
+        overlay.innerHTML = `
+            <button class="video-play-btn" aria-label="Play video">
+                <i class="fas fa-play"></i>
+            </button>
+        `;
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.3);
+            cursor: pointer;
+            z-index: 10;
+        `;
+        
+        const playBtn = overlay.querySelector('.video-play-btn');
+        playBtn.style.cssText = `
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #333;
+            transition: all 0.3s ease;
+        `;
+        
+        playBtn.addEventListener('click', () => {
+            video.muted = true;
+            video.play();
+            overlay.remove();
+        });
+        
+        // Make video container relative if not already
+        if (getComputedStyle(video.parentNode).position === 'static') {
+            video.parentNode.style.position = 'relative';
+        }
+        
+        video.parentNode.appendChild(overlay);
+    };
+    
+    // Initialize video autoplay
+    initVideoAutoplay();
+    
     // Add touch effect to buttons
     const buttons = document.querySelectorAll('button, a');
     buttons.forEach(button => {
