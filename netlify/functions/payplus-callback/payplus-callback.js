@@ -192,6 +192,7 @@ exports.handler = async (event, context) => {
             paymentStatus: 'PAID', // Clean string, no extra quotes
             customerEmail: leadRecord.customerEmail || data.customer?.email || '',
             customerName: leadRecord.customerName || data.customer?.name || '',
+            customerPhone: leadRecord.customerPhone || data.customer?.phone || '',
             country: leadRecord.country || data.customer?.country_iso || '',
             memoryTitle: leadRecord.memoryTitle || '',
             songChoice: leadRecord.songChoice || '',
@@ -219,7 +220,7 @@ exports.handler = async (event, context) => {
         
         // Verify all required fields are present
         const requiredFields = [
-            'orderId', 'paymentStatus', 'customerEmail', 'customerName', 
+            'orderId', 'paymentStatus', 'customerEmail', 'customerName', 'customerPhone',
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
             'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
             'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',

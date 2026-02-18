@@ -315,8 +315,11 @@ function setupFileUpload() {
 }
 
 function validateMusicInputs() {
-    if (teamChooseRadio && teamChooseRadio.checked) {
+    // Check if "Let Us Choose" is selected (either via radio button or form data)
+    if ((teamChooseRadio && teamChooseRadio.checked) || formData.music?.teamChoose) {
         updateNextButton('next-to-checkout', true);
+        // Clear any music input errors when team choose is selected
+        clearMusicInputErrors();
         return true;
     }
 
@@ -324,7 +327,58 @@ function validateMusicInputs() {
     const artist = artistNameInput ? artistNameInput.value.trim() : '';
     const isValid = !!(song && artist);
     updateNextButton('next-to-checkout', isValid);
+    
+    // Handle error states for music inputs
+    if (songNameInput) {
+        const songFormGroup = songNameInput.closest('.form-group');
+        const songError = document.getElementById('song-name-error');
+        
+        if (!song) {
+            songFormGroup?.classList.add('error');
+            songNameInput.classList.add('error');
+            if (songError) songError.style.display = 'block';
+        } else {
+            songFormGroup?.classList.remove('error');
+            songNameInput.classList.remove('error');
+            if (songError) songError.style.display = 'none';
+        }
+    }
+    
+    if (artistNameInput) {
+        const artistFormGroup = artistNameInput.closest('.form-group');
+        const artistError = document.getElementById('artist-name-error');
+        
+        if (!artist) {
+            artistFormGroup?.classList.add('error');
+            artistNameInput.classList.add('error');
+            if (artistError) artistError.style.display = 'block';
+        } else {
+            artistFormGroup?.classList.remove('error');
+            artistNameInput.classList.remove('error');
+            if (artistError) artistError.style.display = 'none';
+        }
+    }
+    
     return isValid;
+}
+
+// Clear music input errors
+function clearMusicInputErrors() {
+    if (songNameInput) {
+        const songFormGroup = songNameInput.closest('.form-group');
+        const songError = document.getElementById('song-name-error');
+        songFormGroup?.classList.remove('error');
+        songNameInput.classList.remove('error');
+        if (songError) songError.style.display = 'none';
+    }
+    
+    if (artistNameInput) {
+        const artistFormGroup = artistNameInput.closest('.form-group');
+        const artistError = document.getElementById('artist-name-error');
+        artistFormGroup?.classList.remove('error');
+        artistNameInput.classList.remove('error');
+        if (artistError) artistError.style.display = 'none';
+    }
 }
 
 async function handleFileSelect(e) {
@@ -366,6 +420,12 @@ function setupEventListeners() {
                         break;
                     case 2:
                         errorMessage = 'Please add at least one photo and wait for it to finish uploading before continuing.';
+                        // Show specific photo upload error
+                        const photoErrorElement = document.getElementById('photo-upload-error');
+                        if (photoErrorElement) {
+                            photoErrorElement.style.display = 'block';
+                            photoErrorElement.textContent = errorMessage;
+                        }
                         break;
                     case 3:
                         errorMessage = 'Please select a song or choose team selection before continuing.';
@@ -669,7 +729,7 @@ async function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 
     });
 }
 
-// Upload a single file to Cloudinary
+// Upload a single file to Cloudinary using unsigned upload method
 async function uploadToCloudinary(file) {
     // Ensure leadId is available before upload
     if (!formData.leadId) {
@@ -677,7 +737,7 @@ async function uploadToCloudinary(file) {
         console.log('Initialized leadId for uploads:', formData.leadId);
     }
 
-    // Compress image before upload for mobile performance
+    // Compress image before upload for mobile performance and memory efficiency
     let processedFile = file;
     if (file.size > 1024 * 1024) { // Only compress if larger than 1MB
         console.log(`Compressing ${file.name} before upload...`);
@@ -688,15 +748,26 @@ async function uploadToCloudinary(file) {
     
     const formDataToUpload = new FormData();
     formDataToUpload.append('file', processedFile);
-    // Use the original preset that should be whitelisted for unsigned uploads
-    formDataToUpload.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned');
-    // Try folder parameter to override preset default
+    
+    // Use unsigned upload preset - this is the key change for unsigned uploads
+    const unsignedPreset = window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned';
+    formDataToUpload.append('upload_preset', unsignedPreset);
+    
+    // Add folder parameter for organization
     formDataToUpload.append('folder', folderPath);
-    // Use public_id for consistent naming
-    const publicId = folderPath + '/' + file.name.split('.')[0];
+    
+    // Generate unique public_id to avoid conflicts
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substr(2, 6);
+    const cleanFileName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+    const publicId = `${folderPath}/${cleanFileName}_${timestamp}_${randomSuffix}`;
     formDataToUpload.append('public_id', publicId);
 
-    console.log('Uploading to Cloudinary:', {
+    // Add quality and format optimizations for better performance
+    formDataToUpload.append('quality', 'auto:good');
+    formDataToUpload.append('fetch_format', 'auto');
+
+    console.log('Uploading to Cloudinary (unsigned):', {
         file: file.name,
         originalSize: file.size,
         compressedSize: processedFile.size,
@@ -704,12 +775,13 @@ async function uploadToCloudinary(file) {
         type: processedFile.type,
         publicId: publicId,
         folder: folderPath,
-        preset: window.CLOUDINARY_UPLOAD_PRESET || 'livingpicture_orders_unsigned',
+        preset: unsignedPreset,
         leadId: formData.leadId,
-        note: 'Using both folder and public_id to override preset default'
+        note: 'Using unsigned upload preset with optimizations'
     });
 
     try {
+        // Use unsigned upload endpoint
         const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
             method: 'POST',
             body: formDataToUpload
@@ -723,7 +795,8 @@ async function uploadToCloudinary(file) {
                 status: response.status,
                 statusText: response.statusText,
                 body: errText,
-                folder: folderPath
+                folder: folderPath,
+                preset: unsignedPreset
             });
             throw new Error(`Cloudinary upload failed: ${response.statusText} | ${errText}`);
         }
@@ -740,290 +813,19 @@ async function uploadToCloudinary(file) {
         // Ensure required fields exist
         if (!result.secure_url || !result.public_id) {
             console.error('Cloudinary response missing required fields:', result);
-            throw new Error('Invalid Cloudinary response: missing secure_url or public_id');
+            throw new Error('Invalid Cloudinary response: missing required fields');
         }
 
-        return result;
+        return {
+            secure_url: result.secure_url,
+            public_id: result.public_id,
+            format: result.format,
+            bytes: result.bytes,
+            folder: result.folder || folderPath
+        };
     } catch (error) {
-        console.error('Upload failed for file:', file.name, error);
+        console.error('Cloudinary upload error:', error);
         throw error;
-    }
-}
-
-// Process selected files
-async function processFiles(files) {
-    // Ensure we have a valid leadId before any uploads start
-    if (!formData.leadId) {
-        formData.leadId = window.leadTracker?.leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
-        console.log('Initialized leadId for uploads:', formData.leadId);
-    }
-
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const heicTypes = ['image/heic', 'image/heif', 'image/heif-sequence'];
-
-    // Check for HEIC files first to show specific error
-    const heicFiles = Array.from(files).filter(file => heicTypes.some(type =>
-        file.type.toLowerCase().includes(type.split('/')[1])
-    ));
-
-    if (heicFiles.length > 0) {
-        showError('HEIC/HEIF files are not supported. Please convert to JPG or PNG before uploading.');
-        reenableFileInput();
-        return;
-    }
-
-    // Check for other valid image types
-    const validFiles = Array.from(files).filter(file =>
-        validImageTypes.includes(file.type.toLowerCase())
-    );
-
-    if (validFiles.length === 0) {
-        showError('Please select valid image files (JPEG, PNG, or WebP)');
-        return;
-    }
-
-    // Get DOM elements
-    const fileInput = document.getElementById('photo-upload');
-    const browseBtn = document.getElementById('browse-files');
-    const progressContainer = document.getElementById('upload-progress');
-    const progressBar = document.getElementById('upload-progress-bar');
-    const progressText = document.getElementById('upload-progress-text');
-
-    if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) return;
-
-    // Function to trigger file input
-    const triggerFileInput = () => {
-        fileInput.click();
-    };
-
-    // Set up event listener for browse button
-    browseBtn.addEventListener('click', triggerFileInput);
-
-    // Store original button HTML to restore later
-    const originalBtnHTML = browseBtn.innerHTML;
-
-    // Set loading state
-    const setLoading = (isLoading) => {
-        if (isLoading) {
-            browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            browseBtn.classList.add('processing');
-            progressContainer.style.display = 'block';
-        } else {
-            // Restore button
-            browseBtn.innerHTML = originalBtnHTML;
-            browseBtn.classList.remove('processing');
-
-            // Fade out progress bar
-            setTimeout(() => {
-                progressContainer.style.opacity = '0';
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                    progressContainer.style.opacity = '1';
-                    progressBar.style.width = '0%';
-                }, 300);
-            }, 500);
-        }
-    };
-
-    // Update progress
-    const updateProgress = (processed, total) => {
-        const percent = Math.round((processed / total) * 100);
-        progressBar.style.width = `${percent}%`;
-        progressText.textContent = `Processing ${processed} of ${total} photos...`;
-    };
-
-    // Start loading
-    setLoading(true);
-    updateProgress(0, files.length);
-
-    // Lock the Continue button until Cloudinary uploads are done
-    updateContinueToMusicButtonState();
-
-    // Check total size
-    const totalSize = Array.from(files).reduce((total, file) => total + file.size, 0);
-    const maxTotalSize = 120 * 1024 * 1024; // 120MB
-
-    // Format bytes to human-readable string
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    if (totalSize > maxTotalSize) {
-        const currentSize = formatFileSize(totalSize);
-        const maxSize = formatFileSize(maxTotalSize);
-        showError(`Total file size (${currentSize}) exceeds the maximum allowed (${maxSize}). Please upload fewer or smaller photos.`);
-        reenableFileInput();
-        return;
-    }
-
-    // Check for duplicate files
-    const existingHashes = new Set(formData.photos.map(photo => photo.fileFingerprint));
-    let duplicateCount = 0;
-    let processedCount = 0;
-    const fileArray = Array.from(files);
-    const totalFiles = fileArray.length;
-    let pendingUIUpdate = false;
-    let lastUpdateTime = 0;
-    let lastProgressUpdate = 0;
-
-    // Determine concurrency based on device type (mobile or desktop)
-    const isMobile = window.innerWidth <= 768; // Common breakpoint for mobile devices
-    const processFilesOptimized = async (filesToProcess) => {
-        const newPhotos = [];
-        let processed = 0;
-
-        // Process files one by one
-        for (const file of filesToProcess) {
-            // Check file type first (fast check before hashing)
-            if (!file.type.startsWith('image/')) {
-                console.log('Skipping non-image file:', file.name);
-                continue;
-            }
-
-            // Generate file fingerprint (quick hash based on name, size, and last modified)
-            const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
-
-            // Check for duplicates
-            if (existingHashes.has(fileFingerprint)) {
-                duplicateCount++;
-                continue;
-            }
-
-            // Mark as processed
-            existingHashes.add(fileFingerprint);
-
-            // Create photo object with temporary placeholder (no expensive objectUrl yet)
-            const photo = {
-                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                previewUrl: null, // Will be set after Cloudinary upload
-                file: file,
-                name: file.name,
-                size: file.size,
-                fileFingerprint: fileFingerprint,
-                uploadStatus: 'uploading'
-            };
-
-            // Add to array immediately
-            formData.photos.push(photo);
-            newPhotos.push(photo);
-
-            try {
-                // Upload to Cloudinary
-                const uploadResult = await uploadToCloudinary(file);
-                
-                // Update photo with Cloudinary data and optimized thumbnail URL
-                photo.permanentUrl = uploadResult.secure_url;
-                photo.publicId = uploadResult.public_id;
-                photo.uploadStatus = 'uploaded';
-                
-                // Create optimized thumbnail URL (200px width, auto height, limited crop)
-                photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
-                
-            } catch (e) {
-                console.error('Cloudinary upload failed for', file.name, e);
-                photo.uploadStatus = 'failed';
-                // Create a fallback preview for failed uploads
-                photo.previewUrl = null;
-            }
-
-            processed++;
-            
-            // Update progress
-            updateProgress(processed, filesToProcess.length);
-
-            // Batch UI updates - only update after each file is fully processed
-            renderPhotoGrid();
-            updateContinueToMusicButtonState();
-            updatePricingDisplay(); // Update pricing after each photo is processed
-            
-        }
-
-        return newPhotos;
-    };
-
-    // Start processing files
-    try {
-        // Process files in the background
-        (async () => {
-            try {
-                const newPhotos = await processFilesOptimized(validFiles);
-
-                // After all files are uploaded and processed
-                console.log('📸 All photos processed. Current step:', getCurrentStep());
-                if (window.leadTracker) {
-                    // Check if at least one upload succeeded before sending photosFolder
-                    const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
-                    
-                    if (successfulUploads.length > 0) {
-                        // Send folder path and first image URL for easy access
-                        const folderPath = getCloudinaryFolderPath();
-                        const firstImageUrl = successfulUploads[0]?.permanentUrl || '';
-                        console.log('PHOTOS_UPLOADED folderPath:', folderPath);
-                        console.log('PHOTOS_UPLOADED firstImageUrl:', firstImageUrl);
-                        console.log(`Successful uploads: ${successfulUploads.length}/${formData.photos.length}`);
-                        
-                        console.log('⚠️ About to call trackStep PHOTOS_UPLOADED...');
-                        await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                            photosFolder: folderPath,
-                            imageUrls: firstImageUrl,
-                            photoCount: successfulUploads.length
-                        });
-                        console.log('✅ trackStep PHOTOS_UPLOADED completed');
-                    } else {
-                        console.warn('No successful uploads, skipping photosFolder tracking');
-                        await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
-                            photoCount: 0
-                        });
-                    }
-                }
-
-                if (newPhotos.length > 0) {
-                    showSuccess(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`);
-                }
-
-                // Final UI updates after processing
-                renderPhotoGrid();
-                updatePhotoCounter();
-                updatePricingDisplay();
-
-                // Enable Continue only when all photos have permanent URLs
-                const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
-                if (!allPhotosUploaded && formData.photos.length > 0) {
-                    console.error('Some photos are missing permanentUrl; keeping Continue disabled. Upload statuses:', formData.photos.map(p => ({ name: p.name, uploadStatus: p.uploadStatus })));
-                    showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
-                }
-                updateContinueToMusicButtonState();
-
-                saveToLocalStorage();
-            } catch (error) {
-                console.error('Error processing files:', error);
-                showError('An error occurred while processing your photos. Please try again.');
-            } finally {
-                // Clean up
-                setLoading(false);
-
-                // Re-enable file input by resetting it
-                const fileInput = document.getElementById('photo-upload');
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-            }
-        })();
-    } catch (error) {
-        console.error('Error processing files:', error);
-        showError('An error occurred while processing your photos. Please try again.');
-    } finally {
-        // Clean up
-        setLoading(false);
-        // Re-enable file input by resetting it
-        const fileInput = document.getElementById('photo-upload');
-        if (fileInput) {
-            fileInput.value = '';
-        }
     }
 }
 
@@ -1210,14 +1012,9 @@ function getCurrentStep() {
 
 // Update the Continue to Music button state based on photo upload statuses
 function updateContinueToMusicButtonState() {
-    const continueBtn = document.getElementById('next-to-music');
-    if (!continueBtn) return;
-
     const photos = formData.photos || [];
     if (photos.length === 0) {
-        continueBtn.disabled = true;
-        continueBtn.textContent = 'Continue';
-        continueBtn.classList.add('btn-disabled');
+        updateNextButton('next-to-music', false);
         return;
     }
 
@@ -1225,23 +1022,22 @@ function updateContinueToMusicButtonState() {
     const failedCount = photos.filter(p => p.uploadStatus === 'error').length;
     const uploadedCount = photos.filter(p => p.uploadStatus === 'uploaded').length;
 
+    const continueBtn = document.getElementById('next-to-music');
+    if (!continueBtn) return;
+
     if (uploadingCount > 0) {
-        continueBtn.disabled = true;
+        updateNextButton('next-to-music', false);
         continueBtn.textContent = `Uploading ${uploadingCount}/${photos.length}...`;
-        continueBtn.classList.add('btn-disabled');
     } else if (failedCount > 0) {
-        continueBtn.disabled = true;
+        updateNextButton('next-to-music', false);
         continueBtn.textContent = `Fix ${failedCount} error${failedCount > 1 ? 's' : ''} to continue`;
-        continueBtn.classList.add('btn-disabled');
     } else if (uploadedCount === photos.length) {
-        continueBtn.disabled = false;
+        updateNextButton('next-to-music', true);
         continueBtn.textContent = 'Continue';
-        continueBtn.classList.remove('btn-disabled');
     } else {
         // Mixed or unknown state
-        continueBtn.disabled = true;
+        updateNextButton('next-to-music', false);
         continueBtn.textContent = 'Processing...';
-        continueBtn.classList.add('btn-disabled');
     }
 }
 
@@ -1421,11 +1217,9 @@ function updateMusicSelectionUI() {
     // Update form data and validate
     saveCurrentStep();
 
-    // Update button state
-    const nextButton = document.getElementById('next-to-checkout');
-    if (nextButton) {
-        nextButton.disabled = !(isTeamChoose || (songNameInput?.value.trim() && artistNameInput?.value.trim()));
-    }
+    // Update button state using updateNextButton for consistency
+    const isValid = isTeamChoose || (songNameInput?.value.trim() && artistNameInput?.value.trim());
+    updateNextButton('next-to-checkout', isValid);
 }
 
 // Update order summary
@@ -1627,7 +1421,7 @@ function showError(message) {
     }, 6000);
 }
 
-// Retry photo upload
+// Retry photo upload using unsigned upload method
 async function retryPhotoUpload(photoId) {
     const photo = formData.photos.find(p => p.id === photoId);
     if (!photo) {
@@ -1637,31 +1431,21 @@ async function retryPhotoUpload(photoId) {
 
     // Reset status
     photo.uploadStatus = 'uploading';
+    photo.previewUrl = null;
     renderPhotoGrid();
     updateContinueToMusicButtonState();
 
     try {
-        // Re-upload to Cloudinary
-        const formDataToUpload = new FormData();
-        formDataToUpload.append('file', photo.file);
-        formDataToUpload.append('upload_preset', 'livingpicture-preset');
-        formDataToUpload.append('folder', getCloudinaryFolderPath());
-
-        const response = await fetch('https://api.cloudinary.com/v1_1/dojuekij4/image/upload', {
-            method: 'POST',
-            body: formDataToUpload
-        });
-
-        if (!response.ok) {
-            throw new Error(`Cloudinary upload failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
+        // Use the same uploadToCloudinary function for consistency
+        const uploadResult = await uploadToCloudinary(photo.file);
 
         // Update photo with Cloudinary data
-        photo.permanentUrl = result.secure_url;
-        photo.publicId = result.public_id;
+        photo.permanentUrl = uploadResult.secure_url;
+        photo.publicId = uploadResult.public_id;
         photo.uploadStatus = 'uploaded';
+        
+        // Create optimized thumbnail URL using Cloudinary dynamic transformations (w_200,c_limit)
+        photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
 
         showSuccess('Photo uploaded successfully');
     } catch (error) {
@@ -2129,6 +1913,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await window.leadTracker.updateLead({
                     customerName: formData.customer?.name,
                     customerEmail: formData.customer?.email,
+                    customerPhone: formData.customer?.phone,
                     country: formData.customer?.country,
                     currency: formData.currency,
                     totalAmount: formData.pricing?.totalPrice,
@@ -2183,6 +1968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await window.leadTracker.updateLead({
                 customerName: formData.customer?.name,
                 customerEmail: formData.customer?.email,
+                customerPhone: formData.customer?.phone,
                 country: formData.customer?.country,
                 step: 'DETAILS_ENTERED'
             }, true);
