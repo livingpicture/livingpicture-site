@@ -818,6 +818,12 @@ function setupEventListeners() {
                 teamChooseRadio.checked = true;
                 updateMusicSelectionUI();
                 // Immediately validate when team choose is selected
+                validateMusicInputs();
+            }
+        });
+    }
+
+    // Setup drag and drop
     if (dropZone) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
@@ -831,30 +837,11 @@ function setupEventListeners() {
         dropZone.addEventListener('drop', handleDrop, false);
     }
     
-    const stepElement = document.getElementById(`step-${stepNumber}`);
-    if (stepElement) stepElement.classList.add('active');
-
-    document.querySelectorAll('.step').forEach(step => {
-        if (parseInt(step.getAttribute('data-step')) === stepNumber) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    });
-
-    const progress = (stepNumber / 4) * 100;
-    const desktopProgress = document.querySelector('.progress');
-    if (desktopProgress) desktopProgress.style.width = `${progress}%`;
-    const mobileProgressBar = document.getElementById('mobile-progress-bar');
-    if (mobileProgressBar) mobileProgressBar.style.width = `${progress}%`;
-    const currentStepElement = document.getElementById('current-step');
-    if (currentStepElement) currentStepElement.textContent = stepNumber;
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    currentStep = stepNumber;
-    updateUIForStep(stepNumber);
-    return true;
+    // Setup file input
+    const fileInput = document.getElementById('photo-upload');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileSelect);
+    }
 }
 
 function validateCurrentStep(stepNumber) {

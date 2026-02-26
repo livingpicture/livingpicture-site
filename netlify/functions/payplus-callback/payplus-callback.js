@@ -430,8 +430,9 @@ exports.handler = async (event, context) => {
         
         console.log('Order fields to create:', JSON.stringify(orderFields, null, 2));
         
+        let createdRecord = null;
         try {
-            const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
+            createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
             console.log('✓ Order record created successfully:', createdRecord[0].id);
             console.log('🔍 Created record fields:', JSON.stringify(createdRecord[0].fields, null, 2));
             
