@@ -344,13 +344,14 @@ function updatePricingDisplay() {
     const photoCount = formData.photos?.length || 0;
     const currency = currentCurrency || formData.currency || 'ILS';
     
-    // Safety check for CURRENCIES
-    if (!window.CURRENCIES) {
-        console.error('CURRENCIES not available - check if currency.js loaded properly');
-        return;
+    // Safety check for CURRENCIES with fallback
+    let currencySymbol = '₪'; // Default fallback
+    if (window.CURRENCIES) {
+        currencySymbol = window.CURRENCIES.find(c => c.code === currency)?.symbol || window.CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    } else {
+        console.warn('CURRENCIES not available yet - using default symbol. This may resolve on next update.');
+        // Don't return - continue with default symbol
     }
-    
-    const currencySymbol = window.CURRENCIES.find(c => c.code === currency)?.symbol || window.CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
 
     const getTier = (count) => {
         if (count >= 26) return '26+';
@@ -1565,10 +1566,13 @@ function updateOrderSummary() {
     const summaryMusic = document.getElementById('summary-music');
     const summaryCurrency = document.getElementById('summary-currency');
     
-    // Get currency symbol
+    // Get currency symbol with fallback
     const currencyCode = formData.currency || 'ILS';
-    const currencyMeta = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES.find(c => c.code === 'ILS') || {};
-    const currencySymbol = currencyMeta.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    let currencySymbol = '₪'; // Default fallback
+    if (window.CURRENCIES) {
+        const currencyMeta = window.CURRENCIES.find(c => c.code === currencyCode) || window.CURRENCIES.find(c => c.code === 'ILS') || {};
+        currencySymbol = currencyMeta.symbol || window.CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    }
     
     // Update memory name
     if (summaryName) {
@@ -1594,7 +1598,11 @@ function updateOrderSummary() {
     
     // Update currency display
     if (summaryCurrency) {
-        const currencyName = currencyMeta.name || currencyCode;
+        let currencyName = currencyCode;
+        if (window.CURRENCIES) {
+            const meta = window.CURRENCIES.find(c => c.code === currencyCode);
+            currencyName = meta?.name || currencyCode;
+        }
         summaryCurrency.textContent = `${currencyCode} (${currencyName})`;
     }
 
@@ -1623,7 +1631,10 @@ async function completePurchase() {
     
     // Get the current currency information
     const currency = formData.currency || 'ILS';
-    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    let currencySymbol = '₪'; // Default fallback
+    if (window.CURRENCIES) {
+        currencySymbol = window.CURRENCIES.find(c => c.code === currency)?.symbol || window.CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    }
 
     if (completeBtn) {
         completeBtn.disabled = true;
