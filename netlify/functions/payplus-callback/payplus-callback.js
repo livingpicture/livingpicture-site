@@ -394,7 +394,7 @@ exports.handler = async (event, context) => {
             paidAt: now,
             fulfillmentStatus: 'NEW', // Use valid option from Airtable
             leadId: leadId,
-            selectedCurrency: leadRecord.selectedCurrency || '',
+            // selectedCurrency field doesn't exist in Airtable Orders table - removed
             // Customer (link) as plain string since it's Single line text in Airtable
             'Customer (link)': leadRecord.airtableRecordId || leadId
         };
@@ -412,7 +412,8 @@ exports.handler = async (event, context) => {
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
             'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
             // totalAmount is computed, not required for creation
-            'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
+            'paidAt', 'fulfillmentStatus', 'leadId',
+            // selectedCurrency field doesn't exist in Airtable Orders table
             'Customer (link)'
         ];
         
