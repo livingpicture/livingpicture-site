@@ -2081,7 +2081,7 @@ function validateCustomerDetails() {
     const countrySelect = document.getElementById('customer-country');
     const phoneInput = document.getElementById('customer-phone');
     
-אק בם    // Reset error states
+    // Reset error states
     document.querySelectorAll('.form-group').forEach(group => {
         group.classList.remove('error');
         const errorEl = group.querySelector('.error-message');
