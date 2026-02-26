@@ -92,6 +92,45 @@ exports.handler = async (event, context) => {
 
     const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
 
+    // Verify table schema before proceeding
+    async function verifyTableSchema(tableName) {
+        try {
+            console.log(`🔍 Verifying schema for table: ${tableName}`);
+            const table = base(tableName);
+            const records = await table.select({ maxRecords: 1 }).firstPage();
+            
+            if (records.length > 0) {
+                const fields = Object.keys(records[0].fields);
+                console.log(`✅ Table ${tableName} found with fields:`, fields);
+                
+                // Check for paymentStatus field specifically
+                if (tableName === AIRTABLE_ORDERS_TABLE) {
+                    const hasPaymentStatus = fields.includes('paymentStatus');
+                    console.log(`🔍 paymentStatus field exists in ${tableName}: ${hasPaymentStatus}`);
+                    
+                    if (!hasPaymentStatus) {
+                        console.error(`❌ CRITICAL: 'paymentStatus' field NOT found in ${tableName} table!`);
+                        console.error('Available fields:', fields);
+                        console.error('Please add a "paymentStatus" field to your Airtable Orders table');
+                        return false;
+                    }
+                }
+                
+                return true;
+            } else {
+                console.warn(`⚠️ Table ${tableName} exists but has no records`);
+                return true;
+            }
+        } catch (error) {
+            console.error(`❌ Error accessing table ${tableName}:`, error);
+            return false;
+        }
+    }
+
+    if (!await verifyTableSchema(AIRTABLE_ORDERS_TABLE)) {
+        return createResponse(500, { ok: false, error: 'Table Schema Error', message: 'paymentStatus field not found in Airtable Orders table' });
+    }
+
     let data;
     try {
         data = JSON.parse(event.body || '{}');
@@ -129,21 +168,37 @@ exports.handler = async (event, context) => {
 
     let leadRecord = {};
     let leadAirtableId = null;
+    
+    console.log('🔍 Searching for Lead record with leadId:', leadId);
+    
     try {
         const records = await base('Leads').select({
             filterByFormula: `{leadId} = '${leadId}'`,
             maxRecords: 1
         }).firstPage();
 
+        console.log(`📋 Found ${records.length} lead record(s) for leadId: ${leadId}`);
+        
         if (records.length > 0) {
             leadAirtableId = records[0].id;
             leadRecord = records[0].fields;
-            console.log('Found lead record:', records[0].id);
+            console.log('✅ Found lead record:', records[0].id);
+            console.log('🔍 Current lead fields:', JSON.stringify(leadRecord, null, 2));
+            console.log('🔍 Current step value:', leadRecord.step);
         } else {
-            console.warn(`Lead with leadId ${leadId} not found. Proceeding with data from metadata.`);
+            console.warn(`❌ Lead with leadId ${leadId} not found. Proceeding with data from metadata.`);
+            console.log('🔍 Available leads (first 5):');
+            try {
+                const allLeads = await base('Leads').select({ maxRecords: 5 }).firstPage();
+                allLeads.forEach(lead => {
+                    console.log(`  - ID: ${lead.id}, leadId: ${lead.fields.leadId}, step: ${lead.fields.step}`);
+                });
+            } catch (listError) {
+                console.warn('Could not list leads:', listError.message);
+            }
         }
     } catch (error) {
-        console.error('Error fetching lead from Airtable:', error);
+        console.error('❌ Error fetching lead from Airtable:', error);
         // Proceeding with metadata even if lead fetch fails
     }
 
@@ -152,28 +207,81 @@ exports.handler = async (event, context) => {
     
     if (leadAirtableId) {
         try {
-            console.log('=== Updating Lead record ===');
+            console.log('=== 🔄 Updating Lead record ===');
+            console.log('🔍 Lead Airtable ID:', leadAirtableId);
+            console.log('🔍 Current step before update:', leadRecord.step);
+            
             const leadUpdateFields = {
                 step: 'PAID',
                 orderId: effectiveOrderId,
                 updatedAt: now
             };
             
-            console.log('Lead update fields:', leadUpdateFields);
+            console.log('📋 Lead update fields:', leadUpdateFields);
             
-            await base('Leads').update([
+            // Verify the Leads table schema
+            console.log('🔍 Verifying Leads table schema...');
+            try {
+                const leadTableCheck = await base('Leads').select({ maxRecords: 1 }).firstPage();
+                if (leadTableCheck.length > 0) {
+                    const leadFields = Object.keys(leadTableCheck[0].fields);
+                    console.log('✅ Leads table fields:', leadFields);
+                    const hasStepField = leadFields.includes('step');
+                    console.log(`🔍 'step' field exists in Leads table: ${hasStepField}`);
+                    
+                    if (!hasStepField) {
+                        console.error('❌ CRITICAL: "step" field NOT found in Leads table!');
+                        console.error('Available fields:', leadFields);
+                        console.error('Please add a "step" field to your Airtable Leads table');
+                    }
+                }
+            } catch (schemaError) {
+                console.warn('Could not verify Leads table schema:', schemaError.message);
+            }
+            
+            const updateResult = await base('Leads').update([
                 {
                     id: leadAirtableId,
                     fields: leadUpdateFields
                 }
             ]);
-            console.log('✓ Updated lead step to PAID for lead:', leadAirtableId);
+            
+            console.log('✅ Lead update result:', JSON.stringify(updateResult, null, 2));
+            console.log('✅ Updated lead step to PAID for lead:', leadAirtableId);
+            
+            // Verify the update actually worked
+            try {
+                const verificationRecord = await base('Leads').find(leadAirtableId);
+                console.log('🔍 Verification - Updated lead fields:', JSON.stringify(verificationRecord.fields, null, 2));
+                console.log('🔍 Verification - New step value:', verificationRecord.fields.step);
+                
+                if (verificationRecord.fields.step === 'PAID') {
+                    console.log('✅ SUCCESS: Lead step field correctly updated to PAID');
+                } else {
+                    console.error('❌ FAILURE: Lead step field was NOT updated to PAID');
+                    console.error('Expected: PAID, Got:', verificationRecord.fields.step);
+                }
+            } catch (verifyError) {
+                console.warn('Could not verify lead update:', verifyError.message);
+            }
+            
         } catch (error) {
-            console.error('✗ Error updating lead step to PAID:', error);
+            console.error('❌ Error updating lead step to PAID:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                leadAirtableId: leadAirtableId,
+                updateFields: {
+                    step: 'PAID',
+                    orderId: effectiveOrderId,
+                    updatedAt: now
+                }
+            });
             // Don't return here - we still want to try creating the order
         }
     } else {
         console.warn('⚠️ No leadAirtableId found - cannot update lead status to PAID');
+        console.warn('This means the lead was not found in Airtable with the given leadId');
     }
 
     try {
@@ -202,7 +310,8 @@ exports.handler = async (event, context) => {
             transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus', // Clean string
             currency: transaction.currency || leadRecord.currency || 'ILS',
-            totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
+            // totalAmount is a computed field - don't set it directly
+            // totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
             fulfillmentStatus: 'NEW', // Use valid option from Airtable
             leadId: leadId,
@@ -223,7 +332,8 @@ exports.handler = async (event, context) => {
             'orderId', 'paymentStatus', 'customerEmail', 'customerName', 'customerPhone',
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
             'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
-            'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
+            // totalAmount is computed, not required for creation
+            'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
             'Customer (link)'
         ];
         
@@ -240,8 +350,22 @@ exports.handler = async (event, context) => {
         
         console.log('Order fields to create:', JSON.stringify(orderFields, null, 2));
         
-        const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
-        console.log('✓ Order record created successfully:', createdRecord[0].id);
+        try {
+            const createdRecord = await base(AIRTABLE_ORDERS_TABLE).create([{ fields: orderFields }]);
+            console.log('✓ Order record created successfully:', createdRecord[0].id);
+            console.log('🔍 Created record fields:', JSON.stringify(createdRecord[0].fields, null, 2));
+            
+            // Verify paymentStatus was saved correctly
+            if (createdRecord[0].fields.paymentStatus) {
+                console.log('✅ paymentStatus saved correctly:', createdRecord[0].fields.paymentStatus);
+            } else {
+                console.error('❌ paymentStatus NOT found in created record!');
+                console.error('Available fields:', Object.keys(createdRecord[0].fields));
+            }
+        } catch (createError) {
+            console.error('❌ Error creating order record:', createError);
+            throw createError;
+        }
         
         // Now migrate photos in the background
         let migrationResult = { success: false, migratedCount: 0 };
