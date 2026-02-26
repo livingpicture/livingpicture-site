@@ -146,24 +146,32 @@ exports.handler = async (event, context) => {
         return createResponse(200, { ok: true, message: 'Payment not successful, no order created.' });
     }
 
-    // Extract leadId strictly from more_info field (primary source)
-    // more_info should contain: leadId (e.g., "lead_123456")
+    // Extract leadId and orderId from more_info field (JSON object)
+    // more_info contains: {"leadId":"lead_YC5DPI","orderId":"59444","source":"memory-book-order"}
     let leadId = null;
     let orderId = null;
     
+    console.log('🔍 Parsing more_info field:', transaction.more_info);
+    
     if (transaction.more_info && transaction.more_info.trim()) {
-        leadId = transaction.more_info.trim();
-        console.log('🔍 Extracted leadId from more_info:', leadId);
+        try {
+            // Parse JSON object from more_info
+            const moreInfoData = JSON.parse(transaction.more_info.trim());
+            leadId = moreInfoData.leadId;
+            orderId = moreInfoData.orderId;
+            console.log('✅ Successfully parsed JSON from more_info:', { leadId, orderId, source: moreInfoData.source });
+        } catch (parseError) {
+            console.warn('⚠️ Failed to parse JSON from more_info, treating as plain string:', parseError.message);
+            leadId = transaction.more_info.trim();
+        }
     } else {
-        // Fallback to more_info_1 if more_info is empty
+        // Fallback to more_info_1 and more_info_2 if more_info is empty
         leadId = transaction.more_info_1;
-        console.log('⚠️ more_info was empty, using fallback more_info_1:', leadId);
+        orderId = transaction.more_info_2;
+        console.log('⚠️ more_info was empty, using fallback more_info_1/more_info_2:', { leadId, orderId });
     }
     
-    // orderId from more_info_2
-    orderId = transaction.more_info_2;
-    
-    console.log('📋 Extracted IDs from PayPlus fields:', { 
+    console.log('📋 Final extracted IDs:', { 
         leadId, 
         orderId,
         more_info: transaction.more_info,
