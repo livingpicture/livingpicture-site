@@ -282,17 +282,21 @@ exports.handler = async (event, context) => {
     
     if (leadAirtableId) {
         try {
-            console.log('=== 🔄 Updating Lead record ===');
-            console.log('🔍 Lead Airtable ID:', leadAirtableId);
+            console.log('=== 🔄 SEQUENTIAL LEAD UPDATE ===');
+            console.log('🔍 Lead Airtable ID found:', leadAirtableId);
+            console.log('🔍 Original leadId from PayPlus:', leadId);
             console.log('🔍 Current step before update:', leadRecord.step);
+            console.log('🔍 Lead record exists in Airtable:', !!leadRecord);
             
+            // SEQUENTIAL UPDATE: First update the Leads table, then create Orders
             const leadUpdateFields = {
                 step: 'PAID',
                 orderId: effectiveOrderId,
                 updatedAt: now
             };
             
-            console.log('📋 Lead update fields:', leadUpdateFields);
+            console.log('📋 Lead update fields being applied:', leadUpdateFields);
+            console.log('🔍 Using leadAirtableId for update:', leadAirtableId);
             
             // Verify the Leads table schema
             console.log('🔍 Verifying Leads table schema...');

@@ -93,12 +93,24 @@ if (memoryNameInput) {
 
 // Initialize the store
 function initStore() {
-    // Load saved data if exists
+    // FORCED LEAD REFRESH: Clear existing leadId for new session to ensure fresh start
+    console.log(' Initializing store - checking for existing leadId...');
+    const existingLeadId = localStorage.getItem('leadId');
+    if (existingLeadId) {
+        console.log(' Found existing leadId in localStorage, clearing for fresh session:', existingLeadId);
+        localStorage.removeItem('leadId');
+        localStorage.removeItem('memoryCreatorData');
+        localStorage.removeItem('livingPictureOrder');
+        console.log(' Cleared existing session data - new leadId will be generated');
+    }
+    
+    // Load saved data if exists (after cleanup)
     loadSavedData();
 
     // Always bind this visit to the current (fresh) leadId
     if (window.leadTracker && window.leadTracker.leadId) {
         formData.leadId = window.leadTracker.leadId;
+        console.log(' Bound to fresh leadId:', formData.leadId);
     }
 
     // Top-left back button: Always navigate to home page
@@ -806,19 +818,6 @@ function setupEventListeners() {
                 teamChooseRadio.checked = true;
                 updateMusicSelectionUI();
                 // Immediately validate when team choose is selected
-                validateMusicInputs();
-            }
-        });
-    }
-
-    // File upload init
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupFileUpload);
-    } else {
-        setTimeout(setupFileUpload, 0);
-    }
-
-    // Drag & drop
     if (dropZone) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
@@ -831,20 +830,7 @@ function setupEventListeners() {
         });
         dropZone.addEventListener('drop', handleDrop, false);
     }
-
-    // Modal close
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => {
-            if (successModal) successModal.classList.remove('active');
-        });
-    }
-}
-
-function showStep(stepNumber) {
-    document.querySelectorAll('.store-step').forEach(step => {
-        step.classList.remove('active');
-    });
-
+    
     const stepElement = document.getElementById(`step-${stepNumber}`);
     if (stepElement) stepElement.classList.add('active');
 
@@ -1536,8 +1522,15 @@ function updateOrderSummary() {
 
 // Complete purchase
 async function completePurchase() {
-    if (window.leadTracker) {
+    // Ensure we have the current leadId from formData
+    const currentLeadId = formData.leadId || window.leadTracker?.leadId;
+    console.log('🔄 Starting completePurchase with leadId:', currentLeadId);
+    
+    if (window.leadTracker && currentLeadId) {
+        console.log('📋 Updating lead status to PENDING_PAYMENT for leadId:', currentLeadId);
         await window.leadTracker.updateLead({ step: 'PENDING_PAYMENT' }, true);
+    } else {
+        console.warn('⚠️ No leadTracker or leadId available for PENDING_PAYMENT update');
     }
     // Show loading state
     const completeBtn = document.getElementById('complete-purchase');
