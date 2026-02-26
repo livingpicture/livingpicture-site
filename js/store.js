@@ -8,7 +8,7 @@ const PRICING_TIERS = [
 let currentCurrency = 'ILS';
 
 // Currency configuration
-const CURRENCIES = [
+const CURRENCIES = window.CURRENCIES || [
     { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
     { code: 'USD', symbol: '$', name: 'US Dollar' },
     { code: 'EUR', symbol: '€', name: 'Euro' }
