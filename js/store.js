@@ -7,6 +7,13 @@ const PRICING_TIERS = [
 
 let currentCurrency = 'ILS';
 
+// Currency configuration
+const CURRENCIES = [
+    { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
+    { code: 'USD', symbol: '$', name: 'US Dollar' },
+    { code: 'EUR', symbol: '€', name: 'Euro' }
+];
+
 // Store the current step and form data
 let currentStep = 1;
 const formData = {
@@ -89,6 +96,97 @@ if (memoryNameInput) {
         // Update form data
         formData.memoryName = this.value.trim();
     });
+}
+
+// Update UI based on current step
+function updateUIForStep(step) {
+    switch (step) {
+        case 1:
+            // Set focus on the input field
+            if (memoryNameInput) {
+                memoryNameInput.focus();
+                // Move cursor to the end
+                const len = memoryNameInput.value.length;
+                memoryNameInput.setSelectionRange(len, len);
+            }
+            break;
+            
+        case 2:
+            // Update photo grid if we have photos
+            if (formData.photos && formData.photos.length > 0) {
+                renderPhotoGrid();
+                updateContinueToMusicButtonState();
+            } else {
+                updateContinueToMusicButtonState();
+            }
+            break;
+            
+        case 3:
+            // Set focus on song name input
+            if (songNameInput) {
+                songNameInput.focus();
+                
+                // Pre-fill if we have data
+                if (formData.music) {
+                    songNameInput.value = formData.music.songName || '';
+                    artistNameInput.value = formData.music.artistName || '';
+                }
+                
+                // Update button state based on existing data
+                const hasValidInput = formData.music.songName && formData.music.artistName;
+                updateNextButton('next-to-checkout', hasValidInput);
+            }
+
+            // Initialize music selection UI
+            if (typeof updateMusicSelectionUI === 'function') {
+                updateMusicSelectionUI();
+            }
+
+            if (window.leadTracker) {
+                window.leadTracker.updateLead({ songChoice: 'choose-song', step: 'SONG_SELECTED' });
+            }
+            break;
+            
+        case 4:
+            // Update order summary
+            updateOrderSummary();
+
+            if (window.leadTracker) {
+                window.leadTracker.trackStep('DETAILS_ENTERED');
+            }
+            break;
+    }
+}
+
+function showStep(stepNumber) {
+    document.querySelectorAll('.store-step').forEach(step => {
+        step.classList.remove('active');
+    });
+
+    const stepElement = document.getElementById(`step-${stepNumber}`);
+    if (stepElement) stepElement.classList.add('active');
+
+    document.querySelectorAll('.step').forEach(step => {
+        if (parseInt(step.getAttribute('data-step')) === stepNumber) {
+            step.classList.add('active');
+        } else {
+            step.classList.remove('active');
+        }
+    });
+
+    const progress = (stepNumber / 4) * 100;
+    const desktopProgress = document.querySelector('.progress');
+    if (desktopProgress) desktopProgress.style.width = `${progress}%`;
+    const mobileProgressBar = document.getElementById('mobile-progress-bar');
+    if (mobileProgressBar) mobileProgressBar.style.width = `${progress}%`;
+    const currentStepElement = document.getElementById('current-step');
+    if (currentStepElement) currentStepElement.textContent = stepNumber;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    currentStep = stepNumber;
+    updateUIForStep(stepNumber);
+    return true;
 }
 
 // Initialize the store
