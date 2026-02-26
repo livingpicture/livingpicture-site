@@ -129,21 +129,29 @@ exports.handler = async (event, context) => {
 
     let leadRecord = {};
     let leadAirtableId = null;
+    console.log(`🔍 Searching for lead with leadId: "${leadId}"`);
+    
     try {
         const records = await base('Leads').select({
             filterByFormula: `{leadId} = '${leadId}'`,
             maxRecords: 1
         }).firstPage();
 
+        console.log(`📋 Lead search results: Found ${records.length} records`);
+        
         if (records.length > 0) {
             leadAirtableId = records[0].id;
             leadRecord = records[0].fields;
-            console.log('Found lead record:', records[0].id);
+            console.log('✅ Found lead record:', records[0].id);
+            console.log('🔍 Current lead step:', leadRecord.step);
+            console.log('🔍 Lead fields:', Object.keys(leadRecord));
         } else {
-            console.warn(`Lead with leadId ${leadId} not found. Proceeding with data from metadata.`);
+            console.warn(`❌ Lead with leadId "${leadId}" not found in Airtable.`);
+            console.warn('🔍 This might indicate the lead was not created or the leadId is incorrect');
         }
     } catch (error) {
-        console.error('Error fetching lead from Airtable:', error);
+        console.error('💥 Error fetching lead from Airtable:', error);
+        console.error('🔍 Error details:', error.message);
         // Proceeding with metadata even if lead fetch fails
     }
 
@@ -152,28 +160,40 @@ exports.handler = async (event, context) => {
     
     if (leadAirtableId) {
         try {
-            console.log('=== Updating Lead record ===');
+            console.log('🔄 === Updating Lead record to PAID ===');
+            console.log('🔍 Lead Airtable ID:', leadAirtableId);
+            console.log('🔍 Effective Order ID:', effectiveOrderId);
+            
             const leadUpdateFields = {
-                step: 'PAID',
+                Status: 'PAID',
                 orderId: effectiveOrderId,
                 updatedAt: now
             };
             
-            console.log('Lead update fields:', leadUpdateFields);
+            console.log('📋 Lead update fields:', leadUpdateFields);
+            console.log('🔄 Sending update request to Airtable...');
             
-            await base('Leads').update([
+            const updateResult = await base('Leads').update([
                 {
                     id: leadAirtableId,
                     fields: leadUpdateFields
                 }
             ]);
-            console.log('✓ Updated lead step to PAID for lead:', leadAirtableId);
+            
+            console.log('✅ Successfully updated lead step to PAID');
+            console.log('🔍 Update result:', updateResult);
+            console.log('🔍 Updated lead ID:', updateResult[0].id);
+            console.log('🔍 Updated lead fields:', updateResult[0].fields);
         } catch (error) {
-            console.error('✗ Error updating lead step to PAID:', error);
+            console.error('💥 Error updating lead step to PAID:', error);
+            console.error('🔍 Error details:', error.message);
+            console.error('🔍 Error stack:', error.stack);
             // Don't return here - we still want to try creating the order
         }
     } else {
         console.warn('⚠️ No leadAirtableId found - cannot update lead status to PAID');
+        console.warn('🔍 This means the lead was not found in Airtable');
+        console.warn('🔍 Available data:', { leadId, leadRecordKeys: Object.keys(leadRecord) });
     }
 
     try {
@@ -202,7 +222,7 @@ exports.handler = async (event, context) => {
             transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus', // Clean string
             currency: transaction.currency || leadRecord.currency || 'ILS',
-            totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
+            RawAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
             fulfillmentStatus: 'NEW', // Use valid option from Airtable
             leadId: leadId,
@@ -223,7 +243,7 @@ exports.handler = async (event, context) => {
             'orderId', 'paymentStatus', 'customerEmail', 'customerName', 'customerPhone',
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
             'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
-            'totalAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
+            'RawAmount', 'paidAt', 'fulfillmentStatus', 'leadId', 'selectedCurrency',
             'Customer (link)'
         ];
         
