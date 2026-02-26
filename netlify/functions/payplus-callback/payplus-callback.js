@@ -389,6 +389,8 @@ exports.handler = async (event, context) => {
             transactionId: transaction.uid || '',
             paymentProvider: 'PayPlus', // Clean string
             currency: transaction.currency || leadRecord.currency || 'ILS',
+            // Add RawAmount field like in Leads table
+            RawAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             // totalAmount is a computed field - don't set it directly
             // totalAmount: Number(transaction.amount) || (Number(transaction.amount_in_cents) / 100) || 0,
             paidAt: now,
@@ -410,7 +412,7 @@ exports.handler = async (event, context) => {
         const requiredFields = [
             'orderId', 'paymentStatus', 'customerEmail', 'customerName', 'customerPhone',
             'country', 'memoryTitle', 'songChoice', 'photoCount', 'packageKey', 
-            'imageUrls', 'transactionId', 'paymentProvider', 'currency', 
+            'imageUrls', 'transactionId', 'paymentProvider', 'currency', 'RawAmount',
             // totalAmount is computed, not required for creation
             'paidAt', 'fulfillmentStatus', 'leadId',
             // selectedCurrency field doesn't exist in Airtable Orders table
