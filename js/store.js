@@ -7,13 +7,6 @@ const PRICING_TIERS = [
 
 let currentCurrency = 'ILS';
 
-// Currency configuration
-const CURRENCIES = window.CURRENCIES || [
-    { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
-    { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'EUR', symbol: '€', name: 'Euro' }
-];
-
 // Store the current step and form data
 let currentStep = 1;
 const formData = {
@@ -350,7 +343,14 @@ function updateNextButton(buttonId, isEnabled) {
 function updatePricingDisplay() {
     const photoCount = formData.photos?.length || 0;
     const currency = currentCurrency || formData.currency || 'ILS';
-    const currencySymbol = CURRENCIES.find(c => c.code === currency)?.symbol || CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
+    
+    // Safety check for CURRENCIES
+    if (!window.CURRENCIES) {
+        console.error('CURRENCIES not available - check if currency.js loaded properly');
+        return;
+    }
+    
+    const currencySymbol = window.CURRENCIES.find(c => c.code === currency)?.symbol || window.CURRENCIES.find(c => c.code === 'ILS')?.symbol || '₪';
 
     const getTier = (count) => {
         if (count >= 26) return '26+';
