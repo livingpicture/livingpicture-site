@@ -69,7 +69,7 @@ const teamChooseNote = document.getElementById('team-choose-note');
 const selectSongRadio = document.getElementById('select-song');
 const teamChooseRadio = document.getElementById('team-choose');
 
-// Clear error message when typing in memory name field
+// Clear error message when typing in memory name field and re-validate button
 if (memoryNameInput) {
     memoryNameInput.addEventListener('input', function() {
         const formGroup = this.closest('.form-group');
@@ -81,6 +81,13 @@ if (memoryNameInput) {
                 errorElement.remove();
             }
         }
+        
+        // Re-evaluate the next button state whenever user types
+        const isValid = !!(this.value && this.value.trim());
+        updateNextButton('next-to-photos', isValid);
+        
+        // Update form data
+        formData.memoryName = this.value.trim();
     });
 }
 
@@ -383,19 +390,267 @@ function clearMusicInputErrors() {
 
 async function handleFileSelect(e) {
     try {
+        console.log('🎯 handleFileSelect triggered');
         if (e && typeof e.preventDefault === 'function') e.preventDefault();
         const files = e?.target?.files || e?.dataTransfer?.files;
 
         if (!files || files.length === 0) {
+            console.log('No files selected');
             if (typeof validatePhotoUpload === 'function') validatePhotoUpload();
             return;
         }
 
+        console.log(`Selected ${files.length} files for processing`);
+
         if (typeof clearPhotoUploadError === 'function') clearPhotoUploadError();
+        
+        // Process files with the new sequential function
         await processFiles(files);
+        
+        console.log('✅ File processing completed successfully');
+        
     } catch (error) {
-        console.error('Error in handleFileSelect:', error);
-        if (typeof showError === 'function') showError('Failed to process files. Please try again.');
+        console.error('💥 Error in handleFileSelect:', error);
+        if (typeof showError === 'function') {
+            showError('Failed to process files. Please try again.');
+        } else {
+            alert('Failed to process files. Please try again.');
+        }
+    }
+}
+
+// Process files with sequential upload for memory optimization
+async function processFiles(files) {
+    console.log('📸 Starting sequential file processing for', files.length, 'files');
+    
+    // Ensure leadId is available before processing
+    if (!formData.leadId) {
+        formData.leadId = window.leadTracker?.leadId || `lead_${Math.floor(100000 + Math.random() * 900000)}`;
+        console.log('Initialized leadId for uploads:', formData.leadId);
+    }
+
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const heicTypes = ['image/heic', 'image/heif', 'image/heif-sequence'];
+
+    // Check for HEIC files first to show specific error
+    const heicFiles = Array.from(files).filter(file => heicTypes.some(type =>
+        file.type.toLowerCase().includes(type.split('/')[1])
+    ));
+
+    if (heicFiles.length > 0) {
+        showError('HEIC/HEIF files are not supported. Please convert to JPG or PNG before uploading.');
+        return;
+    }
+
+    // Check for other valid image types
+    const validFiles = Array.from(files).filter(file =>
+        validImageTypes.includes(file.type.toLowerCase())
+    );
+
+    if (validFiles.length === 0) {
+        showError('Please select valid image files (JPEG, PNG, or WebP)');
+        return;
+    }
+
+    // Get DOM elements
+    const fileInput = document.getElementById('photo-upload');
+    const browseBtn = document.getElementById('browse-files');
+    const progressContainer = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+
+    if (!fileInput || !browseBtn || !progressContainer || !progressBar || !progressText) {
+        console.error('Missing required DOM elements for file processing');
+        return;
+    }
+
+    // Store original button HTML to restore later
+    const originalBtnHTML = browseBtn.innerHTML;
+
+    // Set loading state
+    const setLoading = (isLoading) => {
+        if (isLoading) {
+            browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            browseBtn.classList.add('processing');
+            progressContainer.style.display = 'block';
+        } else {
+            // Restore button
+            browseBtn.innerHTML = originalBtnHTML;
+            browseBtn.classList.remove('processing');
+
+            // Fade out progress bar
+            setTimeout(() => {
+                progressContainer.style.opacity = '0';
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressContainer.style.opacity = '1';
+                    progressBar.style.width = '0%';
+                }, 300);
+            }, 500);
+        }
+    };
+
+    // Update progress
+    const updateProgress = (processed, total) => {
+        const percent = Math.round((processed / total) * 100);
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `Processing ${processed} of ${total} photos...`;
+    };
+
+    // Start loading
+    setLoading(true);
+    updateProgress(0, validFiles.length);
+
+    // Lock the Continue button until Cloudinary uploads are done
+    updateContinueToMusicButtonState();
+
+    // Check total size
+    const totalSize = Array.from(validFiles).reduce((total, file) => total + file.size, 0);
+    const maxTotalSize = 120 * 1024 * 1024; // 120MB
+
+    // Format bytes to human-readable string
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    if (totalSize > maxTotalSize) {
+        const currentSize = formatFileSize(totalSize);
+        const maxSize = formatFileSize(maxTotalSize);
+        showError(`Total file size (${currentSize}) exceeds the maximum allowed (${maxSize}). Please upload fewer or smaller photos.`);
+        setLoading(false);
+        return;
+    }
+
+    // Check for duplicate files
+    const existingHashes = new Set(formData.photos.map(photo => photo.fileFingerprint));
+    const newPhotos = [];
+    let processed = 0;
+    let failedCount = 0;
+
+    try {
+        // Sequential upload - process files one by one to prevent memory crashes
+        console.log('🔄 Starting sequential upload loop...');
+        for (const file of validFiles) {
+            console.log(`📁 Processing file ${processed + 1}/${validFiles.length}: ${file.name}`);
+            
+            // Check file type first (fast check before hashing)
+            if (!file.type.startsWith('image/')) {
+                console.log('Skipping non-image file:', file.name);
+                continue;
+            }
+
+            // Generate file fingerprint (quick hash based on name, size, and last modified)
+            const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
+
+            // Check for duplicates
+            if (existingHashes.has(fileFingerprint)) {
+                console.log('Skipping duplicate file:', file.name);
+                continue;
+            }
+
+            // Mark as processed
+            existingHashes.add(fileFingerprint);
+
+            // Create photo object with temporary placeholder
+            const photo = {
+                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                previewUrl: null, // Will be set after Cloudinary upload
+                file: file,
+                name: file.name,
+                size: file.size,
+                fileFingerprint: fileFingerprint,
+                uploadStatus: 'uploading'
+            };
+
+            // Add to array immediately
+            formData.photos.push(photo);
+            newPhotos.push(photo);
+
+            try {
+                console.log(`☁️ Uploading ${file.name} to Cloudinary...`);
+                // Upload to Cloudinary (sequential - one at a time)
+                const uploadResult = await uploadToCloudinary(file);
+                
+                console.log(`✅ Upload successful for ${file.name}`);
+                
+                // Update photo with Cloudinary data and optimized thumbnail URL
+                photo.permanentUrl = uploadResult.secure_url;
+                photo.publicId = uploadResult.public_id;
+                photo.uploadStatus = 'uploaded';
+                
+                // Create optimized thumbnail URL using Cloudinary dynamic transformations (w_200,c_limit)
+                photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
+                
+            } catch (uploadError) {
+                console.error(`❌ Cloudinary upload failed for ${file.name}:`, uploadError);
+                photo.uploadStatus = 'failed';
+                photo.previewUrl = null;
+                failedCount++;
+                
+                // Show specific error for this upload
+                showError(`Failed to upload ${file.name}. Please check your connection and try again.`);
+            }
+
+            processed++;
+            
+            // Update progress after each file
+            updateProgress(processed, validFiles.length);
+
+            // Update UI after each file is processed (sequential updates)
+            renderPhotoGrid();
+            updateContinueToMusicButtonState();
+            updatePricingDisplay();
+            
+            // Small delay to prevent overwhelming the UI
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        console.log(`🏁 Sequential upload completed. Success: ${processed - failedCount}, Failed: ${failedCount}`);
+
+        // Final updates
+        if (newPhotos.length > 0) {
+            const successCount = newPhotos.filter(p => p.uploadStatus === 'uploaded').length;
+            showSuccess(`Added ${successCount} photo${successCount > 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''}`);
+        }
+
+        // Enable Continue only when all photos have permanent URLs
+        const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
+        if (!allPhotosUploaded && formData.photos.length > 0) {
+            console.error('Some photos are missing permanentUrl; keeping Continue disabled.');
+            showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
+        }
+        
+        updateContinueToMusicButtonState();
+        saveToLocalStorage();
+        setLoading(false);
+
+        // Track successful uploads
+        if (window.leadTracker) {
+            const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
+            
+            if (successfulUploads.length > 0) {
+                const folderPath = getCloudinaryFolderPath();
+                const firstImageUrl = successfulUploads[0]?.permanentUrl || '';
+                
+                await window.leadTracker.trackStep('PHOTOS_UPLOADED', {
+                    photosFolder: folderPath,
+                    imageUrls: firstImageUrl,
+                    photoCount: successfulUploads.length
+                });
+            }
+        }
+
+        return newPhotos;
+        
+    } catch (error) {
+        console.error('💥 Critical error in processFiles:', error);
+        showError('An error occurred while processing your photos. Please try again.');
+        setLoading(false);
+        throw error;
     }
 }
 
@@ -410,8 +665,12 @@ function setupEventListeners() {
             const nextStep = nextButtons[buttonId];
             const currentStepNum = currentStep;
 
-            // Validate current step before proceeding
-            if (!validateCurrentStep(currentStepNum)) {
+            console.log(`🔍 Continue button clicked: currentStep=${currentStepNum}, nextStep=${nextStep}`);
+
+            // Use saveCurrentStep for validation to ensure errors are displayed properly
+            if (!saveCurrentStep()) {
+                console.log(`❌ Validation failed for step ${currentStepNum}`);
+                
                 // Show appropriate error message based on current step
                 let errorMessage = '';
                 switch (currentStepNum) {
@@ -426,15 +685,23 @@ function setupEventListeners() {
                             photoErrorElement.style.display = 'block';
                             photoErrorElement.textContent = errorMessage;
                         }
+                        // Scroll user back to the upload area
+                        const uploadArea = document.getElementById('drop-zone') || document.getElementById('photo-upload');
+                        if (uploadArea) {
+                            uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
                         break;
                     case 3:
                         errorMessage = 'Please select a song or choose team selection before continuing.';
                         break;
                     case 4:
-                        errorMessage = 'Please fill in all required customer details before continuing.';
+                        // saveCurrentStep already calls validateCustomerDetails which shows errors
+                        // Scroll to the first error
+                        const firstError = document.querySelector('.form-group.error');
+                        if (firstError) {
+                            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
                         break;
-                    default:
-                        errorMessage = 'Please complete the current step before continuing.';
                 }
                 
                 if (typeof showError === 'function') {
@@ -444,8 +711,6 @@ function setupEventListeners() {
                 }
                 return;
             }
-
-            if (typeof saveCurrentStep === 'function' && !saveCurrentStep()) return;
 
             if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
                 try {
@@ -1469,40 +1734,33 @@ function showSuccessModal() {
 
 // Save current step data
 function saveCurrentStep() {
-    // Set validation attempted flag to true when trying to proceed
-    if (currentStep === 4) {
-        validationAttempted = true;
-    }
+    console.log(`🔍 saveCurrentStep called: currentStep=${currentStep}, validationAttempted=${validationAttempted}`);
+    // Set validation attempted flag to true when trying to proceed from any step
+    validationAttempted = true;
+    console.log(`✅ validationAttempted set to true`);
     
     switch (currentStep) {
         case 1: {
+            console.log(`🔍 Validating step 1 (memory name)`);
             const memoryName = memoryNameInput ? memoryNameInput.value.trim() : '';
             formData.memoryName = memoryName;
+            console.log(`🔍 memoryName='${memoryName}', memoryNameInput=${!!memoryNameInput}`);
 
             // Validate memory name
             if (!memoryName) {
+                console.log(`❌ Memory name validation failed - showing error`);
                 // Show error message and highlight the input
                 if (memoryNameInput) {
                     const formGroup = memoryNameInput.closest('.form-group');
                     if (formGroup) {
                         formGroup.classList.add('error');
                         memoryNameInput.classList.add('error');
-
-                        // Create or update error message
-                        let errorElement = document.getElementById('memory-name-error');
-                        if (!errorElement) {
-                            errorElement = document.createElement('div');
-                            errorElement.id = 'memory-name-error';
-                            errorElement.className = 'error-message';
-                            // Insert after the form group
-                            formGroup.parentNode.insertBefore(errorElement, formGroup.nextSibling);
-                        }
-                        errorElement.textContent = 'Please enter a name for your memory';
-                        errorElement.style.display = 'block';
+                        showFieldError('memory-name-error', 'Please enter a name for your memory');
                     }
                 }
                 return false;
             } else {
+                console.log(`✅ Memory name validation passed`);
                 // Remove error state if it exists
                 if (memoryNameInput) {
                     const formGroup = memoryNameInput.closest('.form-group');
@@ -1511,7 +1769,8 @@ function saveCurrentStep() {
                         memoryNameInput.classList.remove('error');
                         const errorElement = document.getElementById('memory-name-error');
                         if (errorElement) {
-                            errorElement.remove();
+                            errorElement.textContent = '';
+                            errorElement.style.display = 'none';
                         }
                     }
                 }
@@ -1519,6 +1778,7 @@ function saveCurrentStep() {
             break;
         }
         case 3: {
+            console.log(`🔍 Validating step 3 (music selection)`);
             // Save music selection
             if (selectSongRadio && selectSongRadio.checked) {
                 const songName = songNameInput ? songNameInput.value.trim() : '';
@@ -1796,8 +2056,10 @@ let validationAttempted = false;
 
 // Validate customer details
 function validateCustomerDetails() {
+    console.log(`🔍 validateCustomerDetails called: validationAttempted=${validationAttempted}`);
     // Only show errors if validation has been attempted
     if (!validationAttempted) {
+        console.log(`⚠️ Validation not attempted yet - skipping error display`);
         // Just validate without showing errors on initial load
         const nameInput = document.getElementById('customer-name');
         const emailInput = document.getElementById('customer-email');
@@ -1819,7 +2081,7 @@ function validateCustomerDetails() {
     const countrySelect = document.getElementById('customer-country');
     const phoneInput = document.getElementById('customer-phone');
     
-    // Reset error states
+אק בם    // Reset error states
     document.querySelectorAll('.form-group').forEach(group => {
         group.classList.remove('error');
         const errorEl = group.querySelector('.error-message');
@@ -1868,10 +2130,37 @@ function validateCustomerDetails() {
 
 // Show error message for a specific field
 function showFieldError(fieldId, message) {
+    console.log(`🔍 showFieldError called: fieldId='${fieldId}', message='${message}'`);
     const errorElement = document.getElementById(fieldId);
+    console.log(`🔍 Found error element:`, errorElement);
     if (errorElement) {
         errorElement.textContent = message;
+        errorElement.style.display = 'block'; // Make sure the error is visible
+        console.log(`✅ Error displayed: ${message}`);
+        console.log(`🔍 Error element styles:`, window.getComputedStyle(errorElement));
+        console.log(`🔍 Error element visibility:`, errorElement.offsetParent !== null);
+    } else {
+        console.warn(`❌ Error element with ID '${fieldId}' not found`);
     }
+}
+
+// Test function to verify error display - call from console: testErrorDisplay()
+function testErrorDisplay() {
+    console.log('🧪 Testing error display...');
+    
+    // Test memory name error
+    showFieldError('memory-name-error', 'Test memory name error');
+    
+    // Test customer errors
+    showFieldError('name-error', 'Test name error');
+    showFieldError('email-error', 'Test email error');
+    showFieldError('country-error', 'Test country error');
+    
+    // Test music errors
+    showFieldError('song-name-error', 'Test song name error');
+    showFieldError('artist-name-error', 'Test artist name error');
+    
+    console.log('🧪 Error display test complete - check if messages appear above form fields');
 }
 
 // Complete purchase is implemented above with PayPlus integration
