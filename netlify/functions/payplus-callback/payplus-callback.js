@@ -146,17 +146,30 @@ exports.handler = async (event, context) => {
         return createResponse(200, { ok: true, message: 'Payment not successful, no order created.' });
     }
 
-    // PayPlus truncates more_info, so we rely on more_info_1 and more_info_2
-    // more_info_1 = leadId, more_info_2 = orderId
-    const leadId = transaction.more_info_1;
-    const orderId = transaction.more_info_2;
+    // Extract leadId strictly from more_info field (primary source)
+    // more_info should contain: leadId (e.g., "lead_123456")
+    let leadId = null;
+    let orderId = null;
     
-    console.log('Extracted IDs from PayPlus fields:', { 
+    if (transaction.more_info && transaction.more_info.trim()) {
+        leadId = transaction.more_info.trim();
+        console.log('🔍 Extracted leadId from more_info:', leadId);
+    } else {
+        // Fallback to more_info_1 if more_info is empty
+        leadId = transaction.more_info_1;
+        console.log('⚠️ more_info was empty, using fallback more_info_1:', leadId);
+    }
+    
+    // orderId from more_info_2
+    orderId = transaction.more_info_2;
+    
+    console.log('📋 Extracted IDs from PayPlus fields:', { 
         leadId, 
         orderId,
+        more_info: transaction.more_info,
         more_info_1: transaction.more_info_1,
         more_info_2: transaction.more_info_2,
-        more_info_truncated: transaction.more_info?.substring(0, 100) + '...'
+        more_info_length: transaction.more_info?.length || 0
     });
     const now = new Date().toISOString();
 
@@ -180,22 +193,76 @@ exports.handler = async (event, context) => {
         console.log(`📋 Found ${records.length} lead record(s) for leadId: ${leadId}`);
         
         if (records.length > 0) {
-            leadAirtableId = records[0].id;
-            leadRecord = records[0].fields;
-            console.log('✅ Found lead record:', records[0].id);
+            // STRICT VALIDATION: Ensure exact match
+            const exactMatch = records.find(record => 
+                record.fields.leadId === leadId && 
+                record.fields.leadId !== undefined && 
+                record.fields.leadId !== null
+            );
+            
+            if (!exactMatch) {
+                console.error(`❌ CRITICAL: No exact match found for leadId: ${leadId}`);
+                console.error('Found records do not match exactly:');
+                records.forEach(record => {
+                    console.error(`  - ID: ${record.id}, leadId: "${record.fields.leadId}" (type: ${typeof record.fields.leadId})`);
+                });
+                console.error(`Looking for: "${leadId}" (type: ${typeof leadId})`);
+                return createResponse(404, { 
+                    ok: false, 
+                    error: 'Lead not found', 
+                    message: `No exact match found for leadId: ${leadId}` 
+                });
+            }
+            
+            leadAirtableId = exactMatch.id;
+            leadRecord = exactMatch.fields;
+            
+            // PREVENT DUPLICATE UPDATES: Check if already paid
+            if (leadRecord.step === 'PAID') {
+                console.log(`⚠️ Lead ${leadAirtableId} is already marked as PAID. Skipping duplicate update.`);
+                console.log('🔍 Current step:', leadRecord.step);
+                console.log('🔍 Last updated:', leadRecord.updatedAt);
+                
+                // Still return success so PayPlus doesn't retry
+                return createResponse(200, { 
+                    ok: true, 
+                    message: 'Lead already processed',
+                    leadId: leadId,
+                    leadAirtableId: leadAirtableId,
+                    alreadyPaid: true
+                });
+            }
+            
+            console.log('✅ Found exact lead record:', leadAirtableId);
             console.log('🔍 Current lead fields:', JSON.stringify(leadRecord, null, 2));
             console.log('🔍 Current step value:', leadRecord.step);
         } else {
-            console.warn(`❌ Lead with leadId ${leadId} not found. Proceeding with data from metadata.`);
+            console.error(`❌ Lead with leadId ${leadId} not found in Airtable.`);
+            console.error('This indicates a critical issue - the lead should exist before payment.');
+            console.error('🔍 Transaction UID:', transaction.uid);
+            console.error('🔍 PayPlus more_info:', transaction.more_info);
+            console.error('🔍 PayPlus more_info_1:', transaction.more_info_1);
+            
+            // Show available leads for debugging
             console.log('🔍 Available leads (first 5):');
             try {
                 const allLeads = await base('Leads').select({ maxRecords: 5 }).firstPage();
-                allLeads.forEach(lead => {
-                    console.log(`  - ID: ${lead.id}, leadId: ${lead.fields.leadId}, step: ${lead.fields.step}`);
-                });
+                if (allLeads.length === 0) {
+                    console.error('❌ No leads found in the Leads table at all!');
+                } else {
+                    allLeads.forEach(lead => {
+                        console.error(`  - ID: ${lead.id}, leadId: "${lead.fields.leadId}", step: ${lead.fields.step}`);
+                    });
+                }
             } catch (listError) {
                 console.warn('Could not list leads:', listError.message);
             }
+            
+            return createResponse(404, { 
+                ok: false, 
+                error: 'Lead not found', 
+                message: `Lead with leadId ${leadId} not found. Cannot process payment.` 
+            });
         }
     } catch (error) {
         console.error('❌ Error fetching lead from Airtable:', error);

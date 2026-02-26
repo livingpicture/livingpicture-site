@@ -1602,6 +1602,14 @@ async function completePurchase() {
             if (window.leadTracker && typeof window.leadTracker.trackStep === 'function') {
                 await window.leadTracker.trackStep('PENDING_PAYMENT', { orderId });
             }
+            
+            // CRITICAL: Clear localStorage to ensure fresh lead generation on next visit
+            console.log('🧹 Cleaning up localStorage before payment redirection...');
+            localStorage.removeItem('leadId');
+            localStorage.removeItem('memoryCreatorData');
+            localStorage.removeItem('livingPictureOrder');
+            console.log('✅ localStorage cleared - ready for fresh start on next visit');
+            
             // Redirect to PayPlus payment page
             window.location.href = result.paymentUrl;
         } else {
@@ -2047,6 +2055,13 @@ function saveAndContinueLater() {
 
     // Redirect to home page after a short delay
     setTimeout(() => {
+        // Clean up localStorage to ensure fresh start on next visit
+        console.log('🧹 Cleaning up localStorage before save-and-continue redirection...');
+        localStorage.removeItem('leadId');
+        localStorage.removeItem('memoryCreatorData');
+        localStorage.removeItem('livingPictureOrder');
+        console.log('✅ localStorage cleared - ready for fresh start on next visit');
+        
         window.location.href = 'index.html';
     }, 2000);
 }
