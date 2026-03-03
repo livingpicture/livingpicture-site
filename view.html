@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your LivingPicture</title>
+    <link rel="stylesheet" href="css/view.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <!-- Loading State -->
+    <div id="loading-state" class="state-container active">
+        <div class="loading-card">
+            <div class="logo-container">
+                <a href="index.html" class="logo">
+                    <img src="images/logo.svg" alt="LivingPicture" />
+                </a>
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <p class="loading-text">Preparing your LivingPicture...</p>
+        </div>
+    </div>
+
+    <!-- Not Ready State -->
+    <div id="not-ready-state" class="state-container">
+        <div class="card">
+            <div class="logo-container">
+                <a href="index.html" class="logo">
+                    <img src="images/logo.svg" alt="LivingPicture" />
+                </a>
+            </div>
+            <div class="content">
+                <h1>Your Video is Still Being Prepared</h1>
+                <p class="message">We're carefully creating your LivingPicture. This usually takes a few hours. Please check back soon.</p>
+                <button onclick="location.reload()" class="btn-primary">Check Again</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invalid Link State -->
+    <div id="invalid-state" class="state-container">
+        <div class="card">
+            <div class="logo-container">
+                <a href="index.html" class="logo">
+                    <img src="images/logo.svg" alt="LivingPicture" />
+                </a>
+            </div>
+            <div class="content">
+                <h1>Link Expired or Invalid</h1>
+                <p class="message">This link is no longer valid or has expired. Please contact support if you need assistance.</p>
+                <a href="index.html" class="btn-primary">Return Home</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ready State -->
+    <div id="ready-state" class="state-container">
+        <div class="card">
+            <div class="logo-container">
+                <a href="index.html" class="logo">
+                    <img src="images/logo.svg" alt="LivingPicture" />
+                </a>
+            </div>
+            
+            <div class="content">
+                <h1 id="video-title">Your LivingPicture</h1>
+                
+                <div class="video-container">
+                    <video 
+                        id="video-player"
+                        controls
+                        playsinline
+                        preload="metadata"
+                        class="video-player"
+                        poster="images/video-poster.jpg">
+                        <p>Your browser doesn't support HTML5 video.</p>
+                    </video>
+                </div>
+
+                <div class="actions">
+                    <button id="download-btn" class="btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    </button>
+                    
+                    <button id="share-btn" class="btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"></circle>
+                            <circle cx="6" cy="12" r="3"></circle>
+                            <circle cx="18" cy="19" r="3"></circle>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        </svg>
+                        Share
+                    </button>
+                </div>
+
+                <p class="share-text">
+                    You can share this link with family and friends ❤️
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <script src="js/view.js"></script>
+</body>
+</html>
