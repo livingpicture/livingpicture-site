@@ -124,7 +124,7 @@ exports.handler = async (event) => {
         });
 
         // Check fulfillment status
-        if (order.fulfillmentStatus !== 'READY') {
+        if (!['READY', 'DELIVERED'].includes(order.fulfillmentStatus)) {
             console.log(`⏳ Order not ready. Status: ${order.fulfillmentStatus}`);
             return createResponse(200, {
                 status: 'not_ready',
