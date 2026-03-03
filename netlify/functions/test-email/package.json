@@ -1,0 +1,9 @@
+{
+  "name": "test-email",
+  "version": "1.0.0",
+  "description": "Test email functionality",
+  "main": "test-email.js",
+  "dependencies": {
+    "resend": "^3.0.0"
+  }
+}
