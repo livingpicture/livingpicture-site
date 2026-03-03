@@ -74,7 +74,6 @@ exports.handler = async (event) => {
         // Update order with video information
         const updateFields = {
             videoUrl: videoUrl,
-            fulfillmentStatus: 'READY',
             videoReadyAt: new Date().toISOString()
         };
 
