@@ -38,20 +38,8 @@ class VideoViewManager {
         try {
             console.log(`🎬 Fetching video data for order: ${this.orderId}`);
             
-            const apiUrl = `https://livingpicture.netlify.app/.netlify/functions/get-order-view?orderId=${encodeURIComponent(this.orderId)}&t=${encodeURIComponent(this.token)}`;
-            
-            let response;
-            try {
-                // First attempt: direct fetch
-                response = await fetch(apiUrl);
-            } catch (corsError) {
-                console.log('🔄 CORS error detected, trying alternative method...');
-                // Second attempt: with mode and credentials
-                response = await fetch(apiUrl, {
-                    mode: 'cors',
-                    credentials: 'include'
-                });
-            }
+            // Use relative URL since frontend and functions are on the same Netlify site
+            const response = await fetch(`/.netlify/functions/get-order-view?orderId=${encodeURIComponent(this.orderId)}&t=${encodeURIComponent(this.token)}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -66,9 +54,7 @@ class VideoViewManager {
             console.error('💥 Error fetching video data:', error);
             
             // Show more specific error message
-            if (error.message.includes('CORS')) {
-                this.showError('CORS configuration issue. Please contact support.');
-            } else if (error.message.includes('404')) {
+            if (error.message.includes('404')) {
                 this.showError('Video service not available. Please try again later.');
             } else if (error.message.includes('403')) {
                 this.showError('Access denied. Link may be expired.');
