@@ -146,43 +146,13 @@ exports.handler = async (event) => {
             });
         }
 
-        // Extract Cloudinary public ID from video URL
-        let videoPublicId;
-        try {
-            // Parse Cloudinary URL to get public ID
-            const url = new URL(order.videoUrl);
-            const pathParts = url.pathname.split('/');
-            const uploadIndex = pathParts.indexOf('upload');
-            
-            if (uploadIndex !== -1) {
-                // Remove version number if present and get the rest
-                const remainingParts = pathParts.slice(uploadIndex + 2);
-                videoPublicId = remainingParts.join('/');
-                
-                // Remove file extension for Cloudinary operations
-                videoPublicId = videoPublicId.replace(/\.[^/.]+$/, '');
-            } else {
-                throw new Error('Invalid Cloudinary URL format');
-            }
-            
-            console.log(`🎥 Extracted video public ID: ${videoPublicId}`);
-        } catch (parseError) {
-            console.error(`❌ Failed to parse video URL:`, parseError);
-            return createResponse(500, { 
-                error: 'Invalid video URL format',
-                status: 'error'
-            });
-        }
-
-        // Generate secure signed URLs
-        console.log(`🔐 Generating signed URLs for video...`);
+        // Use the existing Cloudinary URL directly
+        console.log(`🎬 Using existing video URL: ${order.videoUrl}`);
         
-        const streamUrl = generateSignedUrl(videoPublicId, {
-            streaming_profile: 'full_hd',
-            quality: 'auto'
-        });
-
-        const downloadUrl = generateDownloadUrl(videoPublicId);
+        // For now, use the URL as-is for both streaming and download
+        // In production, you might want to generate separate download URLs
+        const streamUrl = order.videoUrl;
+        const downloadUrl = order.videoUrl;
 
         console.log(`✅ Generated secure URLs for order ${orderId}`);
 
