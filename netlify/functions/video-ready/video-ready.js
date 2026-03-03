@@ -118,7 +118,7 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
 
         const result = await resend.emails.send(emailContent);
         console.log(`📧 Email sent successfully to ${customerEmail}`);
-        return { success: true, messageId: result.data.id };
+        return { success: true, messageId: result.id };
         
     } catch (emailError) {
         console.error('💥 Error sending email:', emailError);
