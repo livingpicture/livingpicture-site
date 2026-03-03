@@ -93,7 +93,7 @@ curl -X POST https://your-site.netlify.app/.netlify/functions/video-ready \
 
 ### Access Video Page
 ```
-https://your-site.netlify.app/view.html?orderId=12345&t=jwt_token_here
+https://www.livingpicture.net/view.html?orderId=12345&t=jwt_token_here
 ```
 
 ## 🎨 Design Features

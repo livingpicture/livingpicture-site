@@ -87,6 +87,15 @@ body {
     width: auto;
 }
 
+.logo h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin: 0;
+    text-decoration: none;
+}
+
 /* Content Area */
 .content {
     padding: 40px;
@@ -268,6 +277,10 @@ h1 {
     
     .logo img {
         height: 32px;
+    }
+    
+    .logo h2 {
+        font-size: 24px;
     }
     
     .content {

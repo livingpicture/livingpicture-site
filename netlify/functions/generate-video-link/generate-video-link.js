@@ -78,7 +78,7 @@ exports.handler = async (event) => {
 
         // Generate secure token
         const token = generateVideoToken(orderId, customerEmail);
-        const videoUrl = `https://livingpicture.netlify.app/view.html?orderId=${encodeURIComponent(orderId)}&t=${encodeURIComponent(token)}`;
+        const videoUrl = `https://www.livingpicture.net/view.html?orderId=${encodeURIComponent(orderId)}&t=${encodeURIComponent(token)}`;
 
         console.log(`✅ Generated video link for order ${orderId}`);
 

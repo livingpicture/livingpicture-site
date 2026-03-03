@@ -38,7 +38,7 @@ class VideoViewManager {
         try {
             console.log(`🎬 Fetching video data for order: ${this.orderId}`);
             
-            const response = await fetch(`/.netlify/functions/get-order-view?orderId=${encodeURIComponent(this.orderId)}&t=${encodeURIComponent(this.token)}`);
+            const response = await fetch(`https://livingpicture.netlify.app/.netlify/functions/get-order-view?orderId=${encodeURIComponent(this.orderId)}&t=${encodeURIComponent(this.token)}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
