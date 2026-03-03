@@ -120,7 +120,9 @@ exports.handler = async (event) => {
             orderId: order.orderId,
             status: order.fulfillmentStatus,
             hasVideo: !!order.videoUrl,
-            customerName: order.customerName
+            videoUrl: order.videoUrl,
+            customerName: order.customerName,
+            allFields: Object.keys(order)
         });
 
         // Check fulfillment status
@@ -135,10 +137,12 @@ exports.handler = async (event) => {
 
         // Check if video exists
         if (!order.videoUrl) {
-            console.log(`❌ No video URL found for order ${orderId}`);
-            return createResponse(404, { 
-                error: 'Video not available',
-                status: 'no_video'
+            console.log(`⏳ No video URL found for order ${orderId} - showing not ready`);
+            return createResponse(200, {
+                status: 'not_ready',
+                message: 'Your video is still being prepared',
+                fulfillmentStatus: order.fulfillmentStatus,
+                reason: 'no_video_url'
             });
         }
 
