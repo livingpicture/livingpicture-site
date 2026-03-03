@@ -1,0 +1,9 @@
+{
+  "name": "test-jwt",
+  "version": "1.0.0",
+  "description": "Test JWT token validation",
+  "main": "test-jwt.js",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
+  }
+}

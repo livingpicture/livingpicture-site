@@ -1,0 +1,11 @@
+{
+  "name": "get-order-view",
+  "version": "1.0.0",
+  "description": "Get order view with JWT validation",
+  "main": "get-order-view.js",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "jsonwebtoken": "^9.0.2",
+    "cloudinary": "^1.41.0"
+  }
+}

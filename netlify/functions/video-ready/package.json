@@ -1,0 +1,10 @@
+{
+  "name": "video-ready",
+  "version": "1.0.0",
+  "description": "Mark video as ready and generate access link",
+  "main": "video-ready.js",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

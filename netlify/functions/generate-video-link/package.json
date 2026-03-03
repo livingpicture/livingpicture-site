@@ -1,0 +1,10 @@
+{
+  "name": "generate-video-link",
+  "version": "1.0.0",
+  "description": "Generate secure video link for customers",
+  "main": "generate-video-link.js",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

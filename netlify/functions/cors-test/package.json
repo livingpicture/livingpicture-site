@@ -1,0 +1,6 @@
+{
+  "name": "cors-test",
+  "version": "1.0.0",
+  "description": "Test CORS configuration",
+  "main": "cors-test.js"
+}
