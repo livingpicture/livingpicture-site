@@ -123,7 +123,16 @@ class VideoViewManager {
 
         videoPlayer.addEventListener('error', (e) => {
             console.error('🎥 Video error:', e);
-            this.showToast('Error loading video. Please try again.');
+            
+            // Try fallback to test video
+            if (!videoPlayer.src.includes('test-video')) {
+                console.log('🔄 Trying fallback test video...');
+                videoPlayer.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+                videoPlayer.load();
+                this.showToast('Original video unavailable, showing sample video.');
+            } else {
+                this.showToast('Error loading video. Please try again.');
+            }
         });
 
         // Load video

@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "@sendgrid/mail": "^7.7.0",
     "airtable": "^0.12.2",
     "cloudinary": "^2.9.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "resend": "^3.5.0"
   }
 }

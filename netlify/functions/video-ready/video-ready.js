@@ -1,6 +1,6 @@
 const Airtable = require('airtable');
 const jwt = require('jsonwebtoken');
-const sgMail = require('@sendgrid/mail');
+const { Resend } = require('resend');
 
 // Configure Airtable
 const base = new Airtable({
@@ -38,8 +38,8 @@ function generateVideoToken(orderId, customerEmail) {
 
 async function sendVideoReadyEmail(customerEmail, customerName, videoLink, orderId) {
     try {
-        // Initialize SendGrid
-        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+        // Initialize Resend
+        const resend = new Resend(process.env.RESEND_API_KEY);
         
         const firstName = customerName ? customerName.split(' ')[0] : 'Valued Customer';
         
@@ -116,9 +116,9 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
             `
         };
 
-        const result = await sgMail.send(emailContent);
+        const result = await resend.emails.send(emailContent);
         console.log(`📧 Email sent successfully to ${customerEmail}`);
-        return { success: true, messageId: result[0].headers['x-message-id'] };
+        return { success: true, messageId: result.data.id };
         
     } catch (emailError) {
         console.error('💥 Error sending email:', emailError);
