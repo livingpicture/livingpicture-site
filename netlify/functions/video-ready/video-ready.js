@@ -49,73 +49,68 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
                 email: process.env.SENDGRID_FROM_EMAIL || 'noreply@livingpicture.net',
                 name: 'LivingPicture'
             },
-            subject: '🎬 Your LivingPicture is Ready!',
+            subject: 'Your Living Picture is ready',
             html: `
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Your LivingPicture is Ready!</title>
+                    <title>Your Living Picture is ready</title>
                     <style>
-                        body { font-family: 'Playfair Display', serif, -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background-color: #f5f2ed; }
-                        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(44, 24, 16, 0.12); }
-                        .header { background: linear-gradient(135deg, #2c1810 0%, #8b7355 100%); color: white; padding: 40px 30px; text-align: center; }
-                        .header h1 { margin: 0; font-size: 32px; font-weight: 700; }
-                        .content { padding: 40px 30px; }
-                        .content h2 { color: #2c1810; font-size: 24px; margin-bottom: 20px; }
-                        .content p { color: #6b5d54; line-height: 1.6; margin-bottom: 20px; }
-                        .button { display: inline-block; background-color: #2c1810; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 500; margin: 20px 0; }
-                        .button:hover { background-color: #1a0e08; }
+                        body { font-family: 'Playfair Display', serif, -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background-color: #f5f2ed; line-height: 1.6; }
+                        .container { max-width: 600px; margin: 40px auto; background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(44, 24, 16, 0.12); }
+                        .header { background: linear-gradient(135deg, #2c1810 0%, #8b7355 100%); color: white; padding: 30px; text-align: center; }
+                        .logo { font-size: 24px; font-weight: 700; margin: 0; }
+                        .content { padding: 40px 30px; color: #2c1810; }
+                        .greeting { font-size: 18px; margin-bottom: 20px; }
+                        .body-text { margin-bottom: 20px; color: #6b5d54; }
+                        .video-link { display: inline-block; background-color: #2c1810; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 500; }
+                        .video-link:hover { background-color: #1a0e08; }
                         .footer { background-color: #f8f5f0; padding: 30px; text-align: center; color: #6b5d54; font-size: 14px; }
-                        .logo { font-size: 24px; font-weight: 700; color: white; margin-bottom: 10px; }
+                        .signature { font-style: italic; margin-top: 20px; }
                     </style>
                 </head>
                 <body>
                     <div class="container">
                         <div class="header">
                             <div class="logo">LivingPicture</div>
-                            <h1>🎬 Your LivingPicture is Ready!</h1>
                         </div>
                         <div class="content">
-                            <h2>Dear ${firstName},</h2>
-                            <p>Wonderful news! Your LivingPicture video has been completed and is ready for you to view, download, and share with your loved ones.</p>
-                            <p>We've carefully crafted your memories into a beautiful video that you can treasure forever.</p>
+                            <p class="greeting">Hi ${firstName},</p>
+                            <p class="body-text">Your Living Picture is ready.</p>
+                            <p class="body-text">We've carefully brought your memory back to life, and it's now available for you to view and download securely.</p>
                             <p style="text-align: center;">
-                                <a href="${videoLink}" class="button">Watch Your LivingPicture</a>
+                                <a href="${videoLink}" class="video-link">View your video here</a>
                             </p>
-                            <p><strong>Important:</strong> This secure link will expire in 7 days for your privacy and security. Please download your video to keep it permanently.</p>
-                            <p>You can share this link with family and friends so they can enjoy your LivingPicture as well!</p>
-                            <p>Thank you for choosing LivingPicture to preserve your precious memories.</p>
+                            <p class="body-text">You can share this link with family and friends.</p>
+                            <p class="body-text">The link will remain active for 7 days.</p>
+                            <p class="body-text">If you need anything or would like to create another Living Picture, we're here for you.</p>
+                            <p class="signature">With love,<br>The Living Picture Team</p>
                         </div>
                         <div class="footer">
-                            <p>With love and care,<br>The LivingPicture Team</p>
-                            <p style="font-size: 12px; margin-top: 20px;">
-                                Order ID: ${orderId}<br>
-                                If you have any questions, please don't hesitate to contact us.
-                            </p>
+                            <p style="font-size: 12px;">Order ID: ${orderId}</p>
                         </div>
                     </div>
                 </body>
                 </html>
             `,
             text: `
-                Your LivingPicture is Ready!
+                Hi ${firstName},
                 
-                Dear ${firstName},
+                Your Living Picture is ready.
                 
-                Wonderful news! Your LivingPicture video has been completed and is ready for you to view.
+                We've carefully brought your memory back to life, and it's now available for you to view and download securely.
                 
-                Watch your video here: ${videoLink}
+                View your video here: ${videoLink}
                 
-                This secure link will expire in 7 days, so please download your video to keep it permanently.
+                You can share this link with family and friends.
+                The link will remain active for 7 days.
                 
-                You can share this link with family and friends so they can enjoy your LivingPicture as well!
+                If you need anything or would like to create another Living Picture, we're here for you.
                 
-                Thank you for choosing LivingPicture to preserve your precious memories.
-                
-                With love and care,
-                The LivingPicture Team
+                With love,
+                The Living Picture Team
                 
                 Order ID: ${orderId}
             `
