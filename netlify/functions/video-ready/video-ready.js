@@ -45,10 +45,7 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
         
         const emailContent = {
             to: customerEmail,
-            from: {
-                email: process.env.SENDGRID_FROM_EMAIL || 'noreply@livingpicture.net',
-                name: 'LivingPicture'
-            },
+            from: process.env.RESEND_FROM_EMAIL || 'noreply@livingpicture.net',
             subject: 'Your Living Picture is ready',
             html: `
                 <!DOCTYPE html>

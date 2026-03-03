@@ -30,7 +30,7 @@ exports.handler = async (event) => {
         const resend = new Resend(process.env.RESEND_API_KEY);
         
         const result = await resend.emails.send({
-            from: 'noreply@livingpicture.net',
+            from: process.env.RESEND_FROM_EMAIL || 'noreply@livingpicture.net',
             to: 'ron.krishtul@gmail.com',
             subject: 'Test Email from LivingPicture',
             html: `
