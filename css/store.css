@@ -1315,6 +1315,21 @@ input[type="text"]:focus + .input-underline {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+/* Disabled state — visual only, click events still fire so errors can be shown */
+.btn-primary.btn-disabled {
+    background: #b0a090;
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-primary.btn-disabled:hover {
+    background: #b0a090;
+    transform: none;
+    box-shadow: none;
+}
+
 /* Secondary/Text Buttons - De-emphasized on mobile */
 .btn-text {
     background: none;

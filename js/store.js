@@ -342,11 +342,16 @@ function updateAllPrices() {
 function updateNextButton(buttonId, isEnabled) {
     const button = document.getElementById(buttonId);
     if (!button) return;
-    button.disabled = !isEnabled;
+    // Never use button.disabled — it blocks click events and prevents error messages from showing.
+    // Use only visual classes so the handler always fires and can display the appropriate error.
     if (isEnabled) {
         button.classList.remove('btn-disabled');
+        button.style.opacity = '';
+        button.style.cursor = '';
     } else {
         button.classList.add('btn-disabled');
+        button.style.opacity = '0.5';
+        button.style.cursor = 'not-allowed';
     }
 }
 
