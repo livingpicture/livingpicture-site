@@ -319,7 +319,7 @@ class VideoViewManager {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new VideoViewManager();
+    window.videoViewManager = new VideoViewManager();
 });
 
 // Handle browser back/forward navigation
@@ -329,6 +329,3 @@ window.addEventListener('popstate', () => {
         window.videoViewManager.fetchVideoData();
     }
 });
-
-// Store manager globally for access
-window.videoViewManager = new VideoViewManager();

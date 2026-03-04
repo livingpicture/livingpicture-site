@@ -127,9 +127,8 @@ exports.handler = async (event, context) => {
         }
     }
 
-    if (!await verifyTableSchema(AIRTABLE_ORDERS_TABLE)) {
-        return createResponse(500, { ok: false, error: 'Table Schema Error', message: 'paymentStatus field not found in Airtable Orders table' });
-    }
+    // Schema verification removed from hot path — verify manually in Airtable dashboard
+    // to avoid adding latency and burning API quota on every callback.
 
     let data;
     try {

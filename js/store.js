@@ -712,7 +712,7 @@ async function processFiles(files) {
                 
             } catch (uploadError) {
                 console.error(`❌ Cloudinary upload failed for ${file.name}:`, uploadError);
-                photo.uploadStatus = 'failed';
+                photo.uploadStatus = 'error';
                 photo.previewUrl = null;
                 failedCount++;
                 
@@ -830,9 +830,9 @@ function setupEventListeners() {
                         break;
                 }
                 
-                if (typeof showError === 'function') {
+                if (errorMessage && typeof showError === 'function') {
                     showError(errorMessage);
-                } else {
+                } else if (errorMessage) {
                     alert(errorMessage);
                 }
                 return;
@@ -1401,42 +1401,52 @@ function updateContinueToMusicButtonState() {
     const continueBtn = document.getElementById('next-to-music');
     if (!continueBtn) return;
 
-    // Clear any existing upload error if photos exist
-    if (photos.length > 0) {
-        clearUploadError();
-    }
-
     if (photos.length === 0) {
         updateNextButton('next-to-music', false);
-        continueBtn.innerHTML = 'Continue';
+        continueBtn.textContent = 'Continue';
+        continueBtn.style.opacity = '';
+        continueBtn.style.cursor = '';
+        // Don't proactively show an error here — only show it when the user clicks Continue
         return;
     }
+
+    // Photos exist — always clear any "no photos" error
+    clearUploadError();
 
     const uploadingCount = photos.filter(p => p.uploadStatus === 'uploading').length;
     const failedCount = photos.filter(p => p.uploadStatus === 'error').length;
     const uploadedCount = photos.filter(p => p.uploadStatus === 'uploaded').length;
 
     if (uploadingCount > 0) {
+        clearUploadError();
         uploadUIState.isUploading = true;
         updateNextButton('next-to-music', false);
-        const progressText = uploadUIState.uploadProgress.totalCount > 0 
-            ? `Uploading (${uploadUIState.uploadProgress.uploadedCount}/${uploadUIState.uploadProgress.totalCount})...`
-            : `Uploading ${uploadingCount}/${photos.length}...`;
-        continueBtn.innerHTML = `<span class="btn-spinner">${progressText}</span>`;
+        const progressText = uploadUIState.uploadProgress.totalCount > 0
+            ? `Uploading ${uploadUIState.uploadProgress.uploadedCount} of ${uploadUIState.uploadProgress.totalCount}...` 
+            : `Uploading ${uploadingCount} of ${photos.length}...`;
+        continueBtn.textContent = progressText;
+        continueBtn.style.opacity = '0.65';
+        continueBtn.style.cursor = 'not-allowed';
     } else if (failedCount > 0) {
         uploadUIState.isUploading = false;
         updateNextButton('next-to-music', false);
-        continueBtn.innerHTML = `Fix ${failedCount} error${failedCount > 1 ? 's' : ''} to continue`;
-        setUploadError('Upload failed. Please retry the failed photos to continue.');
+        continueBtn.textContent = `Fix ${failedCount} failed photo${failedCount > 1 ? 's' : ''} to continue`;
+        continueBtn.style.opacity = '';
+        continueBtn.style.cursor = '';
+        setUploadError('Some photos failed to upload. Please retry or remove them to continue.');
     } else if (uploadedCount === photos.length) {
         uploadUIState.isUploading = false;
         updateNextButton('next-to-music', true);
-        continueBtn.innerHTML = 'Continue';
+        continueBtn.textContent = 'Continue';
+        continueBtn.style.opacity = '';
+        continueBtn.style.cursor = '';
     } else {
         // Mixed or unknown state
         uploadUIState.isUploading = false;
         updateNextButton('next-to-music', false);
-        continueBtn.innerHTML = 'Processing...';
+        continueBtn.textContent = 'Processing...';
+        continueBtn.style.opacity = '0.65';
+        continueBtn.style.cursor = 'not-allowed';
     }
 }
 
@@ -1935,6 +1945,24 @@ function saveCurrentStep() {
                 }
             }
             break;
+        }
+        case 2: {
+            console.log(`🔍 Validating step 2 (photo upload)`);
+            const photos = formData.photos || [];
+            if (photos.length === 0) {
+                setUploadError('Please upload at least 1 photo to continue.');
+                return false;
+            }
+            if (uploadUIState.isUploading) {
+                setUploadError('Please wait for all photos to finish uploading.');
+                return false;
+            }
+            const allUploaded = photos.every(p => p.uploadStatus === 'uploaded');
+            if (!allUploaded) {
+                setUploadError('Some photos failed to upload. Please retry or remove them before continuing.');
+                return false;
+            }
+            return true;
         }
         case 3: {
             console.log(`🔍 Validating step 3 (music selection)`);
