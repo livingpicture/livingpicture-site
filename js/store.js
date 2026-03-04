@@ -1,8 +1,8 @@
 const PRICING_TIERS = [
-    { photos: '1-5', price: 1 },
+    { photos: '1-5', price: 20 },
     { photos: '6-15', price: 18 },
-    { photos: '16-25', price: 15 },
-    { photos: '26+', price: 12 },
+    { photos: '16-25', price: 16 },
+    { photos: '26+', price: 14 },
 ];
 
 let currentCurrency = 'ILS';
