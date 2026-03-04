@@ -447,7 +447,7 @@ function setupFileUpload() {
     }, true);
 }
 
-function validateMusicInputs() {
+function validateMusicInputs(showErrors = false) {
     // Check if "Let Us Choose" is selected (either via radio button or form data)
     if ((teamChooseRadio && teamChooseRadio.checked) || formData.music?.teamChoose) {
         updateNextButton('next-to-checkout', true);
@@ -461,7 +461,7 @@ function validateMusicInputs() {
     const isValid = !!(song && artist);
     updateNextButton('next-to-checkout', isValid);
     
-    // Handle error states for music inputs
+    // Only show red error highlights if explicitly requested (i.e. user clicked Continue)\n    if (!showErrors) return isValid;\n    \n    // Handle error states for music inputs
     if (songNameInput) {
         const songFormGroup = songNameInput.closest('.form-group');
         const songError = document.getElementById('song-name-error');
@@ -905,14 +905,14 @@ function setupEventListeners() {
         selectSongRadio.addEventListener('change', () => {
             updateMusicSelectionUI();
             // Validate when choose song is selected (to disable button if fields are empty)
-            validateMusicInputs();
+            clearMusicInputErrors(); // clear errors on switch, don't validate yet
         });
     }
     if (teamChooseRadio) {
         teamChooseRadio.addEventListener('change', () => {
             updateMusicSelectionUI();
             // Immediately validate when team choose is selected
-            validateMusicInputs();
+            clearMusicInputErrors(); // clear errors on switch, don't validate yet
         });
     }
 
@@ -923,7 +923,7 @@ function setupEventListeners() {
                 selectSongRadio.checked = true;
                 updateMusicSelectionUI();
                 // Validate when choose song is selected (to disable button if fields are empty)
-                validateMusicInputs();
+                clearMusicInputErrors(); // clear errors on switch, don't validate yet
             }
         });
     }
@@ -933,7 +933,7 @@ function setupEventListeners() {
                 teamChooseRadio.checked = true;
                 updateMusicSelectionUI();
                 // Immediately validate when team choose is selected
-                validateMusicInputs();
+                clearMusicInputErrors(); // clear errors on switch, don't validate yet
             }
         });
     }
@@ -1423,8 +1423,8 @@ function updateContinueToMusicButtonState() {
         uploadUIState.isUploading = true;
         updateNextButton('next-to-music', false);
         const progressText = uploadUIState.uploadProgress.totalCount > 0
-            ? `Uploading ${uploadUIState.uploadProgress.uploadedCount} of ${uploadUIState.uploadProgress.totalCount}...` 
-            : `Uploading ${uploadingCount} of ${photos.length}...`;
+            ? `Uploading… (${uploadUIState.uploadProgress.uploadedCount}/${uploadUIState.uploadProgress.totalCount})` 
+            : `Uploading… (0/${photos.length})`;
         continueBtn.textContent = progressText;
         continueBtn.style.opacity = '0.65';
         continueBtn.style.cursor = 'not-allowed';
@@ -1974,7 +1974,7 @@ function saveCurrentStep() {
 
                 // Validate the fields
                 if (!songName || !artistName) {
-                    validateMusicInputs();
+                    clearMusicInputErrors(); // clear errors on switch, don't validate yet
                     return false;
                 }
 
