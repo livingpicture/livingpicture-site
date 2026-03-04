@@ -75,7 +75,28 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
                                         <!-- Main Message -->
                                         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">Your Living Picture is ready.</p>
                                         
-                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 40px 0; line-height: 1.8;">View and download it securely using the button below. This link remains active for 7 days.</p>
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">We've carefully brought your memory back to life, and it's now available for you to view and download securely.</p>
+                                        
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">View your video here:</p>
+                                        
+                                        <!-- CTA Button -->
+                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 30px 0;">
+                                            <tr>
+                                                <td align="center" style="background-color: #2B2521; border-radius: 12px;">
+                                                    <a href="${videoLink}" style="display: inline-block; padding: 18px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: normal; color: #ffffff; text-decoration: none; border-radius: 12px; white-space: nowrap;">View Your Living Picture</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">You can share this link with family and friends.</p>
+                                        
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">The link will remain active for 7 days.</p>
+                                        
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 30px 0; line-height: 1.8;">If you need anything or would like to create another Living Picture, we're here for you.</p>
+                                        
+                                        <!-- Signature -->
+                                        <p style="font-family: Georgia, 'Times New Roman', serif; font-size: 16px; color: #2B2521; margin: 0 0 30px 0; line-height: 1.8; font-style: italic;">With love,</p>
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 40px 0; line-height: 1.8;">The Living Picture Team</p>
                                         
                                         ${customMessage ? `
                                         <!-- Custom Message Section -->
@@ -88,15 +109,6 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
                                             </tr>
                                         </table>
                                         ` : ''}
-                                        
-                                        <!-- CTA Button -->
-                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 40px 0;">
-                                            <tr>
-                                                <td align="center" style="background-color: #2B2521; border-radius: 12px;">
-                                                    <a href="${videoLink}" style="display: inline-block; padding: 18px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: normal; color: #ffffff; text-decoration: none; border-radius: 12px; white-space: nowrap;">View Your Living Picture</a>
-                                                </td>
-                                            </tr>
-                                        </table>
                                         
                                         <!-- Secondary Link -->
                                         <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 20px 0 40px 0;">
