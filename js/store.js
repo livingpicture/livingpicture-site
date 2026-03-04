@@ -461,7 +461,10 @@ function validateMusicInputs(showErrors = false) {
     const isValid = !!(song && artist);
     updateNextButton('next-to-checkout', isValid);
     
-    // Only show red error highlights if explicitly requested (i.e. user clicked Continue)\n    if (!showErrors) return isValid;\n    \n    // Handle error states for music inputs
+    // Only show red error highlights if explicitly requested (i.e. user clicked Continue)
+    if (!showErrors) return isValid;
+
+    // Handle error states for music inputs
     if (songNameInput) {
         const songFormGroup = songNameInput.closest('.form-group');
         const songError = document.getElementById('song-name-error');
@@ -897,8 +900,28 @@ function setupEventListeners() {
     });
 
     // Music validation
-    if (songNameInput) songNameInput.addEventListener('input', validateMusicInputs);
-    if (artistNameInput) artistNameInput.addEventListener('input', validateMusicInputs);
+    if (songNameInput) songNameInput.addEventListener('input', () => {
+        // While typing: clear the error if field now has content, but don't show new errors
+        if (songNameInput.value.trim()) {
+            const songFormGroup = songNameInput.closest('.form-group');
+            const songError = document.getElementById('song-name-error');
+            songFormGroup?.classList.remove('error');
+            songNameInput.classList.remove('error');
+            if (songError) songError.style.display = 'none';
+        }
+        // Update button enabled state silently
+        validateMusicInputs(false);
+    });
+    if (artistNameInput) artistNameInput.addEventListener('input', () => {
+        if (artistNameInput.value.trim()) {
+            const artistFormGroup = artistNameInput.closest('.form-group');
+            const artistError = document.getElementById('artist-name-error');
+            artistFormGroup?.classList.remove('error');
+            artistNameInput.classList.remove('error');
+            if (artistError) artistError.style.display = 'none';
+        }
+        validateMusicInputs(false);
+    });
 
     // Music selection radio buttons
     if (selectSongRadio) {
@@ -1624,11 +1647,8 @@ function updateMusicSelectionUI() {
         formData.music.teamChoose = false;
     }
 
-    // Update form data and validate
-    saveCurrentStep();
-
-    // Update button state using updateNextButton for consistency
-    const isValid = isTeamChoose || (songNameInput?.value.trim() && artistNameInput?.value.trim());
+    // Update button state only — never call saveCurrentStep() here, it triggers premature validation
+    const isValid = isTeamChoose || !!(songNameInput?.value.trim() && artistNameInput?.value.trim());
     updateNextButton('next-to-checkout', isValid);
 }
 
@@ -1972,9 +1992,9 @@ function saveCurrentStep() {
                 const songName = songNameInput ? songNameInput.value.trim() : '';
                 const artistName = artistNameInput ? artistNameInput.value.trim() : '';
 
-                // Validate the fields
+                // Validate the fields — show errors because user explicitly clicked Continue
                 if (!songName || !artistName) {
-                    clearMusicInputErrors(); // clear errors on switch, don't validate yet
+                    validateMusicInputs(true);
                     return false;
                 }
 
