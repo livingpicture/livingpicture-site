@@ -48,295 +48,125 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
             from: process.env.RESEND_FROM_EMAIL || 'noreply@livingpicture.net',
             subject: 'Your Living Picture is ready',
             html: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Your Living Picture is Ready</title>
-                    <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;500;600&display=swap');
-                        
-                        body { 
-                            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif; 
-                            margin: 0; 
-                            padding: 0; 
-                            background: linear-gradient(135deg, #f8f6f3 0%, #e8e2d8 100%);
-                            line-height: 1.6;
-                            color: #2c1810;
-                        }
-                        
-                        .container { 
-                            max-width: 650px; 
-                            margin: 30px auto; 
-                            background-color: #ffffff; 
-                            border-radius: 4px; 
-                            overflow: hidden; 
-                            box-shadow: 0 20px 60px rgba(44, 24, 16, 0.15);
-                            border: 1px solid rgba(139, 115, 85, 0.1);
-                        }
-                        
-                        .header { 
-                            background: linear-gradient(135deg, #1a0e08 0%, #2c1810 50%, #8b7355 100%); 
-                            color: white; 
-                            padding: 50px 40px; 
-                            text-align: center;
-                            position: relative;
-                            overflow: hidden;
-                        }
-                        
-                        .header::before {
-                            content: '';
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            right: 0;
-                            bottom: 0;
-                            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.15"/><circle cx="20" cy="60" r="0.5" fill="white" opacity="0.15"/><circle cx="80" cy="40" r="0.5" fill="white" opacity="0.15"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-                            opacity: 0.3;
-                        }
-                        
-                        .logo { 
-                            font-family: 'Playfair Display', serif;
-                            font-size: 32px; 
-                            font-weight: 700; 
-                            margin: 0; 
-                            letter-spacing: 2px;
-                            position: relative;
-                            z-index: 1;
-                        }
-                        
-                        .tagline {
-                            font-size: 14px;
-                            font-weight: 300;
-                            margin-top: 8px;
-                            opacity: 0.9;
-                            letter-spacing: 1px;
-                            position: relative;
-                            z-index: 1;
-                        }
-                        
-                        .content { 
-                            padding: 50px 40px; 
-                            color: #2c1810;
-                        }
-                        
-                        .greeting { 
-                            font-family: 'Playfair Display', serif;
-                            font-size: 24px; 
-                            margin-bottom: 25px; 
-                            color: #2c1810;
-                            font-weight: 400;
-                        }
-                        
-                        .body-text { 
-                            margin-bottom: 25px; 
-                            color: #5a4a3f; 
-                            font-size: 16px;
-                            line-height: 1.7;
-                        }
-                        
-                        .highlight-box {
-                            background: linear-gradient(135deg, #f8f6f3 0%, #e8e2d8 100%);
-                            border-left: 4px solid #8b7355;
-                            padding: 25px 30px;
-                            margin: 30px 0;
-                            border-radius: 0 4px 4px 0;
-                        }
-                        
-                        .cta-wrapper {
-                            text-align: center;
-                            margin: 40px 0;
-                        }
-                        
-                        .video-link { 
-                            display: inline-block; 
-                            background: linear-gradient(135deg, #2c1810 0%, #8b7355 100%); 
-                            color: white; 
-                            padding: 18px 45px; 
-                            text-decoration: none; 
-                            border-radius: 50px; 
-                            font-weight: 600; 
-                            font-size: 16px;
-                            letter-spacing: 0.5px;
-                            transition: all 0.3s ease;
-                            box-shadow: 0 8px 25px rgba(44, 24, 16, 0.3);
-                            position: relative;
-                            overflow: hidden;
-                        }
-                        
-                        .video-link::before {
-                            content: '';
-                            position: absolute;
-                            top: 0;
-                            left: -100%;
-                            width: 100%;
-                            height: 100%;
-                            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                            transition: left 0.5s;
-                        }
-                        
-                        .video-link:hover::before {
-                            left: 100%;
-                        }
-                        
-                        .video-link:hover { 
-                            transform: translateY(-2px);
-                            box-shadow: 0 12px 35px rgba(44, 24, 16, 0.4);
-                        }
-                        
-                        .info-grid {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr;
-                            gap: 20px;
-                            margin: 30px 0;
-                        }
-                        
-                        .info-item {
-                            background: #faf8f5;
-                            padding: 20px;
-                            border-radius: 8px;
-                            text-align: center;
-                            border: 1px solid rgba(139, 115, 85, 0.1);
-                        }
-                        
-                        .info-icon {
-                            font-size: 24px;
-                            margin-bottom: 10px;
-                        }
-                        
-                        .info-title {
-                            font-weight: 600;
-                            color: #2c1810;
-                            margin-bottom: 5px;
-                            font-size: 14px;
-                        }
-                        
-                        .info-text {
-                            font-size: 13px;
-                            color: #6b5d54;
-                        }
-                        
-                        .footer { 
-                            background: linear-gradient(135deg, #2c1810 0%, #1a0e08 100%); 
-                            padding: 40px; 
-                            text-align: center; 
-                            color: #e8e2d8; 
-                            font-size: 14px;
-                        }
-                        
-                        .signature { 
-                            font-family: 'Playfair Display', serif;
-                            font-style: italic; 
-                            margin-top: 20px;
-                            font-size: 18px;
-                            color: #ffffff;
-                        }
-                        
-                        .order-info {
-                            margin-top: 25px;
-                            padding-top: 25px;
-                            border-top: 1px solid rgba(232, 226, 216, 0.3);
-                            font-size: 12px;
-                            opacity: 0.8;
-                        }
-                        
-                        .social-links {
-                            margin-top: 20px;
-                        }
-                        
-                        .social-links a {
-                            color: #e8e2d8;
-                            text-decoration: none;
-                            margin: 0 10px;
-                            opacity: 0.8;
-                            transition: opacity 0.3s;
-                        }
-                        
-                        .social-links a:hover {
-                            opacity: 1;
-                        }
-                        
-                        @media (max-width: 600px) {
-                            .container { margin: 10px; }
-                            .header { padding: 40px 25px; }
-                            .content { padding: 35px 25px; }
-                            .info-grid { grid-template-columns: 1fr; }
-                            .video-link { padding: 15px 35px; font-size: 15px; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <div class="logo">LIVINGPICTURE</div>
-                            <div class="tagline">Preserving Memories, Creating Legacies</div>
-                        </div>
-                        <div class="content">
-                            <p class="greeting">Dear ${firstName},</p>
-                            
-                            <div class="highlight-box">
-                                <p class="body-text" style="margin: 0; font-size: 18px; color: #2c1810; font-weight: 500;">
-                                    🎬 Your Living Picture is ready for viewing
-                                </p>
-                            </div>
-                            
-                            <p class="body-text">
-                                After meticulous craftsmanship and attention to detail, we are delighted to present your completed Living Picture. Your memories have been transformed into a timeless video that you and your loved ones will treasure for generations to come.
-                            </p>
-                            
-                            <div class="cta-wrapper">
-                                <a href="${videoLink}" class="video-link">VIEW YOUR LIVING PICTURE</a>
-                            </div>
-                            
-                            <div class="info-grid">
-                                <div class="info-item">
-                                    <div class="info-icon">⏰</div>
-                                    <div class="info-title">SECURE ACCESS</div>
-                                    <div class="info-text">Link expires in 7 days</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-icon">👥</div>
-                                    <div class="info-title">SHARE WITH FAMILY</div>
-                                    <div class="info-text">Send to loved ones</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-icon">⬇️</div>
-                                    <div class="info-title">DOWNLOAD</div>
-                                    <div class="info-text">Save permanently</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-icon">📱</div>
-                                    <div class="info-title">ANY DEVICE</div>
-                                    <div class="info-text">Watch anywhere</div>
-                                </div>
-                            </div>
-                            
-                            <p class="body-text">
-                                This secure link provides exclusive access to your Living Picture. We encourage you to download your video for permanent safekeeping, as the link will expire after 7 days to maintain security and privacy.
-                            </p>
-                            
-                            <p class="body-text">
-                                Should you wish to create additional Living Pictures or require any assistance, our dedicated team is here to support you every step of the way.
-                            </p>
-                            
-                            <p class="signature">
-                                With warmest regards,<br>
-                                The Living Picture Team
-                            </p>
-                        </div>
-                        <div class="footer">
-                            <div>Thank you for trusting us with your precious memories</div>
-                            <div class="order-info">Order ID: ${orderId}</div>
-                            <div class="social-links">
-                                <a href="#">Website</a> • 
-                                <a href="#">Instagram</a> • 
-                                <a href="#">Contact</a>
-                            </div>
-                        </div>
-                    </div>
-                </body>
-                </html>
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F6F1EB; font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0;">
+                    <tr>
+                        <td align="center" style="padding: 20px 10px;">
+                            <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(58, 31, 20, 0.1);">
+                                
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #3A1F14 0%, #B08D57 100%); padding: 40px; text-align: center;">
+                                        <h1 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 28px; font-weight: bold; color: #ffffff; margin: 0; letter-spacing: 1px;">LIVINGPICTURE</h1>
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-weight: 300;">Preserving Memories, Creating Legacies</p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Content -->
+                                <tr>
+                                    <td style="padding: 40px; color: #2C2C2C;">
+                                        
+                                        <!-- Greeting -->
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 20px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">Dear ${firstName},</p>
+                                        
+                                        <!-- Main Message -->
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">Your memory has been beautifully brought back to life.</p>
+                                        
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 30px 0; line-height: 1.7;">After meticulous craftsmanship and attention to detail, we are delighted to present your completed Living Picture. Your memories have been transformed into a timeless film that you and your loved ones will treasure for generations to come.</p>
+                                        
+                                        <!-- CTA Button -->
+                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 30px 0;">
+                                            <tr>
+                                                <td align="center" style="background: linear-gradient(135deg, #3A1F14 0%, #5C3A2A 100%); border-radius: 30px; box-shadow: 0 4px 15px rgba(58, 31, 20, 0.2);">
+                                                    <a href="${videoLink}" style="display: inline-block; padding: 14px 28px; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 30px; white-space: nowrap;">Watch Your Film</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Info Section -->
+                                        <table border="0" cellspacing="0" cellpadding="0" width="100%" style="margin: 30px 0;">
+                                            <tr>
+                                                <td width="50%" style="padding: 0 10px 20px 0;" valign="top">
+                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
+                                                        <tr>
+                                                            <td align="center">
+                                                                <div style="font-size: 24px; margin-bottom: 8px;">⏰</div>
+                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">SECURE ACCESS</h4>
+                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Link expires in 7 days</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td width="50%" style="padding: 0 0 20px 10px;" valign="top">
+                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
+                                                        <tr>
+                                                            <td align="center">
+                                                                <div style="font-size: 24px; margin-bottom: 8px;">👥</div>
+                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">SHARE WITH FAMILY</h4>
+                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Send to loved ones</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td width="50%" style="padding: 0 10px 0 0;" valign="top">
+                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
+                                                        <tr>
+                                                            <td align="center">
+                                                                <div style="font-size: 24px; margin-bottom: 8px;">⬇️</div>
+                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">DOWNLOAD</h4>
+                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Save permanently</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td width="50%" style="padding: 0 0 0 10px;" valign="top">
+                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
+                                                        <tr>
+                                                            <td align="center">
+                                                                <div style="font-size: 24px; margin-bottom: 8px;">📱</div>
+                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">ANY DEVICE</h4>
+                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Watch anywhere</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Additional Information -->
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">This secure link provides exclusive access to your Living Picture. We encourage you to download your film for permanent safekeeping.</p>
+                                        
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 30px 0; line-height: 1.7;">Should you wish to create additional Living Pictures or require any assistance, our dedicated team is here to support you every step of the way.</p>
+                                        
+                                        <!-- Signature -->
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 10px 0; line-height: 1.7; font-style: italic;">With warmest regards,</p>
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0; line-height: 1.7; font-weight: 600;">The Living Picture Team</p>
+                                        
+                                    </td>
+                                </tr>
+                                
+                                <!-- Footer Divider -->
+                                <tr>
+                                    <td style="border-top: 1px solid #E8E2D8; height: 1px;"></td>
+                                </tr>
+                                
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="background-color: #FAFAFA; padding: 30px 40px; text-align: center;">
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">Order ID: ${orderId}</p>
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">This private link will remain active for 7 days.</p>
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">
+                                            <a href="mailto:support@livingpicture.net" style="color: #B08D57; text-decoration: none;">support@livingpicture.net</a>
+                                        </p>
+                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #8A7F75; margin: 20px 0 0 0; line-height: 1.6;">© 2026 LivingPicture. All rights reserved.</p>
+                                    </td>
+                                </tr>
+                                
+                            </table>
+                        </td>
+                    </tr>
+                </table>
             `,
             text: `
                 Hi ${firstName},
