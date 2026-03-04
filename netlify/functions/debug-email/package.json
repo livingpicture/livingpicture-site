@@ -1,0 +1,9 @@
+{
+  "name": "debug-email",
+  "version": "1.0.0",
+  "description": "Debug email functionality",
+  "main": "debug-email.js",
+  "dependencies": {
+    "resend": "^3.0.0"
+  }
+}
