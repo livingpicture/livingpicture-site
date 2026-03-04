@@ -745,75 +745,22 @@ async function processFiles(files) {
 
         // Enable Continue only when all photos have permanent URLs
         const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
+        if (!allPhotosUploaded && formData.photos.length > 0) {
+            console.error('Some photos are missing permanentUrl; keeping Continue disabled.');
+            showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
+        }
         
-        // Check file type first (fast check before hashing)
-        if (!file.type.startsWith('image/')) {
-            console.log('Skipping non-image file:', file.name);
-            continue;
-        }
-
-        // Generate file fingerprint (quick hash based on name, size, and last modified)
-        const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
-
-        // Check for duplicates
-        if (existingHashes.has(fileFingerprint)) {
-            console.log('Skipping duplicate file:', file.name);
-            continue;
-        }
-
-        // Mark as processed
-        existingHashes.add(fileFingerprint);
-
-        // Create photo object with temporary placeholder
-        const photo = {
-            id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-            previewUrl: null, // Will be set after Cloudinary upload
-            file: file,
-            name: file.name,
-            size: file.size,
-            fileFingerprint: fileFingerprint,
-            uploadStatus: 'uploading'
-        };
-
-        // Add to array immediately
-        formData.photos.push(photo);
-        newPhotos.push(photo);
-
-        try {
-            console.log(`☁️ Uploading ${file.name} to Cloudinary...`);
-            // Upload to Cloudinary (sequential - one at a time)
-            const uploadResult = await uploadToCloudinary(file);
-            
-            console.log(`✅ Upload successful for ${file.name}`);
-            
-            // Update photo with Cloudinary data and optimized thumbnail URL
-            photo.permanentUrl = uploadResult.secure_url;
-            photo.publicId = uploadResult.public_id;
-            photo.uploadStatus = 'uploaded';
-            
-            // Create optimized thumbnail URL using Cloudinary dynamic transformations (w_200,c_limit)
-            photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
-            
-        } catch (uploadError) {
-            console.error(`❌ Cloudinary upload failed for ${file.name}:`, uploadError);
-            photo.uploadStatus = 'failed';
-            photo.previewUrl = null;
-            failedCount++;
-            
-            // Show specific error for this upload
-            showError(`Failed to upload ${file.name}. Please check your connection and try again.`);
-        }
-
-        processed++;
+        // Reset upload state
+        uploadUIState.isUploading = false;
+        setUploadProgress(0, 0);
         
-        // Update progress after each file
-        updateProgress(processed, validFiles.length);
-        setUploadProgress(processed, validFiles.length);
-
-        // Update UI after each file is processed (sequential updates)
-        renderPhotoGrid();
         updateContinueToMusicButtonState();
-        updatePricingDisplay();
+        saveToLocalStorage();
+        setLoading(false);
+
+        // Track successful uploads
+        if (window.leadTracker) {
+            const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
             
             if (successfulUploads.length > 0) {
                 const folderPath = getCloudinaryFolderPath();
