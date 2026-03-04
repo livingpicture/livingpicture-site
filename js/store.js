@@ -53,8 +53,8 @@ const artistNameInput = document.getElementById('artist-name');
 const nextButtons = {
     'next-to-photos': 2,
     'next-to-music': 3,
-    'next-to-checkout': 4,
-    'complete-purchase': 'complete'
+    'next-to-checkout': 4
+    // 'complete-purchase' is intentionally excluded — it has its own dedicated event listener below
 };
 const backButtons = {
     'back-to-name': 1,
