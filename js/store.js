@@ -7,6 +7,16 @@ const PRICING_TIERS = [
 
 let currentCurrency = 'ILS';
 
+// UI State for photo upload
+let uploadUIState = {
+    uploadError: null,
+    isUploading: false,
+    uploadProgress: {
+        uploadedCount: 0,
+        totalCount: 0
+    }
+};
+
 // Store the current step and form data
 let currentStep = 1;
 const formData = {
@@ -612,6 +622,10 @@ async function processFiles(files) {
     setLoading(true);
     updateProgress(0, validFiles.length);
 
+    // Set upload state and track progress
+    uploadUIState.isUploading = true;
+    setUploadProgress(0, validFiles.length);
+
     // Lock the Continue button until Cloudinary uploads are done
     updateContinueToMusicButtonState();
 
@@ -710,6 +724,7 @@ async function processFiles(files) {
             
             // Update progress after each file
             updateProgress(processed, validFiles.length);
+            setUploadProgress(processed, validFiles.length);
 
             // Update UI after each file is processed (sequential updates)
             renderPhotoGrid();
@@ -720,7 +735,7 @@ async function processFiles(files) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        console.log(`🏁 Sequential upload completed. Success: ${processed - failedCount}, Failed: ${failedCount}`);
+        console.log(` Sequential upload completed. Success: ${processed - failedCount}, Failed: ${failedCount}`);
 
         // Final updates
         if (newPhotos.length > 0) {
@@ -730,18 +745,75 @@ async function processFiles(files) {
 
         // Enable Continue only when all photos have permanent URLs
         const allPhotosUploaded = formData.photos.length > 0 && formData.photos.every(p => !!p.permanentUrl);
-        if (!allPhotosUploaded && formData.photos.length > 0) {
-            console.error('Some photos are missing permanentUrl; keeping Continue disabled.');
-            showError('Some photos failed to upload. Please remove and re-add them (or check your connection) to continue.');
-        }
         
-        updateContinueToMusicButtonState();
-        saveToLocalStorage();
-        setLoading(false);
+        // Check file type first (fast check before hashing)
+        if (!file.type.startsWith('image/')) {
+            console.log('Skipping non-image file:', file.name);
+            continue;
+        }
 
-        // Track successful uploads
-        if (window.leadTracker) {
-            const successfulUploads = formData.photos.filter(photo => photo.uploadStatus === 'uploaded');
+        // Generate file fingerprint (quick hash based on name, size, and last modified)
+        const fileFingerprint = `${file.name}-${file.size}-${file.lastModified}`;
+
+        // Check for duplicates
+        if (existingHashes.has(fileFingerprint)) {
+            console.log('Skipping duplicate file:', file.name);
+            continue;
+        }
+
+        // Mark as processed
+        existingHashes.add(fileFingerprint);
+
+        // Create photo object with temporary placeholder
+        const photo = {
+            id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            previewUrl: null, // Will be set after Cloudinary upload
+            file: file,
+            name: file.name,
+            size: file.size,
+            fileFingerprint: fileFingerprint,
+            uploadStatus: 'uploading'
+        };
+
+        // Add to array immediately
+        formData.photos.push(photo);
+        newPhotos.push(photo);
+
+        try {
+            console.log(`☁️ Uploading ${file.name} to Cloudinary...`);
+            // Upload to Cloudinary (sequential - one at a time)
+            const uploadResult = await uploadToCloudinary(file);
+            
+            console.log(`✅ Upload successful for ${file.name}`);
+            
+            // Update photo with Cloudinary data and optimized thumbnail URL
+            photo.permanentUrl = uploadResult.secure_url;
+            photo.publicId = uploadResult.public_id;
+            photo.uploadStatus = 'uploaded';
+            
+            // Create optimized thumbnail URL using Cloudinary dynamic transformations (w_200,c_limit)
+            photo.previewUrl = uploadResult.secure_url.replace('/upload/', '/upload/w_200,c_limit/');
+            
+        } catch (uploadError) {
+            console.error(`❌ Cloudinary upload failed for ${file.name}:`, uploadError);
+            photo.uploadStatus = 'failed';
+            photo.previewUrl = null;
+            failedCount++;
+            
+            // Show specific error for this upload
+            showError(`Failed to upload ${file.name}. Please check your connection and try again.`);
+        }
+
+        processed++;
+        
+        // Update progress after each file
+        updateProgress(processed, validFiles.length);
+        setUploadProgress(processed, validFiles.length);
+
+        // Update UI after each file is processed (sequential updates)
+        renderPhotoGrid();
+        updateContinueToMusicButtonState();
+        updatePricingDisplay();
             
             if (successfulUploads.length > 0) {
                 const folderPath = getCloudinaryFolderPath();
@@ -787,19 +859,15 @@ function setupEventListeners() {
                 switch (currentStepNum) {
                     case 1:
                         errorMessage = 'Please enter a memory name before continuing.';
+                        showError(errorMessage);
                         break;
                     case 2:
-                        errorMessage = 'Please add at least one photo and wait for it to finish uploading before continuing.';
-                        // Show specific photo upload error
-                        const photoErrorElement = document.getElementById('photo-upload-error');
-                        if (photoErrorElement) {
-                            photoErrorElement.style.display = 'block';
-                            photoErrorElement.textContent = errorMessage;
-                        }
-                        // Scroll user back to the upload area
-                        const uploadArea = document.getElementById('drop-zone') || document.getElementById('photo-upload');
-                        if (uploadArea) {
-                            uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Handle photo upload step with specific validation
+                        const photos = formData.photos || [];
+                        if (photos.length === 0) {
+                            setUploadError('Please upload at least 1 photo to continue.');
+                        } else if (uploadUIState.isUploading) {
+                            setUploadError('Please wait until upload completes.');
                         }
                         break;
                     case 3:
@@ -1347,11 +1415,53 @@ function getCurrentStep() {
     return null;
 }
 
+// Show/hide upload error message
+function updateUploadErrorMessage() {
+    const errorElement = document.getElementById('photo-upload-error');
+    if (!errorElement) return;
+
+    if (uploadUIState.uploadError) {
+        errorElement.style.display = 'flex';
+        const errorText = errorElement.querySelector('span');
+        if (errorText) {
+            errorText.textContent = uploadUIState.uploadError;
+        }
+    } else {
+        errorElement.style.display = 'none';
+    }
+}
+
+// Set upload error and update UI
+function setUploadError(error) {
+    uploadUIState.uploadError = error;
+    updateUploadErrorMessage();
+}
+
+// Clear upload error
+function clearUploadError() {
+    uploadUIState.uploadError = null;
+    updateUploadErrorMessage();
+}
+
+// Update upload progress state
+function setUploadProgress(uploadedCount, totalCount) {
+    uploadUIState.uploadProgress = { uploadedCount, totalCount };
+}
+
 // Update the Continue to Music button state based on photo upload statuses
 function updateContinueToMusicButtonState() {
     const photos = formData.photos || [];
+    const continueBtn = document.getElementById('next-to-music');
+    if (!continueBtn) return;
+
+    // Clear any existing upload error if photos exist
+    if (photos.length > 0) {
+        clearUploadError();
+    }
+
     if (photos.length === 0) {
         updateNextButton('next-to-music', false);
+        continueBtn.innerHTML = 'Continue';
         return;
     }
 
@@ -1359,22 +1469,27 @@ function updateContinueToMusicButtonState() {
     const failedCount = photos.filter(p => p.uploadStatus === 'error').length;
     const uploadedCount = photos.filter(p => p.uploadStatus === 'uploaded').length;
 
-    const continueBtn = document.getElementById('next-to-music');
-    if (!continueBtn) return;
-
     if (uploadingCount > 0) {
+        uploadUIState.isUploading = true;
         updateNextButton('next-to-music', false);
-        continueBtn.textContent = `Uploading ${uploadingCount}/${photos.length}...`;
+        const progressText = uploadUIState.uploadProgress.totalCount > 0 
+            ? `Uploading (${uploadUIState.uploadProgress.uploadedCount}/${uploadUIState.uploadProgress.totalCount})...`
+            : `Uploading ${uploadingCount}/${photos.length}...`;
+        continueBtn.innerHTML = `<span class="btn-spinner">${progressText}</span>`;
     } else if (failedCount > 0) {
+        uploadUIState.isUploading = false;
         updateNextButton('next-to-music', false);
-        continueBtn.textContent = `Fix ${failedCount} error${failedCount > 1 ? 's' : ''} to continue`;
+        continueBtn.innerHTML = `Fix ${failedCount} error${failedCount > 1 ? 's' : ''} to continue`;
+        setUploadError('Upload failed. Please retry the failed photos to continue.');
     } else if (uploadedCount === photos.length) {
+        uploadUIState.isUploading = false;
         updateNextButton('next-to-music', true);
-        continueBtn.textContent = 'Continue';
+        continueBtn.innerHTML = 'Continue';
     } else {
         // Mixed or unknown state
+        uploadUIState.isUploading = false;
         updateNextButton('next-to-music', false);
-        continueBtn.textContent = 'Processing...';
+        continueBtn.innerHTML = 'Processing...';
     }
 }
 
