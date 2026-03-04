@@ -703,6 +703,14 @@ async function processFiles(files) {
             formData.photos.push(photo);
             newPhotos.push(photo);
 
+            // Update button text NOW, before the async upload starts
+            const continueBtn = document.getElementById('next-to-music');
+            if (continueBtn) {
+                continueBtn.textContent = `Uploading… (${processed + 1}/${validFiles.length})`;
+                continueBtn.style.opacity = '0.65';
+                continueBtn.style.cursor = 'not-allowed';
+            }
+
             try {
                 console.log(`☁️ Uploading ${file.name} to Cloudinary...`);
                 // Upload to Cloudinary (sequential - one at a time)
