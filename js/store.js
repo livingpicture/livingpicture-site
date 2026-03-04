@@ -805,17 +805,13 @@ function setupEventListeners() {
                 let errorMessage = '';
                 switch (currentStepNum) {
                     case 1:
+                        // saveCurrentStep() already highlights the field inline.
+                        // The shared showError() call below will show the toast once.
                         errorMessage = 'Please enter a memory name before continuing.';
-                        showError(errorMessage);
                         break;
                     case 2:
-                        // Handle photo upload step with specific validation
-                        const photos = formData.photos || [];
-                        if (photos.length === 0) {
-                            setUploadError('Please upload at least 1 photo to continue.');
-                        } else if (uploadUIState.isUploading) {
-                            setUploadError('Please wait until upload completes.');
-                        }
+                        // saveCurrentStep() already calls setUploadError() with the correct message.
+                        // Nothing extra needed here.
                         break;
                     case 3:
                         errorMessage = 'Please select a song or choose team selection before continuing.';
@@ -1192,7 +1188,7 @@ function updatePhotoGrid() {
     // Add photos to grid
     formData.photos.forEach(photo => {
         const isUploading = photo.uploadStatus === 'uploading';
-        const isFailed = photo.uploadStatus === 'failed';
+        const isFailed = photo.uploadStatus === 'error';
         const isSuccess = photo.uploadStatus === 'uploaded';
         const stateClass = isUploading ? 'is-uploading' : (isFailed ? 'is-error' : (isSuccess ? 'is-success' : ''));
         const overlay = isUploading
@@ -1273,7 +1269,7 @@ function renderPhotoGrid() {
     // Render all photos but only show the limited set initially
     photoGrid.innerHTML = formData.photos.map((photo, index) => {
         const isUploading = photo.uploadStatus === 'uploading';
-        const isFailed = photo.uploadStatus === 'failed';
+        const isFailed = photo.uploadStatus === 'error';
         const isSuccess = photo.uploadStatus === 'uploaded';
         const stateClass = isUploading ? 'is-uploading' : (isFailed ? 'is-error' : (isSuccess ? 'is-success' : ''));
         const overlay = isUploading
