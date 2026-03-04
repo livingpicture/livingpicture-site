@@ -48,118 +48,65 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
             from: process.env.RESEND_FROM_EMAIL || 'noreply@livingpicture.net',
             subject: 'Your Living Picture is ready',
             html: `
-                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F6F1EB; font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0;">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F6F1EA; font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0;">
                     <tr>
-                        <td align="center" style="padding: 20px 10px;">
-                            <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(58, 31, 20, 0.1);">
+                        <td align="center" style="padding: 40px 20px;">
+                            <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 0px; overflow: hidden;">
                                 
                                 <!-- Header -->
                                 <tr>
-                                    <td style="background: linear-gradient(135deg, #3A1F14 0%, #B08D57 100%); padding: 40px; text-align: center;">
-                                        <h1 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 28px; font-weight: bold; color: #ffffff; margin: 0; letter-spacing: 1px;">LIVINGPICTURE</h1>
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-weight: 300;">Preserving Memories, Creating Legacies</p>
+                                    <td style="background-color: #F6F1EA; padding: 50px 40px; text-align: center;">
+                                        <h1 style="font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: normal; color: #2B2521; margin: 0; letter-spacing: 3px;">LIVINGPICTURE</h1>
                                     </td>
+                                </tr>
+                                
+                                <!-- Gold Line Divider -->
+                                <tr>
+                                    <td style="border-top: 1px solid #B08D57; height: 1px;"></td>
                                 </tr>
                                 
                                 <!-- Content -->
                                 <tr>
-                                    <td style="padding: 40px; color: #2C2C2C;">
+                                    <td style="padding: 60px 40px; color: #2B2521;">
                                         
                                         <!-- Greeting -->
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 20px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">Dear ${firstName},</p>
+                                        <p style="font-family: Georgia, 'Times New Roman', serif; font-size: 18px; color: #2B2521; margin: 0 0 30px 0; line-height: 1.8;">Dear ${firstName},</p>
                                         
                                         <!-- Main Message -->
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">Your memory has been beautifully brought back to life.</p>
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">Your Living Picture is ready.</p>
                                         
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 30px 0; line-height: 1.7;">After meticulous craftsmanship and attention to detail, we are delighted to present your completed Living Picture. Your memories have been transformed into a timeless film that you and your loved ones will treasure for generations to come.</p>
+                                        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 40px 0; line-height: 1.8;">View and download it securely using the button below. This link remains active for 7 days.</p>
                                         
                                         <!-- CTA Button -->
-                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 30px 0;">
+                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 40px 0;">
                                             <tr>
-                                                <td align="center" style="background: linear-gradient(135deg, #3A1F14 0%, #5C3A2A 100%); border-radius: 30px; box-shadow: 0 4px 15px rgba(58, 31, 20, 0.2);">
-                                                    <a href="${videoLink}" style="display: inline-block; padding: 14px 28px; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 30px; white-space: nowrap;">Watch Your Film</a>
+                                                <td align="center" style="background-color: #2B2521; border-radius: 12px;">
+                                                    <a href="${videoLink}" style="display: inline-block; padding: 18px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: normal; color: #ffffff; text-decoration: none; border-radius: 12px; white-space: nowrap;">View Your Living Picture</a>
                                                 </td>
                                             </tr>
                                         </table>
                                         
-                                        <!-- Info Section -->
-                                        <table border="0" cellspacing="0" cellpadding="0" width="100%" style="margin: 30px 0;">
+                                        <!-- Secondary Link -->
+                                        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 20px 0 40px 0;">
                                             <tr>
-                                                <td width="50%" style="padding: 0 10px 20px 0;" valign="top">
-                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
-                                                        <tr>
-                                                            <td align="center">
-                                                                <div style="font-size: 24px; margin-bottom: 8px;">⏰</div>
-                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">SECURE ACCESS</h4>
-                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Link expires in 7 days</p>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
-                                                </td>
-                                                <td width="50%" style="padding: 0 0 20px 10px;" valign="top">
-                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
-                                                        <tr>
-                                                            <td align="center">
-                                                                <div style="font-size: 24px; margin-bottom: 8px;">👥</div>
-                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">SHARE WITH FAMILY</h4>
-                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Send to loved ones</p>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td width="50%" style="padding: 0 10px 0 0;" valign="top">
-                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
-                                                        <tr>
-                                                            <td align="center">
-                                                                <div style="font-size: 24px; margin-bottom: 8px;">⬇️</div>
-                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">DOWNLOAD</h4>
-                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Save permanently</p>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
-                                                </td>
-                                                <td width="50%" style="padding: 0 0 0 10px;" valign="top">
-                                                    <table border="0" cellspacing="0" cellpadding="0" width="100%" style="background-color: #FAFAFA; border-radius: 12px; padding: 20px;">
-                                                        <tr>
-                                                            <td align="center">
-                                                                <div style="font-size: 24px; margin-bottom: 8px;">📱</div>
-                                                                <h4 style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #2C2C2C; margin: 0 0 4px 0;">ANY DEVICE</h4>
-                                                                <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0; line-height: 1.5;">Watch anywhere</p>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
+                                                <td align="center">
+                                                    <a href="${videoLink}" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #666666; text-decoration: underline;">Or open in browser</a>
                                                 </td>
                                             </tr>
                                         </table>
                                         
-                                        <!-- Additional Information -->
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 20px 0; line-height: 1.7;">This secure link provides exclusive access to your Living Picture. We encourage you to download your film for permanent safekeeping.</p>
+                                        <!-- Footer -->
+                                        <table border="0" cellspacing="0" cellpadding="0" width="100%" style="margin-top: 60px;">
+                                            <tr>
+                                                <td align="center" style="padding: 30px 0 0 0; border-top: 1px solid #E8E8E8;">
+                                                    <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #888888; margin: 0 0 10px 0; line-height: 1.6;">Order ID: ${orderId}</p>
+                                                    <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #888888; margin: 0 0 10px 0; line-height: 1.6;">
+                                                        <a href="mailto:support@livingpicture.net" style="color: #888888; text-decoration: none;">support@livingpicture.net</a>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
                                         
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 30px 0; line-height: 1.7;">Should you wish to create additional Living Pictures or require any assistance, our dedicated team is here to support you every step of the way.</p>
-                                        
-                                        <!-- Signature -->
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0 0 10px 0; line-height: 1.7; font-style: italic;">With warmest regards,</p>
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px; color: #2C2C2C; margin: 0; line-height: 1.7; font-weight: 600;">The Living Picture Team</p>
-                                        
-                                    </td>
-                                </tr>
-                                
-                                <!-- Footer Divider -->
-                                <tr>
-                                    <td style="border-top: 1px solid #E8E2D8; height: 1px;"></td>
-                                </tr>
-                                
-                                <!-- Footer -->
-                                <tr>
-                                    <td style="background-color: #FAFAFA; padding: 30px 40px; text-align: center;">
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">Order ID: ${orderId}</p>
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">This private link will remain active for 7 days.</p>
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #8A7F75; margin: 0 0 15px 0; line-height: 1.6;">
-                                            <a href="mailto:support@livingpicture.net" style="color: #B08D57; text-decoration: none;">support@livingpicture.net</a>
-                                        </p>
-                                        <p style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #8A7F75; margin: 20px 0 0 0; line-height: 1.6;">© 2026 LivingPicture. All rights reserved.</p>
                                     </td>
                                 </tr>
                                 
