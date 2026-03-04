@@ -36,7 +36,7 @@ function generateVideoToken(orderId, customerEmail) {
     );
 }
 
-async function sendVideoReadyEmail(customerEmail, customerName, videoLink, orderId) {
+async function sendVideoReadyEmail(customerEmail, customerName, videoLink, orderId, customMessage = '') {
     try {
         // Initialize Resend
         const resend = new Resend(process.env.RESEND_API_KEY);
@@ -76,6 +76,18 @@ async function sendVideoReadyEmail(customerEmail, customerName, videoLink, order
                                         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 20px 0; line-height: 1.8;">Your Living Picture is ready.</p>
                                         
                                         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #2B2521; margin: 0 0 40px 0; line-height: 1.8;">View and download it securely using the button below. This link remains active for 7 days.</p>
+                                        
+                                        ${customMessage ? `
+                                        <!-- Custom Message Section -->
+                                        <table border="0" cellspacing="0" cellpadding="0" width="100%" style="margin: 0 0 40px 0;">
+                                            <tr>
+                                                <td style="padding: 25px 30px; background-color: #FAFAFA; border-left: 3px solid #B08D57;">
+                                                    <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #666666; margin: 0 0 12px 0; line-height: 1.6; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">A personal note from our team:</p>
+                                                    <p style="font-family: Georgia, 'Times New Roman', serif; font-size: 16px; color: #2B2521; margin: 0; line-height: 1.8; font-style: italic;">${customMessage}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        ` : ''}
                                         
                                         <!-- CTA Button -->
                                         <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 40px 0;">
@@ -215,7 +227,8 @@ exports.handler = async (event) => {
             order.customerEmail,
             order.customerName,
             videoLink,
-            orderId
+            orderId,
+            order.customMessage || ''
         );
 
         return createResponse(200, {
