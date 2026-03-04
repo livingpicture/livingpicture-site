@@ -149,10 +149,24 @@ exports.handler = async (event) => {
         // Use the existing Cloudinary URL directly
         console.log(`🎬 Using existing video URL: ${order.videoUrl}`);
         
-        // For now, use the URL as-is for both streaming and download
-        // In production, you might want to generate separate download URLs
-        const streamUrl = order.videoUrl;
-        const downloadUrl = order.videoUrl;
+        // Extract public ID from the Cloudinary URL for download URL generation
+        const cloudinaryUrl = order.videoUrl;
+        const publicIdMatch = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.\w+)?$/);
+        
+        let downloadUrl = cloudinaryUrl; // fallback to stream URL if extraction fails
+        
+        if (publicIdMatch) {
+            const publicId = publicIdMatch[1];
+            console.log(`🔍 Extracted public ID: ${publicId}`);
+            
+            // Generate proper download URL with attachment flag
+            downloadUrl = generateDownloadUrl(publicId);
+            console.log(`📥 Generated download URL: ${downloadUrl}`);
+        } else {
+            console.warn(`⚠️ Could not extract public ID from URL: ${cloudinaryUrl}`);
+        }
+        
+        const streamUrl = cloudinaryUrl;
 
         console.log(`✅ Generated secure URLs for order ${orderId}`);
 

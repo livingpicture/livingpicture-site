@@ -146,6 +146,11 @@ class VideoViewManager {
         downloadBtn.addEventListener('click', async () => {
             try {
                 console.log('⬇️ Starting video download...');
+                console.log('📥 Download URL:', downloadUrl);
+                
+                // Disable button during download
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Downloading...';
                 
                 // Create a temporary link element to force download
                 const link = document.createElement('a');
@@ -155,13 +160,37 @@ class VideoViewManager {
                 
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
                 
-                this.showToast('Download started!');
+                // Wait a moment before removing to ensure download starts
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    `;
+                }, 1000);
+                
+                this.showToast('Download started! Check your downloads folder.');
                 
             } catch (error) {
                 console.error('💥 Download error:', error);
                 this.showToast('Download failed. Please try again.');
+                
+                // Reset button state on error
+                downloadBtn.disabled = false;
+                downloadBtn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download
+                `;
             }
         });
     }
