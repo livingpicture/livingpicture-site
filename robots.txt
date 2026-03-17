@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# Sitemap (if you have one)
+# Sitemap: https://www.livingpicture.net/sitemap.xml
+
+# Block common non-content paths
+Disallow: /.netlify/
+Disallow: /netlify/functions/
+Disallow: /admin/
+Disallow: /*.json$
